@@ -1,42 +1,47 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using PetShop.Core;
 using PetShop.Shop;
+using PetShop.UI;
 
 namespace PetShop.Dev
 {
     /// <summary>
-    /// Flies a camera through a set of framed viewpoints and writes a PNG of each, so the
-    /// game can be looked at without anyone sitting in front of it.
+    /// Photographs the whole game — world, mechanics and every UI panel — so it can be
+    /// reviewed without launching it.
     ///
     /// Renders through an off-screen RenderTexture rather than ScreenCapture, because that
-    /// works in batch mode where there is no game view — which is how the editor-side
-    /// <c>SceneShot</c> drives it. The same component serves a normal player build.
+    /// works in batch mode where there is no game view. UI shots need a further trick: a
+    /// ScreenSpaceOverlay canvas is composited straight to the display and never appears in
+    /// a RenderTexture, so for those the canvas is temporarily rebound to the tour camera in
+    /// ScreenSpaceCamera mode and put back afterwards.
     ///
     ///   -tour &lt;dir&gt;   capture into that directory, then quit
     /// </summary>
     public class CameraTour : MonoBehaviour
     {
         public string OutputDir = "Screenshots";
-        public int    Width     = 1280;
-        public int    Height    = 720;
-        public float  WarmupSeconds = 2.5f;
+        public int    Width     = 1600;
+        public int    Height    = 900;
+        public float  WarmupSeconds = 3.5f;
 
-        public struct Shot
+        private enum Kind { World, Plan, Ui }
+
+        private struct Shot
         {
             public string  Name;
+            public Kind    Kind;
             public Vector3 Position;
             public Vector3 LookAt;
             public float   Fov;
-            public float   OrthoSize;   // > 0 renders orthographic, for plan views
-
-            public Shot(string name, Vector3 position, Vector3 lookAt, float fov = 60f, float orthoSize = 0f)
-            { Name = name; Position = position; LookAt = lookAt; Fov = fov; OrthoSize = orthoSize; }
+            public float   OrthoSize;
+            public Action  Setup;      // opens a panel / sets a state before the frame
+            public Action  Teardown;
         }
 
-        /// <summary>Reads -tour from the command line; returns false when it is absent.</summary>
         public static bool TryCreate(out CameraTour tour)
         {
             tour = null;
@@ -57,9 +62,6 @@ namespace PetShop.Dev
 
         private IEnumerator Start()
         {
-            // Let the shop generate, the NavMesh bake and a few customers appear.
-            // WaitForSeconds is fine here (batch mode still advances time), but guard against
-            // a world that never finished building.
             float waited = 0f;
             while (waited < WarmupSeconds)
             {
@@ -76,23 +78,27 @@ namespace PetShop.Dev
             cam.clearFlags      = CameraClearFlags.Skybox;
             cam.backgroundColor = new Color(0.10f, 0.12f, 0.16f);
             cam.nearClipPlane   = 0.05f;
-            cam.farClipPlane    = 600f;
+            cam.farClipPlane    = 900f;
 
             var rt  = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
             var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
 
-            int index = 0;
-            foreach (var shot in shots)
+            for (int index = 0; index < shots.Count; index++)
             {
+                var shot = shots[index];
+
                 cam.transform.position = shot.Position;
                 cam.transform.LookAt(shot.LookAt, Vector3.up);
-                cam.orthographic = shot.OrthoSize > 0f;
+                cam.orthographic = shot.Kind == Kind.Plan;
                 if (cam.orthographic) cam.orthographicSize = shot.OrthoSize;
                 else                  cam.fieldOfView      = shot.Fov;
 
-                // Two plain frames to let animation and transforms settle. Deliberately not
-                // WaitForEndOfFrame: that never fires in batch mode, where there is no screen
-                // to end a frame on, and the coroutine would hang forever.
+                bool uiShot = shot.Kind == Kind.Ui;
+                Canvas canvas = uiShot ? BindCanvas(cam) : null;
+
+                try { shot.Setup?.Invoke(); }
+                catch (Exception e) { Debug.LogWarning($"[Tour] setup for {shot.Name} failed: {e.Message}"); }
+
                 yield return null;
                 yield return null;
 
@@ -109,96 +115,196 @@ namespace PetShop.Dev
                 string file = Path.Combine(OutputDir, $"{index:00}_{shot.Name}.png");
                 File.WriteAllBytes(file, tex.EncodeToPNG());
                 Debug.Log($"[Tour] {file}");
-                index++;
+
+                try { shot.Teardown?.Invoke(); }
+                catch (Exception e) { Debug.LogWarning($"[Tour] teardown for {shot.Name} failed: {e.Message}"); }
+
+                if (canvas != null) RestoreCanvas(canvas);
             }
 
             Destroy(cam.gameObject);
             rt.Release();
 
-            // Marker the editor-side driver polls for, so it knows when to exit.
-            File.WriteAllText(Path.Combine(OutputDir, "_done.txt"), $"{index} shots\n");
-            Debug.Log($"[Tour] done — {index} shots in {OutputDir}");
+            File.WriteAllText(Path.Combine(OutputDir, "_done.txt"), $"{shots.Count} shots\n");
+            Debug.Log($"[Tour] done — {shots.Count} shots in {OutputDir}");
 
-            yield return new WaitForSeconds(0.3f);
-
-            // In a player build, quit. In the editor, SceneShot sees the _done marker and
-            // exits the editor itself — calling Application.Quit from editor play mode tears
-            // down the windowing system underneath Unity and crashes it on the way out.
+            yield return null;
             if (!Application.isEditor) Application.Quit();
         }
 
-        /// <summary>
-        /// Viewpoints derived from the live scene rather than hard-coded, so they stay framed
-        /// when the shop or the street is resized.
-        /// </summary>
+        // ── Canvas rebinding ────────────────────────────────────────────────────
+
+        private RenderMode _savedMode;
+        private Camera     _savedCamera;
+        private float      _savedPlane;
+
+        private Canvas BindCanvas(Camera cam)
+        {
+            var ui = FindAnyObjectByType<GameUI>();
+            var canvas = ui != null ? ui.Canvas : null;
+            if (canvas == null) return null;
+
+            _savedMode   = canvas.renderMode;
+            _savedCamera = canvas.worldCamera;
+            _savedPlane  = canvas.planeDistance;
+
+            canvas.renderMode    = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera   = cam;
+            canvas.planeDistance = 1f;
+            return canvas;
+        }
+
+        private void RestoreCanvas(Canvas canvas)
+        {
+            canvas.renderMode    = _savedMode;
+            canvas.worldCamera   = _savedCamera;
+            canvas.planeDistance = _savedPlane;
+        }
+
+        // ── Shot list ───────────────────────────────────────────────────────────
+
         private List<Shot> BuildShots()
         {
-            var gen = FindAnyObjectByType<ShopGenerator>();
-            float w  = gen != null ? gen.RoomWidth  : 20f;
-            float d  = gen != null ? gen.RoomDepth  : 16f;
-            float h  = gen != null ? gen.WallHeight : 4f;
-            Vector3 shop = gen != null ? gen.ShopCentre : Vector3.zero;
+            var gen  = FindAnyObjectByType<ShopGenerator>();
+            var ui   = FindAnyObjectByType<GameUI>();
+            var game = GameManager.Instance;
 
-            float front = shop.z + d * 0.5f;
+            float w = gen != null ? gen.RoomWidth  : 16f;
+            float d = gen != null ? gen.RoomDepth  : 12f;
+            float h = gen != null ? gen.WallHeight : 4f;
+            Vector3 shop  = gen != null ? gen.ShopCentre : Vector3.zero;
+            float front   = shop.z + d * 0.5f;
+            float yardEnd = gen != null ? gen.YardFrontZ : 17f;
+
+            Vector3 pens = PenCentre(out Vector3 firstPen);
+
             var shots = new List<Shot>
             {
-                // Kept inside the yard: viewpoints out on the pavement end up with a street
-                // tree or a lamp post filling the frame.
-                new("yard_from_gate",     new Vector3(shop.x + 14f, 7f, front + 5f),
-                                          new Vector3(shop.x + 6f, 1.5f, shop.z - 4f), 60f),
-                new("shopfront",          new Vector3(shop.x + 3.5f, 2.4f, front + 6f),
-                                          new Vector3(shop.x, 2.4f, front), 55f),
-                new("yard_wide",          new Vector3(shop.x + 30f, 9f, shop.z - 14f),
-                                          new Vector3(shop.x + 4f, 1f, shop.z - 2f), 62f),
-                new("interior_wide",      new Vector3(shop.x, h - 0.9f, shop.z + d * 0.5f - 1.5f),
-                                          new Vector3(shop.x, 0.8f, shop.z - d * 0.3f), 68f),
-                new("interior_counter",   new Vector3(shop.x + w * 0.22f, 1.9f, shop.z + 1.5f),
-                                          new Vector3(shop.x, 1.1f, shop.z - d * 0.45f), 55f),
-                new("interior_shelves",   new Vector3(shop.x + w * 0.30f, 1.65f, shop.z + d * 0.22f),
-                                          new Vector3(shop.x - w * 0.28f, 1.1f, shop.z - d * 0.32f), 62f),
-                new("interior_till",      new Vector3(shop.x + 2.2f, 1.7f, shop.z - d * 0.12f),
-                                          new Vector3(shop.x - 0.5f, 1.2f, shop.z - d * 0.42f), 50f),
+                // 00-15: the world. Sixteen of them, so the HUD lands on 16 as asked.
+                World("street_from_across", new Vector3(shop.x + 6f, 6.5f, yardEnd + 26f),
+                                            new Vector3(shop.x + 2f, 3f, front), 55f),
+                World("shopfront",          new Vector3(shop.x + 3.5f, 2.4f, front + 6f),
+                                            new Vector3(shop.x, 2.4f, front), 55f),
+                World("yard_from_gate",     new Vector3(shop.x + 13f, 6.5f, yardEnd - 2f),
+                                            new Vector3(shop.x + 6f, 1.5f, shop.z - 6f), 60f),
+                World("yard_wide",          new Vector3(shop.x + 32f, 10f, shop.z - 18f),
+                                            new Vector3(shop.x + 4f, 1f, shop.z - 2f), 62f),
+                World("garden",             new Vector3(shop.x + 12f, 3.2f, shop.z - 16f),
+                                            new Vector3(shop.x + 15f, 1.2f, shop.z - 11f), 55f),
+                World("paddock",            pens + new Vector3(-13f, 7f, -13f), pens + Vector3.up, 58f),
+                World("pen_close",          firstPen + new Vector3(0f, 1.9f, -4.2f),
+                                            firstPen + Vector3.up * 0.5f, 45f),
+                World("pergola",            pens + new Vector3(-9f, 2.2f, -11f),
+                                            pens + new Vector3(2f, 2.4f, 2f), 60f),
+                World("interior_wide",      new Vector3(shop.x, h - 1.1f, shop.z + d * 0.5f - 1.4f),
+                                            new Vector3(shop.x, 0.9f, shop.z - d * 0.35f), 68f),
+                World("interior_counter",   new Vector3(shop.x + 2.2f, 1.7f, shop.z - d * 0.10f),
+                                            new Vector3(shop.x - 0.5f, 1.2f, shop.z - d * 0.42f), 50f),
+                World("interior_shelves",   new Vector3(shop.x + w * 0.30f, 1.65f, shop.z + d * 0.22f),
+                                            new Vector3(shop.x - w * 0.28f, 1.1f, shop.z - d * 0.30f), 62f),
+                World("interior_pet_decor", new Vector3(shop.x - 1.5f, 1.6f, shop.z + 1.2f),
+                                            new Vector3(shop.x + w * 0.45f, 1.2f, shop.z + 2.4f), 55f),
+                World("roof_detail",        new Vector3(shop.x + 13f, 16f, front + 10f),
+                                            new Vector3(shop.x + 2f, 11f, shop.z), 45f),
+                World("player",             PlayerShot(out Vector3 playerLook), playerLook, 45f),
+                World("customer",           CustomerShot(out Vector3 custLook), custLook, 45f),
+                World("aerial",             shop + new Vector3(10f, 44f, -22f), shop + Vector3.forward * 4f, 60f),
             };
 
-            // A look at the pens, wherever they ended up
-            var pens = FindObjectsByType<PetShop.Pets.PetPen>(FindObjectsSortMode.None);
-            if (pens.Length > 0)
+            // 16 onwards: the interface, over an interior view.
+            Vector3 uiFrom = new(shop.x + 1.5f, 1.65f, shop.z + d * 0.5f - 2f);
+            Vector3 uiTo   = new(shop.x - 1f, 1.2f, shop.z - d * 0.4f);
+
+            shots.Add(Ui("hud", uiFrom, uiTo, null, null));
+
+            if (ui != null && ui.Stats != null)
             {
-                Vector3 centre = Vector3.zero;
-                foreach (var pen in pens) centre += pen.transform.position;
-                centre /= pens.Length;
-                shots.Add(new Shot("pens", centre + new Vector3(0f, 5.5f, -9f), centre, 58f));
-                shots.Add(new Shot("pen_close", pens[0].transform.position + new Vector3(0f, 1.6f, -3.2f),
-                                   pens[0].transform.position + Vector3.up * 0.4f, 45f));
+                shots.Add(Ui("ledger_shelves",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(0); }, ui.Stats.Hide));
+                shots.Add(Ui("ledger_animals",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(1); }, ui.Stats.Hide));
+                shots.Add(Ui("ledger_catalogue", uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(2); }, ui.Stats.Hide));
+                shots.Add(Ui("ledger_manage",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(3); }, ui.Stats.Hide));
             }
 
-            // Whatever the player is looking at
-            var player = GameObject.Find("Player");
-            if (player != null)
-                shots.Add(new Shot("player", player.transform.position + new Vector3(2.2f, 1.8f, 2.6f),
-                                   player.transform.position + Vector3.up * 1.1f, 45f));
+            if (ui != null && ui.Info != null)
+                shots.Add(Ui("info_panel", uiFrom, uiTo,
+                             () => ui.Info.Show(PenDescription()), ui.Info.Hide));
 
-            // A customer, if any are in
-            var customer = FindAnyObjectByType<PetShop.Customer.CustomerAI>();
-            if (customer != null)
-                shots.Add(new Shot("customer", customer.transform.position + new Vector3(1.6f, 1.7f, 2.2f),
-                                   customer.transform.position + Vector3.up * 1.0f, 42f));
+            if (ui != null && ui.Results != null && game != null)
+                shots.Add(Ui("day_results", uiFrom, uiTo,
+                             () => ui.Results.Show(game.Shop.GetCurrentDaySummary()), ui.Results.Hide));
 
-            shots.Add(new Shot("aerial", shop + new Vector3(0f, 40f, -18f), shop + Vector3.forward * 6f, 60f));
+            if (ui != null && ui.Pause != null)
+                shots.Add(Ui("pause_menu", uiFrom, uiTo,
+                             () => ui.Pause.Open(),
+                             () => { ui.Pause.Close(); Time.timeScale = 1f; }));
 
-            // Plan views for design review. Orthographic so distances read true — a
-            // perspective "top view" makes the far side of the block look smaller than it is.
-            Vector3 plot = new(0f, 0f, 0f);
-            shots.Add(new Shot("plan_yard", plot + Vector3.up * 90f, plot, 60f, orthoSize: 22f));
-            shots.Add(new Shot("plan_block", plot + new Vector3(0f, 140f, 18f),
-                               plot + new Vector3(0f, 0f, 18f), 60f, orthoSize: 46f));
-            shots.Add(new Shot("plan_city", plot + new Vector3(0f, 240f, 60f),
-                               plot + new Vector3(0f, 0f, 60f), 60f, orthoSize: 110f));
+            if (game != null && game.Build != null)
+                shots.Add(Ui("build_mode",
+                             new Vector3(shop.x + 9f, 3.4f, shop.z - 6f),
+                             new Vector3(shop.x + 13f, 0f, shop.z - 11f),
+                             () => game.Build.EnterBuildMode(BuildCatalog.Get(BuildCatalog.PetPen)),
+                             () => game.Build.ExitBuildMode()));
 
-            // A raking bird's-eye, which reads better than straight down for composition.
-            shots.Add(new Shot("city_oblique", plot + new Vector3(-70f, 80f, -60f),
-                               plot + new Vector3(10f, 0f, 30f), 55f));
+            // Plan views last: orthographic, so distances read true for design review.
+            Vector3 plot = Vector3.zero;
+            shots.Add(Plan("plan_yard",  plot + Vector3.up * 90f, plot, 22f));
+            shots.Add(Plan("plan_block", plot + new Vector3(0f, 140f, 20f), plot + new Vector3(0f, 0f, 20f), 48f));
+            shots.Add(Plan("plan_city",  plot + new Vector3(0f, 260f, 90f), plot + new Vector3(0f, 0f, 90f), 130f));
+            shots.Add(World("city_oblique", plot + new Vector3(-80f, 90f, -70f),
+                            plot + new Vector3(10f, 0f, 40f), 55f));
             return shots;
+        }
+
+        // ── Shot helpers ────────────────────────────────────────────────────────
+
+        private static Shot World(string name, Vector3 from, Vector3 to, float fov) =>
+            new() { Name = name, Kind = Kind.World, Position = from, LookAt = to, Fov = fov };
+
+        private static Shot Plan(string name, Vector3 from, Vector3 to, float size) =>
+            new() { Name = name, Kind = Kind.Plan, Position = from, LookAt = to, OrthoSize = size };
+
+        private static Shot Ui(string name, Vector3 from, Vector3 to, Action setup, Action teardown) =>
+            new() { Name = name, Kind = Kind.Ui, Position = from, LookAt = to, Fov = 60f,
+                    Setup = setup, Teardown = teardown };
+
+        private Vector3 PenCentre(out Vector3 firstPen)
+        {
+            var pens = FindObjectsByType<PetShop.Pets.PetPen>(FindObjectsSortMode.None);
+            if (pens.Length == 0) { firstPen = Vector3.zero; return Vector3.zero; }
+
+            Vector3 centre = Vector3.zero;
+            foreach (var pen in pens) centre += pen.transform.position;
+            firstPen = pens[0].transform.position;
+            return centre / pens.Length;
+        }
+
+        private string PenDescription()
+        {
+            var pen = FindAnyObjectByType<PetShop.Pets.PetPen>();
+            return pen != null ? pen.Describe() : "No pens.";
+        }
+
+        private Vector3 PlayerShot(out Vector3 lookAt)
+        {
+            var player = GameObject.Find("Player");
+            Vector3 at = player != null ? player.transform.position : Vector3.zero;
+            lookAt = at + Vector3.up * 1.1f;
+            return at + new Vector3(2.4f, 1.9f, 2.8f);
+        }
+
+        private Vector3 CustomerShot(out Vector3 lookAt)
+        {
+            var customer = FindAnyObjectByType<PetShop.Customer.CustomerAI>();
+            if (customer == null)
+            {
+                var assistant = FindAnyObjectByType<PetShop.Commerce.Assistant>();
+                Vector3 fallback = assistant != null ? assistant.transform.position : Vector3.zero;
+                lookAt = fallback + Vector3.up * 1.1f;
+                return fallback + new Vector3(1.8f, 1.8f, 2.4f);
+            }
+            Vector3 at = customer.transform.position;
+            lookAt = at + Vector3.up * 1.05f;
+            return at + new Vector3(1.7f, 1.8f, 2.3f);
         }
     }
 }

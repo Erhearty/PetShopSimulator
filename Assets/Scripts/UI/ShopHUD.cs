@@ -167,9 +167,13 @@ namespace PetShop.UI
                     new Vector2(x0, 0.30f), new Vector2(x0 + slot, 0.94f));
                 btn.onClick.AddListener(() => _game.Build.EnterBuildMode(BuildCatalog.Get(BuildCatalog.HotkeyOrder[index])));
 
-                UIFactory.Label("Name", btn.transform, def.DisplayName,
-                    new Vector2(0.03f, 0.40f), new Vector2(0.97f, 0.95f), 13f, UIFactory.Ink,
+                var caption = UIFactory.Label("Name", btn.transform, def.DisplayName,
+                    new Vector2(0.01f, 0.40f), new Vector2(0.99f, 0.95f), 13f, UIFactory.Ink,
                     TextAlignmentOptions.Center);
+                // Long names ("Window Wall") were clipping mid-word in a narrow slot.
+                caption.enableAutoSizing = true;
+                caption.fontSizeMin      = 9f;
+                caption.fontSizeMax      = 13f;
                 UIFactory.Label("Cost", btn.transform, $"€{def.Cost:N0}",
                     new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.42f), 14f, UIFactory.InkMuted,
                     TextAlignmentOptions.Center);
@@ -215,7 +219,7 @@ namespace PetShop.UI
                 
                 
                 "E  interact / restock\n" +
-                "1-4 or B  build mode\n" +
+                "1-8 or B  build mode\n" +
                 "LMB place · R rotate\n" +
                 "Middle-click  remove\n" +
                 "Enter  close up early\n" +

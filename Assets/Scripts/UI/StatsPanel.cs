@@ -86,6 +86,13 @@ namespace PetShop.UI
             _tabs.Add(btn);
         }
 
+        /// <summary>Select a tab by index. Used by the screenshot tour.</summary>
+        public void ShowTab(int index)
+        {
+            Refresh();
+            ShowPage(index);
+        }
+
         private void ShowPage(int index)
         {
             _shelvesPage.SetActive(index == 0);

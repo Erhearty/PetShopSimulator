@@ -26,6 +26,8 @@ namespace PetShop.UI
         /// a plain Transform in the middle of a UI hierarchy breaks RectTransform anchoring.</summary>
         public Transform CanvasRoot { get; private set; }
 
+        public Canvas Canvas { get; private set; }
+
         private GameManager _game;
         private BuildMode   _build;
 
@@ -50,6 +52,13 @@ namespace PetShop.UI
             var canvasGO = new GameObject("Canvas");
             var canvas   = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            // Explicit ordering: the HUD must sit above anything else that ever gets drawn,
+            // and overlay canvases are sorted by this rather than by hierarchy depth.
+            canvas.sortingOrder      = 100;
+            canvas.overrideSorting   = false;
+            canvas.pixelPerfect      = false;
+            Canvas = canvas;
 
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;

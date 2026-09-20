@@ -15,12 +15,19 @@ namespace PetShop.Core
         /// The City People cast, preferred over the generic bodies because the models are
         /// better and more varied. Paths are relative to Resources.
         /// </summary>
+        /// <summary>
+        /// The City People cast, preferred over the generic bodies because the models are
+        /// better and more varied.
+        ///
+        /// "city/casual_Female_G" is deliberately absent: that variant is in swimwear, which
+        /// looks like a bug when it walks into a pet shop in the middle of a city street. The
+        /// downtown set is the everyday-clothes equivalent.
+        /// </summary>
         public static readonly string[] CityPeople =
         {
-            "Packs/CityPeople/city/casual_Female_G",
-            "Packs/CityPeople/city/casual_Male_G",
             "Packs/CityPeople/downtown/casual_Female_K",
             "Packs/CityPeople/downtown/casual_Male_K",
+            "Packs/CityPeople/city/casual_Male_G",
             "Packs/CityPeople/elder/elder_Female_A",
             "Packs/CityPeople/little_kids/little_boy_B",
             "Packs/CityPeople/professions/Doctor_Male_B",

@@ -92,6 +92,8 @@ namespace PetShop.Shop
         [Header("City behind the street")]
         public float CityHalfWidth = 190f;
         public float BlockWidth    = 60f;
+        [Tooltip("Rows of blocks. The furthest must still fall inside the fog fade.")]
+        public int   CityRows      = 4;
 
         private static readonly string[] CityFill =
         {
@@ -303,7 +305,7 @@ namespace PetShop.Shop
 
             float firstBlockZ = FarPavementZ + 16f;
 
-            for (int row = 0; row < 3; row++)
+            for (int row = 0; row < CityRows; row++)
             {
                 float z0 = firstBlockZ + row * (blockDepth + crossRoad);
                 BuildCrossStreet(z0 - crossRoad * 0.5f);
@@ -340,9 +342,11 @@ namespace PetShop.Shop
                     if (size.x < 1f) return;
                     if (x + size.x > x0 + width + 4f) break;
 
-                    Track(ModelLibrary.Spawn(model, StreetRoot,
+                    var go = ModelLibrary.Spawn(model, StreetRoot,
                         new Vector3(x + size.x * 0.5f, 0f, z + (facing > 90f ? -size.z : size.z) * 0.5f),
-                        facing, ModelLibrary.Fit.Height, height));
+                        facing, ModelLibrary.Fit.Height, height);
+                    FadeWithDistance(go, row);
+                    Track(go);
 
                     x += size.x + Random(0.2f, 1.6f);
                     i++;
@@ -364,9 +368,11 @@ namespace PetShop.Shop
                     if (size.x < 1f) break;
                     if (z + size.x > z0 + depth - 6f) break;
 
-                    Track(ModelLibrary.Spawn(model, StreetRoot,
+                    var go = ModelLibrary.Spawn(model, StreetRoot,
                         new Vector3(x + (facing < 180f ? -size.z : size.z) * 0.5f, 0f, z + size.x * 0.5f),
-                        facing, ModelLibrary.Fit.Height, height));
+                        facing, ModelLibrary.Fit.Height, height);
+                    FadeWithDistance(go, row);
+                    Track(go);
 
                     z += size.x + Random(0.2f, 1.6f);
                 }
@@ -400,6 +406,31 @@ namespace PetShop.Shop
                     BuildingFacing, ModelLibrary.Fit.Height, height));
 
                 x += size.x;
+            }
+        }
+
+        /// <summary>
+        /// Washes distant blocks towards the fog colour and drops their shadows.
+        ///
+        /// Linear fog alone still leaves the far row reading as full-contrast buildings that
+        /// then vanish; tinting them as well makes the city recede instead of ending.
+        /// </summary>
+        private void FadeWithDistance(GameObject go, int row)
+        {
+            if (go == null || row <= 0) return;
+
+            float t = Mathf.Clamp01(row / (float)Mathf.Max(1, CityRows - 1)) * 0.72f;
+            Color haze = RenderSettings.fog ? RenderSettings.fogColor : new Color(0.74f, 0.81f, 0.89f);
+
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+            {
+                var block = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(block);
+                block.SetColor("_Color", Color.Lerp(Color.white, haze, t));
+                renderer.SetPropertyBlock(block);
+
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows    = false;
             }
         }
 

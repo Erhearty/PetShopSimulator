@@ -77,7 +77,9 @@ namespace PetShop.Shop
             Street.KerbZ         = YardFrontZ + 7f;
             Street.FarPavementZ  = Street.KerbZ + Street.RoadWidth + 6f;
             Street.ShopHalfWidth = YardWidth * 0.5f;
-            Street.HalfLength    = Mathf.Max(70f, YardWidth * 0.5f + 24f);
+            // The street has to reach roughly as far as the city blocks behind it, or the
+            // parade trails off into open ground while the skyline carries on.
+            Street.HalfLength    = Mathf.Max(120f, YardWidth * 0.5f + 60f);
             Street.WalkableHalf  = YardWidth * 0.5f;
             Street.Generate(ShopRoot);
 
@@ -556,11 +558,15 @@ namespace PetShop.Shop
                 RenderSettings.ambientGroundColor  = new Color(0.20f, 0.19f, 0.18f);
             }
 
+            // Fog is the distance fade: it has to finish before anything is clipped, or the
+            // far row of buildings ends on a hard edge instead of dissolving.
             RenderSettings.fog        = true;
             RenderSettings.fogMode    = FogMode.Linear;
-            RenderSettings.fogColor   = new Color(0.72f, 0.79f, 0.88f);
-            RenderSettings.fogStartDistance = 70f;
-            RenderSettings.fogEndDistance   = 320f;
+            // Matched to the skybox near the horizon: a fog colour that differs from the sky
+            // turns the far edge of the ground plane into a visible band.
+            RenderSettings.fogColor   = new Color(0.70f, 0.78f, 0.82f);
+            RenderSettings.fogStartDistance = 95f;
+            RenderSettings.fogEndDistance   = 400f;
 
             var sun = new GameObject("SunLight").AddComponent<Light>();
             sun.type            = LightType.Directional;
@@ -913,11 +919,22 @@ namespace PetShop.Shop
                 YardProp(hedge, parent, new Vector3(-hw + YRand(0.9f, 2.4f), 0.06f, z),
                          YRand(0f, 360f), YRand(0.8f, 1.3f));
 
+            // Scatter tufts over the open grass only. Without the shop test, tufts sprout
+            // through the shop floor and show up as weeds growing indoors.
+            var shopFootprint = new Rect(ShopCentre.x - RoomWidth * 0.5f - 1f,
+                                         ShopCentre.z - RoomDepth * 0.5f - 1f,
+                                         RoomWidth + 2f, RoomDepth + 2f);
+
             for (int i = 0; i < 40; i++)
             {
                 float x = YRand(-hw + 3f, hw - 3f), z = YRand(-hd + 6f, hd - 3f);
-                if (PaddockArea.Contains(new Vector2(x, z))) continue;
-                if (Mathf.Abs(z - PathZ) < 3f) continue;
+                var at = new Vector2(x, z);
+
+                if (PaddockArea.Contains(at))    continue;
+                if (shopFootprint.Contains(at))  continue;
+                if (Mathf.Abs(z - PathZ) < 3f)   continue;
+                if (z > YardDepth * 0.5f - ShopFrontMargin - 1f) continue;   // keep the forecourt clear
+
                 YardProp(grass, parent, new Vector3(x, 0f, z), YRand(0f, 360f), YRand(0.3f, 0.6f));
             }
         }
@@ -1100,7 +1117,9 @@ namespace PetShop.Shop
             cam.clearFlags      = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.10f, 0.12f, 0.16f);
             cam.nearClipPlane   = 0.1f;
-            cam.farClipPlane    = 200f;
+            // The city blocks run past z = 300. A 200 m far plane sliced them off in a hard
+            // straight line across the skyline; fog now takes over well before this.
+            cam.farClipPlane    = 900f;
             cam.fieldOfView     = 68f;   // a touch wide, which suits first person indoors
 
             // First person is the default view. The orbit camera is left in the project and
