@@ -101,13 +101,13 @@ preference profile generated at spawn:
 This makes pricing meaningful per-category rather than as a global slider, and makes the day-results
 bar breakdown feel earned.
 
-### 4. Breeding panel (MEDIUM)
+### 4. Breeding panel (MEDIUM) — ✅ DONE (sprint 5)
 `BreedingSystem.AdvanceDay` currently pairs at random. Add a modal (Tab → Animals → Breed) showing
 all adult pets. Player drags two compatible adults into slots; the pairing is locked in for tonight.
 Unpaired adults still breed randomly. Shows the expected offspring traits (midpoint of parents').
 This is the feature most requested in the Pet Shop Simulator community.
 
-### 5. Staff hiring UI (MEDIUM)
+### 5. Staff hiring UI (MEDIUM) — ✅ DONE (sprint 6)
 `GameManager._assistants` exists, but the player has no way to hire or fire. Add a "Staff" section
 to the Manage tab: a pool of 3 candidate cards (randomised name, service speed, daily wage), a hire
 button (deducts sign-on fee), a fire button (costs 0.5 rep per assistant — they talk). Show the
@@ -209,8 +209,8 @@ already spanned the doorway._
 | 2 | ✅ In-world price tags + pen health bars (visual polish, high payoff) |
 | 3 | ✅ Customer thought bubbles + satisfaction flash (feel) |
 | 4 | ✅ Restocking order system (core loop depth) |
-| 5 | Breeding panel ← **next** (customer preferences ✅) |
-| 6 | Staff hiring UI + shop expansion (late-game) |
+| 5 | ✅ Breeding panel + customer preferences |
+| 6 | ✅ Staff hiring UI · shop expansion ← **next** |
 
 ### Sprint 2–3 implementation notes
 
@@ -251,3 +251,25 @@ The loop is: order ahead cheaply, or pay a premium at the door.
 - Tour shot 29 (`29_delivery.png`) orders two pallets and forces them to land, so the mechanic is
   visible in the screenshot set.
 
+### Sprint 5–6 implementation notes — breeding planner and staff board
+
+- `PetPen` holds `PlannedA`/`PlannedB` for tonight. `HasValidPlan` re-checks that both animals are
+  still resident and still adult, so a plan naming a pet you sold this afternoon is quietly dropped
+  rather than breeding a ghost.
+- `BreedingSystem.AdvanceDay` breeds a locked pairing **guaranteed** and clears it; pens with no plan
+  still roll the 45% nightly chance. That guarantee is the reason to open the panel at all.
+- `BreedingPanel` (ledger → Animals → *Plan tonight's breeding*) steps through pens with two adults,
+  picks two into slots A and B, and previews the offspring from `BreedingSystem.DescribeExpected` —
+  species, rarity floor, the 5% upgrade chance, midpoint traits and a rough list price. The gate sign
+  in the yard reads "paired tonight" once a plan is set.
+- `StaffCandidate.Generate` produces three applicants each morning with a name, service speed, daily
+  wage and sign-on fee. Speed and wage correlate with ±15% noise, so bargains and duds both exist.
+- `StaffPanel` (ledger → Manage → *Staff board*) shows the three cards against the current payroll,
+  hires a named candidate (charging the sign-on fee) and lets a specific person go, not just whoever
+  was hired last. Firing costs 0.5 reputation.
+- `ShopManager.DailyWages` now sums the wages of the people actually employed
+  (`SetPayroll`), falling back to the flat rate for saves written before individual wages existed.
+- `Dev/BreedProbe.cs` runs at the end of every tour, after the last frame is captured: it locks a
+  pairing, runs the night, and asserts the baby arrived, the plan was cleared and a stale plan is
+  refused. Latest run: *plan valid True, bred True (2 → 3), cleared True, stale rejected True.*
+  This is the one gameplay path a screenshot cannot show.

@@ -232,6 +232,23 @@ Two ways to get stock, and the difference between them is the planning game:
 from the stockroom, what was spent). Orders still in transit at close of business arrive overnight
 rather than being lost; the stockroom persists via `SaveData.Warehouse`.
 
+## Breeding and staff
+
+**Breeding**: a pen holds one optional planned pairing (`PetPen.PlannedA/PlannedB`). A locked plan
+breeds **guaranteed** overnight and is then cleared; unpaired pens still roll `BreedChancePerNight`
+(45%). `HasValidPlan` re-checks residency and adulthood every time, so selling a parent silently
+voids the plan. The planner is `BreedingPanel`, reached from the ledger's Animals tab.
+
+**Staff**: three `StaffCandidate`s are generated every morning in `GameManager.StartDay`, each with
+a service speed, a daily wage and a sign-on fee. `StaffPanel` (ledger → Manage → Staff board) hires
+a *named* candidate and can let a *specific* person go. Wages are per person now —
+`ShopManager.DailyWages` sums `SetPayroll`, falling back to the flat `WagePerAssistant` only for
+saves written before that existed. Assistants still cap at three.
+
+`StaffCandidate.ServedPerMinute` is for balance maths, not the UI: a trading day is compressed into
+a few minutes, so "17 customers a minute" is arithmetically right and reads as nonsense. Show
+`ServiceSeconds` instead.
+
 ## Model scaling
 
 The Kenney kits are authored at wildly different scales — a furniture bookcase measures ~8.8
@@ -354,6 +371,8 @@ Assets/
     ├── Commerce/
     │   ├── ShopManager.cs          ← balance, reputation, sales log, rent, orders, CloseDay()
     │   ├── DeliveryCrate.cs        ← forecourt pallet from a supplier order; E to collect
+    │   ├── StaffCandidate.cs       ← a daily applicant: speed, wage, sign-on fee
+    │   ├── Assistant.cs            ← serves the queue at ServiceSeconds for DailyWage
     │   ├── ShelfUnit.cs            ← product lines, in-world price tag, stockroom restocking
     │   ├── ProductItem.cs          ← id, name, category, unitCost, basePrice
     │   └── ItemDatabase.cs         ← 14-product catalog built in code; asset is optional
@@ -369,13 +388,18 @@ Assets/
     │   ├── ShopHUD.cs              ← status bar, clock, shopper count, alerts, build palette
     │   ├── TitleScreen.cs          ← boot screen; Continue / New shop / Quit
     │   ├── PauseMenu.cs            ← Esc menu; sets Time.timeScale = 0
-    │   ├── StatsPanel.cs           ← the ledger (Tab): shelves, animals, catalogue
+    │   ├── StatsPanel.cs           ← the ledger (Tab): shelves, animals, catalogue, manage
+    │   ├── BreedingPanel.cs        ← choose tonight's pairing; previews the offspring
+    │   ├── StaffPanel.cs           ← three applicant cards vs. the current payroll
     │   ├── DayResultsPanel.cs      ← end-of-day books, revenue breakdown, advice
     │   ├── InfoPanel.cs            ← shelf / pen / books popup
     │   └── GameOverPanel.cs        ← bankruptcy screen with Restart
     │
     └── Dev/
-        └── ScreenshotCapture.cs    ← -screenshot support
+        ├── ScreenshotCapture.cs    ← -screenshot support
+        ├── CameraTour.cs           ← the 32-shot tour; HUD is fixed at shot 16
+        ├── NavProbe.cs             ← proves pavement → forecourt → door → till is walkable
+        └── BreedProbe.cs           ← proves a locked pairing breeds; runs after the last frame
 ```
 
 ## Key architecture rules

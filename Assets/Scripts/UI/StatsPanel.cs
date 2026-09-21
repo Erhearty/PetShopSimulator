@@ -27,6 +27,7 @@ namespace PetShop.UI
         private TMP_Text   _manageText;
         private readonly List<GameObject> _manageControls = new();
         private readonly List<GameObject> _orderControls  = new();
+        private readonly List<GameObject> _animalControls = new();
 
         /// <summary>Units per wholesale order — one pallet.</summary>
         private const int OrderSize = 12;
@@ -66,6 +67,7 @@ namespace PetShop.UI
 
             BuildManageControls(panel.transform);
             BuildOrderControls(panel.transform);
+            BuildAnimalControls(panel.transform);
 
             var close = UIFactory.Button("Close", panel.transform, "Close  (Tab)",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
@@ -108,12 +110,28 @@ namespace PetShop.UI
             _managePage.SetActive(index == 3);
             foreach (var control in _manageControls) control.SetActive(index == 3);
             foreach (var control in _orderControls)  control.SetActive(index == 2);
+            foreach (var control in _animalControls) control.SetActive(index == 1);
 
             for (int i = 0; i < _tabs.Count; i++)
             {
                 var image = _tabs[i].GetComponent<Image>();
                 if (image != null) image.color = i == index ? UIFactory.ButtonOn : UIFactory.ButtonBg;
             }
+        }
+
+        /// <summary>Way through to the breeding planner from the animals list.</summary>
+        private void BuildAnimalControls(Transform panel)
+        {
+            var breed = UIFactory.Button("PlanBreeding", panel, "Plan tonight's breeding",
+                new Vector2(0.05f, 0.015f), new Vector2(0.38f, 0.075f), 15f, UIFactory.ButtonOn);
+            breed.onClick.AddListener(() =>
+            {
+                // Every panel is a component on the canvas object, so no manager lookup.
+                var planner = GetComponent<BreedingPanel>();
+                Hide();
+                planner?.Show();
+            });
+            _animalControls.Add(breed.gameObject);
         }
 
         /// <summary>
@@ -154,17 +172,20 @@ namespace PetShop.UI
                 new Vector2(0.28f, 0.11f), new Vector2(0.50f, 0.18f), 15f);
             dearer.onClick.AddListener(() => { _game.AdjustPrices(0.1f); Refresh(); });
 
-            var hire = UIFactory.Button("Hire", panel, "Hire assistant",
-                new Vector2(0.52f, 0.11f), new Vector2(0.74f, 0.18f), 15f, UIFactory.ButtonOn);
-            hire.onClick.AddListener(() => { _game.HireAssistant(); Refresh(); });
-
-            var fire = UIFactory.Button("Fire", panel, "Let one go",
-                new Vector2(0.75f, 0.11f), new Vector2(0.95f, 0.18f), 15f);
-            fire.onClick.AddListener(() => { _game.FireAssistant(); Refresh(); });
+            // Hiring is a choice between named applicants now, so it gets its own board
+            // rather than a nameless "hire" button.
+            var staff = UIFactory.Button("StaffBoard", panel, "Staff board  —  hire and fire",
+                new Vector2(0.52f, 0.11f), new Vector2(0.95f, 0.18f), 15f, UIFactory.ButtonOn);
+            staff.onClick.AddListener(() =>
+            {
+                var board = GetComponent<StaffPanel>();
+                Hide();
+                board?.Show();
+            });
 
             _manageControls.AddRange(new[]
             {
-                cheaper.gameObject, dearer.gameObject, hire.gameObject, fire.gameObject
+                cheaper.gameObject, dearer.gameObject, staff.gameObject
             });
         }
 
@@ -219,8 +240,12 @@ namespace PetShop.UI
             sb.AppendLine();
 
             sb.AppendLine("<b>Staff</b>");
-            sb.AppendLine($"  {_game.StaffCount} assistant(s) at € {shop.WagePerAssistant:N0} a day each " +
+            sb.AppendLine($"  {_game.StaffCount} assistant(s) on the payroll " +
                           $"= <b>€ {shop.DailyWages:N0}</b> tonight.");
+            foreach (var member in _game.Staff)
+                if (member != null)
+                    sb.AppendLine($"    {member.StaffName,-18}€ {member.DailyWage,-8:N0}" +
+                                  $"one customer every {member.ServiceSeconds:0.#} s");
             sb.AppendLine("  Assistants work the till on their own, slower than you do.");
             sb.AppendLine(_game.StaffCount == 0
                 ? "  <color=#F27370>Nobody on the till — you must serve every customer yourself.</color>"

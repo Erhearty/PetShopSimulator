@@ -32,7 +32,18 @@ namespace PetShop.Commerce
             OnStaffChanged.Invoke(Staff);
         }
 
-        public float DailyWages => Staff * WagePerAssistant;
+        /// <summary>
+        /// Actual payroll, summed from the people you hired. Falls back to the flat rate for
+        /// a save loaded from before individual wages existed.
+        /// </summary>
+        public float DailyWages => _payroll > 0f ? _payroll : Staff * WagePerAssistant;
+
+        private float _payroll;
+
+        public void SetPayroll(float total)
+        {
+            _payroll = Mathf.Max(0f, total);
+        }
 
         // Events
         public UnityEvent<float>       OnBalanceChanged    = new();

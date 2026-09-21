@@ -29,6 +29,10 @@ namespace PetShop.Pets
         public bool NeedsCleaning => Cleanliness < 0.45f;
         public bool NeedsService => Count > 0 && (NeedsFeeding || NeedsCleaning);
 
+        /// <summary>Two adults the player has paired for tonight, if any.</summary>
+        public Pet PlannedA { get; private set; }
+        public Pet PlannedB { get; private set; }
+
         public UnityEvent<PetPen, Pet> OnPetAdded   = new();
         public UnityEvent<PetPen, Pet> OnPetRemoved = new();
         public UnityEvent<PetPen>      OnDayPassed  = new();
@@ -43,6 +47,30 @@ namespace PetShop.Pets
         private Transform  _cleanBar;
         private Renderer   _foodBarRenderer;
         private Renderer   _cleanBarRenderer;
+
+        // ── Breeding plan ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// A plan only holds while both animals are still here and still adult — one of them
+        /// may have been sold since the player set it.
+        /// </summary>
+        public bool HasValidPlan =>
+            PlannedA != null && PlannedB != null && PlannedA != PlannedB &&
+            _residents.Contains(PlannedA) && _residents.Contains(PlannedB) &&
+            PlannedA.IsAdult && PlannedB.IsAdult;
+
+        public void SetPlannedPair(Pet a, Pet b)
+        {
+            PlannedA = a;
+            PlannedB = b;
+            RefreshLabel();
+        }
+
+        public void ClearPlan()
+        {
+            PlannedA = PlannedB = null;
+            RefreshLabel();
+        }
 
         // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -251,8 +279,9 @@ namespace PetShop.Pets
             var shop  = GameManager.Instance != null ? GameManager.Instance.Shop : null;
             float ask = shop != null ? shop.PriceOf(best.SellPrice()) : best.SellPrice();
 
+            string plan = HasValidPlan ? "  ·  paired tonight" : string.Empty;
             _signLabel.SetText($"{PenSpecies}   € {ask:0.00}\n" +
-                               $"<size=75%>{_residents.Count} / {Capacity}  ·  {best.rarity}</size>");
+                               $"<size=75%>{_residents.Count} / {Capacity}  ·  {best.rarity}{plan}</size>");
             _signLabel.SetColour(RarityColour(best.rarity));
         }
 

@@ -20,6 +20,9 @@ namespace PetShop.Commerce
         [Header("Economics")]
         public float DailyWage = 55f;
 
+        /// <summary>Who they are, for notifications and the staff board.</summary>
+        public string StaffName = "Assistant";
+
         public CheckoutQueue Queue;
         public ShopManager   Shop;
 

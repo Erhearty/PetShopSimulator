@@ -175,8 +175,10 @@ namespace PetShop.Core
                 }
             }
             // You inherit one member of staff — without anyone on the till a new shop cannot
-            // trade at all while you are out in the yard.
-            HireAssistant();
+            // trade at all while you are out in the yard. Inherited, so no sign-on fee.
+            var inherited = StaffCandidate.Generate();
+            inherited.SignOnFee = 0f;
+            HireCandidate(inherited);
             Notify("Welcome to your pet shop! B to build, E to interact, Enter to close up.");
         }
 
@@ -403,6 +405,10 @@ namespace PetShop.Core
             IsModalOpen  = false;
             _dayElapsed  = 0f;
             IsDayRunning = true;
+
+            // A fresh set of applicants each morning gives the staff board a reason to be
+            // checked more than once.
+            RefreshCandidates();
             Spawner?.StartDay();
             OnDayStarted.Invoke(Shop.Day);
             Notify($"Day {Shop.Day} — open. Tonight: rent €{Shop.DailyRent:N0}" +
@@ -460,12 +466,50 @@ namespace PetShop.Core
 
         public int StaffCount => _assistants.Count;
 
+        /// <summary>Everyone currently on the payroll, for the staff board.</summary>
+        public IReadOnlyList<Assistant> Staff => _assistants;
+
         /// <summary>Hire one assistant. Their first day's wage is due at close, not now.</summary>
-        public bool HireAssistant()
+        /// <summary>The three people currently looking for work. Refreshed every morning.</summary>
+        public IReadOnlyList<StaffCandidate> Candidates => _candidates;
+
+        private readonly List<StaffCandidate> _candidates = new();
+
+        public void RefreshCandidates()
         {
+            _candidates.Clear();
+            for (int i = 0; i < 3; i++) _candidates.Add(StaffCandidate.Generate());
+        }
+
+        /// <summary>Total wages owed tonight, from the people actually on the payroll.</summary>
+        public float Payroll
+        {
+            get
+            {
+                float total = 0f;
+                foreach (var a in _assistants) if (a != null) total += a.DailyWage;
+                return total;
+            }
+        }
+
+        public bool HireAssistant() => HireCandidate(StaffCandidate.Generate());
+
+        /// <summary>Takes a named applicant on: pays their sign-on fee and puts them on the till.</summary>
+        public bool HireCandidate(StaffCandidate candidate)
+        {
+            if (candidate == null) return false;
+
             if (_assistants.Count >= 3)
             {
                 Notify("There is no room behind that counter for another assistant.");
+                return false;
+            }
+
+            if (candidate.SignOnFee > 0f &&
+                !Shop.ChangeBalance(-candidate.SignOnFee, $"Sign-on fee for {candidate.Name}"))
+            {
+                Notify($"You cannot cover {candidate.Name}'s €{candidate.SignOnFee:N0} sign-on fee.");
+                Audio?.PlaySfx("deny");
                 return false;
             }
 
@@ -475,24 +519,45 @@ namespace PetShop.Core
 
             var assistant = Assistant.Create(transform, station + offset, facing,
                                              Queue, Shop, _assistants.Count);
-            assistant.DailyWage = Shop.WagePerAssistant;
+            assistant.DailyWage      = candidate.DailyWage;
+            assistant.ServiceSeconds = candidate.ServiceSeconds;
+            assistant.StaffName      = candidate.Name;
             _assistants.Add(assistant);
 
+            _candidates.Remove(candidate);
+
             Shop.SetStaff(_assistants.Count);
-            Notify($"Hired an assistant — €{Shop.WagePerAssistant:N0} a day, {_assistants.Count} on the payroll.");
+            Shop.SetPayroll(Payroll);
+            Notify($"Hired {candidate.Name} — {candidate.SpeedWord} at the till, " +
+                   $"€{candidate.DailyWage:N0} a day, {_assistants.Count} on the payroll.");
             return true;
         }
 
         public bool FireAssistant()
         {
             if (_assistants.Count == 0) { Notify("There is nobody to let go."); return false; }
+            return FireAssistant(_assistants[_assistants.Count - 1]);
+        }
 
-            int last = _assistants.Count - 1;
-            if (_assistants[last] != null) Destroy(_assistants[last].gameObject);
-            _assistants.RemoveAt(last);
+        /// <summary>Lets one named member of staff go, rather than whoever happens to be last.</summary>
+        public bool FireAssistant(Assistant member)
+        {
+            if (member == null || !_assistants.Contains(member))
+            {
+                Notify("There is nobody to let go.");
+                return false;
+            }
+
+            string name = member.StaffName;
+            _assistants.Remove(member);
+            Destroy(member.gameObject);
 
             Shop.SetStaff(_assistants.Count);
-            Notify($"Let an assistant go — {_assistants.Count} left on the payroll.");
+            Shop.SetPayroll(Payroll);
+
+            // People talk: sacking staff costs you a little standing locally.
+            Shop.ChangeReputation(-0.5f);
+            Notify($"Let {name} go — {_assistants.Count} left on the payroll.");
             return true;
         }
 

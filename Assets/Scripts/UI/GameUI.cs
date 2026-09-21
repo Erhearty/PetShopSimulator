@@ -20,6 +20,8 @@ namespace PetShop.UI
         public GameOverPanel   GameOver  { get; private set; }
         public PauseMenu       Pause     { get; private set; }
         public StatsPanel      Stats     { get; private set; }
+        public BreedingPanel   Breeding  { get; private set; }
+        public StaffPanel      StaffBoard{ get; private set; }
         public TitleScreen     Title     { get; private set; }
 
         /// <summary>The canvas every panel lives under. Panels must parent here, not to GameUI:
@@ -35,6 +37,8 @@ namespace PetShop.UI
             (Results  != null && Results.IsOpen)  ||
             (Pause    != null && Pause.IsOpen)    ||
             (Stats    != null && Stats.IsOpen)    ||
+            (Breeding != null && Breeding.IsOpen) ||
+            (StaffBoard != null && StaffBoard.IsOpen) ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -73,6 +77,8 @@ namespace PetShop.UI
             Results  = canvasGO.AddComponent<DayResultsPanel>();
             GameOver = canvasGO.AddComponent<GameOverPanel>();
             Stats    = canvasGO.AddComponent<StatsPanel>();
+            Breeding   = canvasGO.AddComponent<BreedingPanel>();
+            StaffBoard = canvasGO.AddComponent<StaffPanel>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
 
@@ -81,6 +87,8 @@ namespace PetShop.UI
             Results.Build(canvasGO.transform, game);
             GameOver.Build(canvasGO.transform, game);
             Stats.Build(canvasGO.transform, game);
+            Breeding.Build(canvasGO.transform, game);
+            StaffBoard.Build(canvasGO.transform, game);
             Pause.Build(canvasGO.transform, game, audio);
 
             return canvas;
@@ -104,6 +112,8 @@ namespace PetShop.UI
         {
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
             if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
+            if (Breeding != null && Breeding.IsOpen) { Breeding.Hide();        return; }
+            if (StaffBoard != null && StaffBoard.IsOpen) { StaffBoard.Hide();   return; }
             if (Stats != null && Stats.IsOpen)     { Stats.Hide();           return; }
             if (Results != null && Results.IsOpen) return;   // must be dismissed with the button
             if (_game.IsGameOver) return;

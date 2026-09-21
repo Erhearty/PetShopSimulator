@@ -125,6 +125,9 @@ namespace PetShop.Dev
             Destroy(cam.gameObject);
             rt.Release();
 
+            // After the camera work: paths that cannot be photographed get checked instead.
+            Debug.Log(BreedProbe.Run());
+
             File.WriteAllText(Path.Combine(OutputDir, "_done.txt"), $"{shots.Count} shots\n");
             Debug.Log($"[Tour] done — {shots.Count} shots in {OutputDir}");
 
@@ -254,6 +257,15 @@ namespace PetShop.Dev
             shots.Add(Plan("plan_city",  plot + new Vector3(0f, 260f, 90f), plot + new Vector3(0f, 0f, 90f), 130f));
             shots.Add(World("city_oblique", plot + new Vector3(-80f, 90f, -70f),
                             plot + new Vector3(10f, 0f, 40f), 55f));
+
+            // Appended rather than slotted in with the other panels, so the HUD stays on 16.
+            if (ui != null && ui.Breeding != null)
+                shots.Add(Ui("breeding_panel", uiFrom, uiTo,
+                             () => ui.Breeding.Show(), ui.Breeding.Hide));
+
+            if (ui != null && ui.StaffBoard != null)
+                shots.Add(Ui("staff_board", uiFrom, uiTo,
+                             () => ui.StaffBoard.Show(), ui.StaffBoard.Hide));
 
             // Deliveries: order a pallet and force it to land so the forecourt loop is on film.
             if (game != null && gen != null)

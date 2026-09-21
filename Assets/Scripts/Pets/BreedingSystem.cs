@@ -64,6 +64,17 @@ namespace PetShop.Pets
                 pen.AdvanceDay();
 
                 if (!pen.HasSpace || pen.AdultCount < 2) continue;
+
+                // A pairing the player locked in is guaranteed — that is the point of
+                // choosing one. Unpaired pens still take their chances.
+                if (pen.HasValidPlan)
+                {
+                    var planned = Breed(pen.PlannedA, pen.PlannedB);
+                    pen.ClearPlan();
+                    if (planned != null && pen.AddPet(planned)) born.Add(planned);
+                    continue;
+                }
+
                 if (Random.value > BreedChancePerNight) continue;
 
                 var adults = new List<Pet>();
@@ -75,6 +86,30 @@ namespace PetShop.Pets
             }
             return born;
         }
+
+        /// <summary>
+        /// What the player is told to expect from a pairing. Traits land on the midpoint
+        /// before mutation, and rarity starts at the lower of the two parents.
+        /// </summary>
+        public static string DescribeExpected(Pet a, Pet b)
+        {
+            if (a == null || b == null) return "Pick two adults of the same species.";
+            if (a == b)                 return "Pick two different animals.";
+            if (a.species != b.species) return "They have to be the same species.";
+            if (!a.CanBreed || !b.CanBreed) return "Both parents have to be fully grown.";
+
+            var rarity = (Pet.Rarity)Mathf.Min((int)a.rarity, (int)b.rarity);
+            return $"Expected: a baby {a.species}, {rarity} or better " +
+                   $"({RarityUpgradeChance * 100f:0}% chance of a step up)\n" +
+                   $"temperament {(a.temperament + b.temperament) * 0.5f:0.00}   ·   " +
+                   $"energy {(a.energyLevel + b.energyLevel) * 0.5f:0.00}   ·   " +
+                   $"friendliness {(a.friendliness + b.friendliness) * 0.5f:0.00}\n" +
+                   $"list price around € {(a.basePrice + b.basePrice) * 0.5f:N0} before rarity and growth";
+        }
+
+        /// <summary>Whether these two can actually be paired.</summary>
+        public static bool CanPair(Pet a, Pet b) =>
+            a != null && b != null && a != b && a.species == b.species && a.CanBreed && b.CanBreed;
 
         /// <summary>Generate a random adult pet for starter stock.</summary>
         public static Pet GenerateRandom(Pet.Species species)
