@@ -100,6 +100,8 @@ namespace PetShop.Core
         /// <summary>Called by GameBootstrapper once the room and player exist.</summary>
         public void Begin()
         {
+            Shop?.OnDeliveryArrived.AddListener(OnDeliveryArrived);
+
             var save = SaveSystem.Load();
             if (save != null) LoadGame(save);
             else              NewGame();
@@ -124,6 +126,8 @@ namespace PetShop.Core
             if (!IsDayRunning || DayLengthSeconds <= 0f) return;
 
             _dayElapsed += Time.deltaTime;
+
+            Shop?.PollDeliveries(DayProgress);
 
             // Stop letting new customers in shortly before closing time
             if (Spawner != null && !Spawner.DoorsClosed && DayProgress > 0.88f)
@@ -222,19 +226,66 @@ namespace PetShop.Core
 
         // ── Interactions ──────────────────────────────────────────────────────
 
+        /// <summary>Orders a pallet of stock for a category, to arrive later today.</summary>
+        public bool OrderStock(ProductCategory category, int units)
+        {
+            if (Shop == null) return false;
+
+            float unitCost = Catalog != null ? Catalog.AverageUnitCost(category) : 3.2f;
+            var order = Shop.PlaceOrder(category, units, unitCost, DayProgress);
+            if (order == null)
+            {
+                Notify("Not enough money for that order.");
+                Audio?.PlaySfx("deny");
+                return false;
+            }
+
+            Notify($"Ordered {units} {category} units for €{order.Cost:N2} — the van is on its way.");
+            Audio?.PlaySfx("restock");
+            return true;
+        }
+
+        /// <summary>Puts the pallet on the forecourt and tells the player it has landed.</summary>
+        private void OnDeliveryArrived(SupplierOrder order)
+        {
+            Vector3 spot = Generator != null ? Generator.ForecourtPosition : Vector3.zero;
+            // Spread pallets out so two deliveries never stack in the same spot.
+            spot += new Vector3(UnityEngine.Random.Range(-2.4f, 2.4f), 0f, UnityEngine.Random.Range(-1f, 1.4f));
+
+            DeliveryCrate.Spawn(spot, order.Category, order.Units);
+            Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. Press E to collect.");
+            Audio?.PlaySfx("restock");
+        }
+
+        /// <summary>Carries a delivered pallet into the stockroom.</summary>
+        public void CollectDelivery(DeliveryCrate crate)
+        {
+            if (crate == null) return;
+
+            int units = crate.Collect(Shop);
+            Notify($"Collected {units} units — they are in the stockroom, ready to shelve.");
+            Audio?.PlaySfx("restock");
+        }
+
         public void RestockShelf(ShelfUnit shelf)
         {
             if (shelf == null) return;
 
-            float before = Shop.Balance;
-            float spent  = shelf.Restock(Shop, Catalog);
+            var result = shelf.Restock(Shop, Catalog);
 
-            if (spent <= 0f)
+            if (result.Units <= 0)
                 Notify(shelf.HasSpace ? "Not enough money to restock." : "Shelf is already full.");
+            else if (result.Spent <= 0.01f)
+                Notify($"Shelved {result.Units} {shelf.Category} units from the stockroom " +
+                       $"({Shop.Warehouse(shelf.Category)} left).");
+            else if (result.FromWarehouse > 0)
+                Notify($"Shelved {result.FromWarehouse} from the stockroom and bought {result.Units - result.FromWarehouse} " +
+                       $"at the cash-and-carry for €{result.Spent:N2}.");
             else
-                Notify($"Restocked {shelf.Category} for €{spent:N2}  (balance €{Shop.Balance:N0})");
+                Notify($"Restocked {shelf.Category} for €{result.Spent:N2} at cash-and-carry prices " +
+                       $"— ordering ahead is {(1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f:0}% cheaper.");
 
-            Audio?.PlaySfx(spent > 0f ? "restock" : "deny");
+            Audio?.PlaySfx(result.Units > 0 ? "restock" : "deny");
             OnInfoPanel.Invoke(shelf.Describe());
         }
 
@@ -493,6 +544,13 @@ namespace PetShop.Core
             foreach (var kvp in Shop.Stock)
                 data.Stock.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
 
+            foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
+            {
+                int units = Shop.Warehouse(category);
+                if (units > 0)
+                    data.Warehouse.Add(new SaveData.StockEntry { id = category.ToString(), qty = units });
+            }
+
             foreach (var entry in Grid.GetAllPlaced())
             {
                 if (entry.Data == null) continue;
@@ -539,6 +597,10 @@ namespace PetShop.Core
 
             foreach (var entry in data.Stock)
                 Shop.ChangeStock(entry.id, entry.qty);
+
+            foreach (var entry in data.Warehouse)
+                if (System.Enum.TryParse(entry.id, out ProductCategory category))
+                    Shop.AddToWarehouse(category, entry.qty);
 
             foreach (var item in data.PlacedObjects)
             {

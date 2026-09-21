@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using PetShop.Core;
+using PetShop.UI;
 
 namespace PetShop.Pets
 {
@@ -35,8 +36,13 @@ namespace PetShop.Pets
 
         private readonly List<Pet>        _residents = new();
         private readonly List<PetVisual>  _visuals   = new();
-        private Transform _visualRoot;
-        private Transform _upkeepRoot;
+        private Transform  _visualRoot;
+        private Transform  _upkeepRoot;
+        private WorldLabel _signLabel;
+        private Transform  _foodBar;
+        private Transform  _cleanBar;
+        private Renderer   _foodBarRenderer;
+        private Renderer   _cleanBarRenderer;
 
         // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -146,6 +152,110 @@ namespace PetShop.Pets
             return sb.ToString().TrimEnd();
         }
 
+        // ── Gate sign ───────────────────────────────────────────────────────────
+
+        private void Start()
+        {
+            BuildPenSign();
+            RefreshLabel();
+        }
+
+        /// <summary>
+        /// A sign on the gate plus two upkeep bars. The whole yard has to be readable from
+        /// the path without walking up to every pen and pressing E.
+        /// </summary>
+        private void BuildPenSign()
+        {
+            // Eye level, not scaled off the pen: any higher and the sign leaves the frame
+            // when you stand next to the gate (and hides above the pergola beams).
+            const float y = 1.32f;
+            _signLabel = WorldLabel.Create(transform, new Vector3(0f, y, PenSize * 0.5f),
+                                           "", 0.09f, UIFactory.Ink, width: 1.6f);
+
+            var barRoot = new GameObject("UpkeepBars").transform;
+            barRoot.SetParent(transform, false);
+            barRoot.localPosition = new Vector3(0f, y - 0.26f, PenSize * 0.5f - 0.005f);
+
+            _foodBar  = MakeBar(barRoot, -0.07f, out _foodBarRenderer);
+            _cleanBar = MakeBar(barRoot, -0.16f, out _cleanBarRenderer);
+        }
+
+        /// <summary>One track plus a fill that scales from its left edge.</summary>
+        private Transform MakeBar(Transform parent, float localY, out Renderer fillRenderer)
+        {
+            const float width = 0.62f, height = 0.055f;
+
+            var track = MeshBuilder.CreateBox(width, height, 0.015f,
+                MaterialFactory.Get("penBar_track", new Color(0.1f, 0.11f, 0.14f, 0.9f)), "BarTrack");
+            track.transform.SetParent(parent, false);
+            track.transform.localPosition = new Vector3(0f, localY, 0f);
+            Destroy(track.GetComponent<Collider>());
+
+            var fill = MeshBuilder.CreateBox(width, height * 0.72f, 0.015f,
+                MaterialFactory.Get("penBar_fill", Color.white), "BarFill");
+            fill.transform.SetParent(parent, false);
+            // Pivot on the left edge so scaling drains the bar rightwards.
+            fill.transform.localPosition = new Vector3(-width * 0.5f, localY, -0.008f);
+            Destroy(fill.GetComponent<Collider>());
+
+            fillRenderer = fill.GetComponent<Renderer>();
+            return fill.transform;
+        }
+
+        /// <summary>Scales and tints one bar without duplicating its material.</summary>
+        private void SetBar(Transform bar, Renderer renderer, float value01)
+        {
+            if (bar == null || renderer == null) return;
+
+            const float width = 0.62f;
+            float v = Mathf.Clamp01(value01);
+
+            Vector3 scale = bar.localScale;
+            bar.localScale    = new Vector3(width * v, scale.y, scale.z);
+            bar.localPosition = new Vector3(-width * 0.5f + width * v * 0.5f,
+                                            bar.localPosition.y, bar.localPosition.z);
+
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            block.SetColor("_Color", Color.Lerp(UIFactory.Bad, UIFactory.Good, v));
+            renderer.SetPropertyBlock(block);
+        }
+
+        private static Color RarityColour(Pet.Rarity rarity) => rarity switch
+        {
+            Pet.Rarity.Uncommon  => new Color(0.55f, 0.85f, 0.55f),
+            Pet.Rarity.Rare      => new Color(0.55f, 0.74f, 0.98f),
+            Pet.Rarity.Legendary => new Color(0.98f, 0.82f, 0.38f),
+            _                    => UIFactory.Ink
+        };
+
+        /// <summary>Species, asking price and condition — refreshed whenever the pen changes.</summary>
+        public void RefreshLabel()
+        {
+            if (_signLabel == null) return;
+
+            SetBar(_foodBar,  _foodBarRenderer,  FoodLevel);
+            SetBar(_cleanBar, _cleanBarRenderer, Cleanliness);
+
+            if (_residents.Count == 0)
+            {
+                _signLabel.SetText($"{PenSpecies} pen\n<size=75%>empty</size>");
+                _signLabel.SetColour(UIFactory.InkMuted);
+                return;
+            }
+
+            Pet best = _residents[0];
+            foreach (var p in _residents)
+                if (p.SellPrice() > best.SellPrice()) best = p;
+
+            var shop  = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            float ask = shop != null ? shop.PriceOf(best.SellPrice()) : best.SellPrice();
+
+            _signLabel.SetText($"{PenSpecies}   € {ask:0.00}\n" +
+                               $"<size=75%>{_residents.Count} / {Capacity}  ·  {best.rarity}</size>");
+            _signLabel.SetColour(RarityColour(best.rarity));
+        }
+
         // ── Visuals ─────────────────────────────────────────────────────────────
 
         private void RefreshVisuals()
@@ -161,6 +271,7 @@ namespace PetShop.Pets
             _visuals.Clear();
 
             RefreshUpkeepVisuals();
+            RefreshLabel();
 
             float inner = PenSize * 0.5f - 0.35f;
             for (int i = 0; i < _residents.Count; i++)

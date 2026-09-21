@@ -26,6 +26,10 @@ namespace PetShop.UI
         private GameObject _shelvesPage, _pensPage, _catalogPage, _managePage;
         private TMP_Text   _manageText;
         private readonly List<GameObject> _manageControls = new();
+        private readonly List<GameObject> _orderControls  = new();
+
+        /// <summary>Units per wholesale order — one pallet.</summary>
+        private const int OrderSize = 12;
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
@@ -44,12 +48,14 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
 
+            // Stops short of 0.78 so the Close button in the corner does not sit on the text.
             _headerText = UIFactory.Label("Header", panel.transform, "The ledger",
-                new Vector2(0.03f, 0.89f), new Vector2(0.97f, 0.97f), 24f, UIFactory.Ink);
+                new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f), 24f, UIFactory.Ink);
 
             _shelvesPage = MakePage(panel.transform, out _shelvesText);
             _pensPage    = MakePage(panel.transform, out _pensText);
             _catalogPage = MakePage(panel.transform, out _catalogText);
+            _catalogText.fontSize = 13f;
 
             _managePage = MakePage(panel.transform, out _manageText);
 
@@ -59,9 +65,10 @@ namespace PetShop.UI
             MakeTab(panel.transform, "Manage",    3, 4, () => ShowPage(3));
 
             BuildManageControls(panel.transform);
+            BuildOrderControls(panel.transform);
 
             var close = UIFactory.Button("Close", panel.transform, "Close  (Tab)",
-                new Vector2(0.38f, 0.02f), new Vector2(0.62f, 0.08f), 15f);
+                new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
             close.onClick.AddListener(Hide);
 
             _root.SetActive(false);
@@ -100,11 +107,39 @@ namespace PetShop.UI
             _catalogPage.SetActive(index == 2);
             _managePage.SetActive(index == 3);
             foreach (var control in _manageControls) control.SetActive(index == 3);
+            foreach (var control in _orderControls)  control.SetActive(index == 2);
 
             for (int i = 0; i < _tabs.Count; i++)
             {
                 var image = _tabs[i].GetComponent<Image>();
                 if (image != null) image.color = i == index ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+            }
+        }
+
+        /// <summary>
+        /// One order button per aisle. Ordering ahead is the cheap way to get stock; walking
+        /// up to a shelf and pressing E is the expensive way, so this is where the planning
+        /// happens.
+        /// </summary>
+        private void BuildOrderControls(Transform panel)
+        {
+            var categories = (ProductCategory[])System.Enum.GetValues(typeof(ProductCategory));
+            float w = 0.9f / categories.Length;
+
+            for (int i = 0; i < categories.Length; i++)
+            {
+                ProductCategory category = categories[i];
+                float x = 0.05f + i * w;
+
+                var btn = UIFactory.Button($"Order_{category}", panel,
+                    $"Order {OrderSize} {category}", new Vector2(x, 0.015f),
+                    new Vector2(x + w - 0.012f, 0.075f), 14f);
+                btn.onClick.AddListener(() =>
+                {
+                    _game.OrderStock(category, OrderSize);
+                    Refresh();
+                });
+                _orderControls.Add(btn.gameObject);
             }
         }
 
@@ -294,6 +329,28 @@ namespace PetShop.UI
                     sb.AppendLine($"{p.displayName,-20}{p.category,-13}" +
                                   $"{"€ " + p.unitCost.ToString("N2"),-10}{"€ " + p.basePrice.ToString("N2"),-10}" +
                                   $"<color=#73DB95>€ {p.DefaultMargin:N2}</color>");
+
+            sb.AppendLine();
+            sb.AppendLine("<color=#9FB2C4>Stockroom and deliveries</color>");
+
+            var shop = _game.Shop;
+            if (shop != null)
+            {
+                foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
+                {
+                    float unit  = catalog != null ? catalog.AverageUnitCost(category) : 3.2f;
+                    float order = unit * ShopManager.WholesaleDiscount * OrderSize;
+                    int   ready = shop.Warehouse(category);
+
+                    sb.AppendLine($"{category,-20}{ready + " in stockroom",-18}" +
+                                  $"{"€ " + order.ToString("N2") + " per " + OrderSize,-20}" +
+                                  $"<color=#9FB2C4>vs € {unit * ShopManager.EmergencyMarkup * OrderSize:N2} at the door</color>");
+                }
+
+                foreach (var order in shop.Orders)
+                    sb.AppendLine($"<color=#F0C46A>on the van: {order.Units} {order.Category} " +
+                                  $"— arriving around {Mathf.Lerp(9f, 18f, order.ArrivalProgress):0}:00</color>");
+            }
 
             sb.AppendLine();
             sb.AppendLine("<color=#9FB2C4>Animals</color>");

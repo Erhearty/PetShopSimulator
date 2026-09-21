@@ -19,6 +19,7 @@ namespace PetShop.UI
         private BuildMode   _build;
 
         private TMP_Text _balanceLabel;
+        private TMP_Text _tickerLabel;
         private TMP_Text _dayLabel;
         private TMP_Text _repLabel;
         private TMP_Text _rentLabel;
@@ -75,7 +76,11 @@ namespace PetShop.UI
                                       UIFactory.BarBg, new Vector2(0f, -54f), Vector2.zero);
 
             _balanceLabel = UIFactory.Label("Balance", bar.transform, "€ 0",
-                new Vector2(0.012f, 0f), new Vector2(0.22f, 1f), 24f, UIFactory.Good);
+                new Vector2(0.012f, 0.40f), new Vector2(0.22f, 1f), 24f, UIFactory.Good);
+
+            // Live running total for the day — the thing players check most often.
+            _tickerLabel = UIFactory.Label("Ticker", bar.transform, "today  +€ 0  /  −€ 0",
+                new Vector2(0.014f, 0.04f), new Vector2(0.23f, 0.42f), 14f, UIFactory.InkMuted);
             _dayLabel = UIFactory.Label("Day", bar.transform, "Day 1",
                 new Vector2(0.23f, 0f), new Vector2(0.36f, 1f), 21f);
             _rentLabel = UIFactory.Label("Rent", bar.transform, "Rent € 0",
@@ -320,7 +325,13 @@ namespace PetShop.UI
             foreach (var pen in _game.Pens)
                 if (pen != null && pen.Count == 0) emptyPens++;
 
-            if (_game.Queue != null && _game.Queue.Length > 0)
+            int crates = UnityEngine.Object.FindObjectsByType<DeliveryCrate>(FindObjectsSortMode.None).Length;
+
+            if (crates > 0)
+                message = crates == 1
+                    ? "A delivery is waiting on the forecourt — press E at it to take it in."
+                    : $"{crates} deliveries are waiting on the forecourt.";
+            else if (_game.Queue != null && _game.Queue.Length > 0)
                 message = _game.Queue.Length == 1
                     ? "Someone is waiting at the till — press E behind the counter to serve them."
                     : $"{_game.Queue.Length} people are waiting at the till.";
@@ -351,6 +362,13 @@ namespace PetShop.UI
             {
                 _balanceLabel.text  = $"€ {_shop.Balance:N0}";
                 _balanceLabel.color = _shop.Balance >= _shop.DailyRent ? UIFactory.Good : UIFactory.Bad;
+            }
+            if (_tickerLabel != null)
+            {
+                float net = _shop.EarnedToday - _shop.SpentToday;
+                string netTag = net >= 0f ? $"<color=#{ColorUtility.ToHtmlStringRGB(UIFactory.Good)}>+€ {net:N0}</color>"
+                                          : $"<color=#{ColorUtility.ToHtmlStringRGB(UIFactory.Bad)}>−€ {-net:N0}</color>";
+                _tickerLabel.text = $"today  +€ {_shop.EarnedToday:N0}  /  −€ {_shop.SpentToday:N0}   =  {netTag}";
             }
             if (_dayLabel  != null) _dayLabel.text  = $"Day {_shop.Day}";
             if (_rentLabel != null) _rentLabel.text = $"Rent tonight  € {_shop.DailyRent:N0}";

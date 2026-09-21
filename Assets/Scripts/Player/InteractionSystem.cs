@@ -54,6 +54,11 @@ namespace PetShop.Player
             if (_game != null && _game.IsBuildModeActive) return;
             if (!FindTarget(out var hit)) return;
 
+            // Deliveries first: a pallet parked by a shelf should hand over its stock,
+            // not silently restock the shelf behind it.
+            var crate = hit.collider.GetComponentInParent<DeliveryCrate>();
+            if (crate != null) { _game?.CollectDelivery(crate); return; }
+
             var shelf = hit.collider.GetComponentInParent<ShelfUnit>();
             if (shelf != null) { _game?.RestockShelf(shelf); return; }
 
@@ -66,11 +71,20 @@ namespace PetShop.Player
 
         private string PromptFor(Collider col)
         {
+            var crate = col.GetComponentInParent<DeliveryCrate>();
+            if (crate != null) return crate.Prompt;
+
             var shelf = col.GetComponentInParent<ShelfUnit>();
             if (shelf != null)
+            {
+                var shop  = _game != null ? _game.Shop : null;
+                int ready = shop != null ? shop.Warehouse(shelf.Category) : 0;
+                string source = ready > 0 ? $"  ·  {ready} in the stockroom" : "  ·  stockroom empty, cash-and-carry prices";
+
                 return shelf.IsEmpty
-                    ? "[E]  Restock shelf"
-                    : $"[E]  Restock {shelf.Category} shelf  ({shelf.TotalUnits} units left)";
+                    ? $"[E]  Restock shelf{source}"
+                    : $"[E]  Restock {shelf.Category} shelf  ({shelf.TotalUnits} units left){source}";
+            }
 
             var pen = col.GetComponentInParent<PetPen>();
             if (pen != null)

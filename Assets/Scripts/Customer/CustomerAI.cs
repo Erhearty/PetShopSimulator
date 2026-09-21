@@ -5,6 +5,7 @@ using UnityEngine.AI;
 using PetShop.Core;
 using PetShop.Commerce;
 using PetShop.Pets;
+using PetShop.UI;
 
 namespace PetShop.Customer
 {
@@ -39,6 +40,18 @@ namespace PetShop.Customer
         private readonly List<(string id, string label, float price)> _basket = new();
         private NavMeshAgent    _agent;
         private CharacterVisual _visual;
+        private WorldLabel      _bubble;
+
+        // ── What this shopper came in for ───────────────────────────────────────
+
+        /// <summary>The aisle this customer heads for first.</summary>
+        public ProductCategory PreferredCategory { get; private set; }
+
+        /// <summary>Some shoppers are here for an animal, not a bag of food.</summary>
+        public bool WantsPet { get; private set; }
+
+        /// <summary>Above this, they will not buy however much they liked it.</summary>
+        public float BudgetCap { get; private set; }
         private bool  _boughtPet;
         private bool  _served;
         private bool  _gaveUp;
@@ -72,7 +85,39 @@ namespace PetShop.Customer
             BuildVisual();
         }
 
-        private void Start() => StartCoroutine(RunBehaviour());
+        private void Start()
+        {
+            // A preference profile makes per-category pricing meaningful and gives the
+            // thought bubble something true to show.
+            var categories = (ProductCategory[])System.Enum.GetValues(typeof(ProductCategory));
+            PreferredCategory = categories[Random.Range(0, categories.Length)];
+            WantsPet          = Random.value < 0.30f;
+            BudgetCap         = WantsPet ? Random.Range(120f, 900f) : Random.Range(14f, 60f);
+
+            BuildBubble();
+            StartCoroutine(RunBehaviour());
+        }
+
+        /// <summary>
+        /// A bubble over the head saying what they are after. Shop sims universally show
+        /// this — without it the player cannot tell which aisle to restock.
+        /// </summary>
+        private void BuildBubble()
+        {
+            string want = WantsPet ? "wants a pet" : PreferredCategory.ToString().ToLowerInvariant();
+            Color colour = WantsPet ? new Color(0.98f, 0.78f, 0.38f) : UIFactory.Ink;
+
+            _bubble = WorldLabel.Create(transform, new Vector3(0f, 2.15f, 0f),
+                                        $"<size=80%>{want}</size>", 0.085f, colour, width: 1.4f);
+            _bubble.MaxVisibleDistance = 22f;
+        }
+
+        private void SetBubble(string text, Color colour)
+        {
+            if (_bubble == null) return;
+            _bubble.SetText($"<size=80%>{text}</size>");
+            _bubble.SetColour(colour);
+        }
 
         private void BuildVisual()
         {
@@ -145,6 +190,7 @@ namespace PetShop.Customer
             }
 
             Queue.Join(this);
+            SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
             int lastPlace = -1;
 
             while (!_served && !_gaveUp)
@@ -182,6 +228,8 @@ namespace PetShop.Customer
                 // shop's standing takes a real hit.
                 ShopManager?.ChangeReputation(-3.5f);
                 GameManager.Instance?.Notify($"{name} gave up waiting and walked out.");
+                SetBubble("gave up!", UIFactory.Bad);
+                FloatingText.Spawn(transform.position + Vector3.up * 2.4f, "−3.5 rep", UIFactory.Bad, 0.26f);
                 _basket.Clear();
             }
         }
@@ -246,6 +294,11 @@ namespace PetShop.Customer
             float demand = ShopManager != null ? ShopManager.DemandFactor : 1f;
 
             var stocked = Shelves.FindAll(s => s != null && !s.IsEmpty);
+
+            // Favour the aisle they came for; fall back to anything stocked.
+            var preferred = stocked.FindAll(s => s.Category == PreferredCategory);
+            if (preferred.Count > 0) stocked = preferred;
+
             if (stocked.Count > 0 && Random.value < 0.7f * demand)
             {
                 var shelf   = stocked[Random.Range(0, stocked.Count)];
@@ -254,11 +307,22 @@ namespace PetShop.Customer
                 {
                     float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice)
                                                       : product.basePrice;
-                    _basket.Add((product.id, product.displayName, price));
+
+                    if (price <= BudgetCap)
+                    {
+                        _basket.Add((product.id, product.displayName, price));
+                        SetBubble($"got {product.displayName}", UIFactory.Good);
+                    }
+                    else
+                    {
+                        // Too dear: put it back, and let the player see why.
+                        shelf.AddStock(product, 1);
+                        SetBubble("too expensive", UIFactory.Bad);
+                    }
                 }
             }
 
-            if (!_boughtPet && Random.value < PetBuyChance * demand)
+            if (!_boughtPet && WantsPet && Random.value < PetBuyChance * 3f * demand)
             {
                 var pens = PetPens.FindAll(p => p != null && p.HasAdults);
                 if (pens.Count > 0)
@@ -271,6 +335,7 @@ namespace PetShop.Customer
                                                           : pet.SellPrice();
                         _basket.Add(($"pet_{pet.species}", pet.DisplayName(), price));
                         _boughtPet = true;
+                        SetBubble($"buying a {pet.species}", UIFactory.Good);
                     }
                 }
             }
@@ -288,6 +353,10 @@ namespace PetShop.Customer
             }
             ShopManager.ChangeReputation(0.4f + _basket.Count * 0.5f);
             if (_basket.Count >= 3) _visual?.PlayTrigger("happy_dance");
+
+            SetBubble("thanks!", UIFactory.Good);
+            FloatingText.Spawn(transform.position + Vector3.up * 2.3f,
+                               $"+€ {total:N2}", UIFactory.Good, 0.3f);
             GameManager.Instance?.Notify($"Sold {_basket.Count} item(s) for €{total:N2}");
             AudioManager.Instance?.PlaySfx("sale");
         }

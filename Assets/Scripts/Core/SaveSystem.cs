@@ -22,6 +22,8 @@ namespace PetShop.Core
         public string SavedAt;
 
         public List<StockEntry>   Stock         = new();
+        /// <summary>Delivered units still in the stockroom, keyed by category name.</summary>
+        public List<StockEntry>   Warehouse     = new();
         public List<PlacedItem>   PlacedObjects = new();
 
         [Serializable]

@@ -12,7 +12,7 @@ Art is **procedural geometry plus the CC0 Kenney model kits** in `Assets/Resourc
 audio files. The earlier "no external assets at all" rule was lifted deliberately when the
 street was added; the procedural paths all still exist as fallbacks, and **deleting
 `Assets/Resources/Kenney/` must leave the game running**, just plainer. Keep it that way:
-every `KenneyLibrary.Spawn` call can return null and every caller has to cope.
+every `ModelLibrary.Spawn` call can return null and every caller has to cope.
 
 This is a **3D** game. Do not reintroduce `SpriteRenderer`, `Camera.orthographic`, or 2D physics.
 
@@ -200,16 +200,48 @@ The barriers fencing the pavement in sit on the **Ignore Raycast** layer: they s
 and still bake, but the camera can see through them instead of being shoved about by an
 invisible wall.
 
+## World-space labels
+
+Price tags, pen signs, thought bubbles and delivery labels are all `WorldLabel` — a TextMeshPro
+in world space, not a per-object canvas, so they occlude correctly behind walls.
+
+Two rules, both learned the hard way:
+
+- **`size` is the cap height in metres.** `TextMeshPro.fontSize` runs at roughly ten units per
+  metre, so `Create` sets `fontSize = size * 10f`. Passing a "font size" straight through gives
+  price tags a metre tall.
+- **Billboarding runs off `Camera.onPreCull`, per rendering camera** — never once a frame against
+  `Camera.main`. The screenshot tour renders through its own untagged camera, and a label turned
+  to face the player is edge-on, i.e. invisible, from anywhere else. Labels that "do not render"
+  are almost always rendering perfectly, facing somewhere else.
+
+Labels hide below `MinVisibleDistance` (0.8 m) as well as beyond `MaxVisibleDistance`, so standing
+next to a sign does not black out the screen.
+
+## Restocking and supplier orders
+
+Two ways to get stock, and the difference between them is the planning game:
+
+- **Order ahead** (ledger → Catalogue → *Order 12 X*): charged at `WholesaleDiscount` (0.78) per
+  unit up front, arrives 0.10–0.22 of a day later as a `DeliveryCrate` on the forecourt. `E` on the
+  crate moves the units into the stockroom.
+- **Cash-and-carry**: `E` on a shelf with an empty stockroom buys on the spot at `EmergencyMarkup`
+  (1.45). Always available, so a player who never orders can still trade — just at far worse margins.
+
+`ShelfUnit.Restock` drains the stockroom first and returns a `RestockResult` (units, how many came
+from the stockroom, what was spent). Orders still in transit at close of business arrive overnight
+rather than being lost; the stockroom persists via `SaveData.Warehouse`.
+
 ## Model scaling
 
 The Kenney kits are authored at wildly different scales — a furniture bookcase measures ~8.8
-units tall, a whole city building ~1.3. **Never hard-code a scale factor.** `KenneyLibrary`
+units tall, a whole city building ~1.3. **Never hard-code a scale factor.** `ModelLibrary`
 measures each model's combined mesh bounds off the asset and scales it so a chosen axis hits
 a target size in metres:
 
 ```csharp
-KenneyLibrary.Spawn(KenneyLibrary.Commercial + "building-f", parent, pos,
-                    yRotation: 180f, KenneyLibrary.Fit.Height, targetSize: 9f);
+ModelLibrary.Spawn(ModelLibrary.Commercial + "building-f", parent, pos,
+                    yRotation: 180f, ModelLibrary.Fit.Height, targetSize: 9f);
 ```
 
 `Spawn` also drops the model onto Y = 0 and centres it on X/Z. Models whose pivot means
@@ -295,10 +327,12 @@ Assets/
     │   ├── GameBootstrapper.cs     ← entry point; builds systems → world → UI → wiring
     │   ├── GameManager.cs          ← singleton; day cycle, save/load, interactions, catalog
     │   ├── GameLayers.cs           ← named layer lookups + masks
-    │   ├── KenneyLibrary.cs        ← loads models and sizes them by measured bounds
+    │   ├── CharacterFactory.cs     ← City People bodies; CharacterVisual animator bridge; procedural humanoid fallback
+│   ├── ModelLibrary.cs         ← path constants for all Kenney + Asset Store packs; Prefab(path) with Fit scaling
     │   ├── MaterialFactory.cs      ← material cache, palette, build-safe shader resolution
     │   ├── MeshBuilder.cs          ← all procedural geometry (furniture, humanoids, pets)
     │   ├── AudioManager.cs         ← synthesises every clip at startup; no audio assets
+    │   ├── WorldLabel.cs           ← billboarded world-space TMP labels + FloatingText pops
     │   └── SaveSystem.cs           ← JSON save incl. full furniture layout
     │
     ├── Shop/
@@ -318,8 +352,9 @@ Assets/
     │   └── CustomerSpawner.cs      ← footfall scales with reputation; closes doors near closing
     │
     ├── Commerce/
-    │   ├── ShopManager.cs          ← balance, reputation, sales log, rent, CloseDay()
-    │   ├── ShelfUnit.cs            ← up to 3 product lines; renders one crate per unit
+    │   ├── ShopManager.cs          ← balance, reputation, sales log, rent, orders, CloseDay()
+    │   ├── DeliveryCrate.cs        ← forecourt pallet from a supplier order; E to collect
+    │   ├── ShelfUnit.cs            ← product lines, in-world price tag, stockroom restocking
     │   ├── ProductItem.cs          ← id, name, category, unitCost, basePrice
     │   └── ItemDatabase.cs         ← 14-product catalog built in code; asset is optional
     │

@@ -192,8 +192,10 @@ namespace PetShop.Dev
                 World("garden",             new Vector3(shop.x + 12f, 3.2f, shop.z - 16f),
                                             new Vector3(shop.x + 15f, 1.2f, shop.z - 11f), 55f),
                 World("paddock",            pens + new Vector3(-13f, 7f, -13f), pens + Vector3.up, 58f),
-                World("pen_close",          firstPen + new Vector3(0f, 1.9f, -4.2f),
-                                            firstPen + Vector3.up * 0.5f, 45f),
+                // Offset diagonally: straight back from a pen puts the camera inside the
+                // sign of the pen behind it.
+                World("pen_close",          firstPen + new Vector3(-3.4f, 2.0f, -3.6f),
+                                            firstPen + Vector3.up * 0.9f, 50f),
                 World("pergola",            pens + new Vector3(-9f, 2.2f, -11f),
                                             pens + new Vector3(2f, 2.4f, 2f), 60f),
                 World("interior_wide",      new Vector3(shop.x, h - 1.1f, shop.z + d * 0.5f - 1.4f),
@@ -252,6 +254,27 @@ namespace PetShop.Dev
             shots.Add(Plan("plan_city",  plot + new Vector3(0f, 260f, 90f), plot + new Vector3(0f, 0f, 90f), 130f));
             shots.Add(World("city_oblique", plot + new Vector3(-80f, 90f, -70f),
                             plot + new Vector3(10f, 0f, 40f), 55f));
+
+            // Deliveries: order a pallet and force it to land so the forecourt loop is on film.
+            if (game != null && gen != null)
+            {
+                Vector3 forecourt = gen.ForecourtPosition;
+                shots.Add(new Shot
+                {
+                    Name     = "delivery",
+                    Kind     = Kind.World,
+                    Position = forecourt + new Vector3(4.5f, 2.2f, 4.5f),
+                    LookAt   = forecourt + Vector3.up * 0.7f,
+                    Fov      = 55f,
+                    Setup    = () =>
+                    {
+                        game.OrderStock(PetShop.Commerce.ProductCategory.Food, 18);
+                        game.OrderStock(PetShop.Commerce.ProductCategory.Toy, 12);
+                        game.Shop?.PollDeliveries(1f);   // pull both vans forward to now
+                    },
+                });
+            }
+
             return shots;
         }
 
@@ -303,8 +326,9 @@ namespace PetShop.Dev
                 return fallback + new Vector3(1.8f, 1.8f, 2.4f);
             }
             Vector3 at = customer.transform.position;
-            lookAt = at + Vector3.up * 1.05f;
-            return at + new Vector3(1.7f, 1.8f, 2.3f);
+            // Aimed at the thought bubble over the head, not the chest.
+            lookAt = at + Vector3.up * 1.75f;
+            return at + new Vector3(1.7f, 2.0f, 2.3f);
         }
     }
 }

@@ -37,6 +37,17 @@ namespace PetShop.Commerce
                 : (IReadOnlyList<ProductItem>)System.Array.Empty<ProductItem>();
         }
 
+        /// <summary>Typical wholesale cost of a unit in this aisle — what an order is priced off.</summary>
+        public float AverageUnitCost(ProductCategory category)
+        {
+            var list = GetByCategory(category);
+            if (list.Count == 0) return 3.2f;
+
+            float total = 0f;
+            foreach (var item in list) total += item.unitCost;
+            return total / list.Count;
+        }
+
         public ProductItem RandomOfCategory(ProductCategory category)
         {
             var list = GetByCategory(category);

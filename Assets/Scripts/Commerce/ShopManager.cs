@@ -42,11 +42,19 @@ namespace PetShop.Commerce
         public UnityEvent<string, int> OnStockChanged      = new();
         public UnityEvent<float>       OnPriceChanged      = new();
         public UnityEvent<int>         OnStaffChanged      = new();
+        public UnityEvent<SupplierOrder> OnOrderPlaced      = new();
+        public UnityEvent<SupplierOrder> OnDeliveryArrived  = new();
 
         // Runtime state
         public float Balance    { get; private set; }
         public float Reputation { get; private set; }
         public int   Day        { get; private set; } = 1;
+
+        /// <summary>Cash taken so far today. Drives the HUD ticker.</summary>
+        public float EarnedToday { get; private set; }
+
+        /// <summary>Cash paid out so far today (restocking, vet bills, wages already drawn).</summary>
+        public float SpentToday  { get; private set; }
 
         public IReadOnlyDictionary<string, int> Stock => _stock;
         public IReadOnlyList<SaleRecord> TodaysSales  => _dayLog;
@@ -72,7 +80,9 @@ namespace PetShop.Commerce
         /// <summary>Everything owed at close of business.</summary>
         public float DailyOutgoings => DailyRent + DailyWages;
 
-        private readonly Dictionary<string, int> _stock  = new();
+        private readonly Dictionary<string, int>          _stock     = new();
+        private readonly List<SupplierOrder>              _orders    = new();
+        private readonly Dictionary<ProductCategory, int> _warehouse = new();
         private readonly List<SaleRecord>        _dayLog = new();
         private float _dayOpeningBalance;
 
@@ -94,6 +104,8 @@ namespace PetShop.Commerce
                 return false;
             }
             Balance += delta;
+            if (delta >= 0f) EarnedToday += delta;
+            else             SpentToday  += -delta;
             OnBalanceChanged.Invoke(Balance);
             return true;
         }
@@ -182,6 +194,82 @@ namespace PetShop.Commerce
             return true;
         }
 
+        // ── Supplier orders ─────────────────────────────────────────────────────
+
+        /// <summary>Orders placed today that have not yet been delivered.</summary>
+        public IReadOnlyList<SupplierOrder> Orders => _orders;
+
+        /// <summary>What a unit costs when ordered from the wholesaler, ahead of time.</summary>
+        public const float WholesaleDiscount = 0.78f;
+
+        /// <summary>
+        /// Buying off the shelf at the cash-and-carry when you have run out. Deliberately
+        /// dearer than ordering: planning ahead is supposed to be worth something.
+        /// </summary>
+        public const float EmergencyMarkup = 1.45f;
+
+        /// <summary>Units delivered and waiting in the stockroom for this category.</summary>
+        public int Warehouse(ProductCategory category) =>
+            _warehouse.TryGetValue(category, out int units) ? units : 0;
+
+        public int WarehouseTotal
+        {
+            get { int t = 0; foreach (var kv in _warehouse) t += kv.Value; return t; }
+        }
+
+        public void AddToWarehouse(ProductCategory category, int units)
+        {
+            if (units <= 0) return;
+            _warehouse[category] = Warehouse(category) + units;
+        }
+
+        /// <summary>Draws up to <paramref name="units"/> from the stockroom; returns what it got.</summary>
+        public int TakeFromWarehouse(ProductCategory category, int units)
+        {
+            int available = Warehouse(category);
+            int taken     = Mathf.Min(available, Mathf.Max(0, units));
+            if (taken > 0) _warehouse[category] = available - taken;
+            return taken;
+        }
+
+        /// <summary>
+        /// Pays for a delivery up front and schedules it to arrive later in the day. Returns
+        /// null when the shop cannot afford it.
+        /// </summary>
+        public SupplierOrder PlaceOrder(ProductCategory category, int units, float unitCost,
+                                        float dayProgressNow)
+        {
+            if (units <= 0) return null;
+
+            float cost = unitCost * WholesaleDiscount * units;
+            if (!ChangeBalance(-cost, $"Order {units}x {category}")) return null;
+
+            var order = new SupplierOrder
+            {
+                Category        = category,
+                Units           = units,
+                Cost            = cost,
+                ArrivalProgress = Mathf.Min(0.97f, dayProgressNow + UnityEngine.Random.Range(0.10f, 0.22f)),
+            };
+            _orders.Add(order);
+            OnOrderPlaced.Invoke(order);
+            return order;
+        }
+
+        /// <summary>Called each frame by the day clock; raises deliveries as they fall due.</summary>
+        public void PollDeliveries(float dayProgress)
+        {
+            for (int i = _orders.Count - 1; i >= 0; i--)
+            {
+                var order = _orders[i];
+                if (order.Delivered || dayProgress < order.ArrivalProgress) continue;
+
+                order.Delivered = true;
+                _orders.RemoveAt(i);
+                OnDeliveryArrived.Invoke(order);
+            }
+        }
+
         // ── Day cycle ───────────────────────────────────────────────────────────
 
         /// <summary>
@@ -196,8 +284,16 @@ namespace PetShop.Commerce
 
             var summary = BuildSummary(rent, wages);
 
+            // Anything still on the van turns up overnight rather than vanishing.
+            foreach (var order in _orders) AddToWarehouse(order.Category, order.Units);
+            _orders.Clear();
+
+            SpentToday += rent + wages;
+
             _dayLog.Clear();
             Day++;
+            EarnedToday = 0f;
+            SpentToday  = 0f;
             _dayOpeningBalance = Balance;
             OnDayAdvanced.Invoke(Day);
 
@@ -225,9 +321,22 @@ namespace PetShop.Commerce
                 NetChange      = Balance - _dayOpeningBalance,
                 Reputation     = Reputation,
                 ClosingBalance = Balance,
+                Spend          = SpentToday,
                 Records        = new List<SaleRecord>(_dayLog),
             };
         }
+    }
+
+    /// <summary>A wholesale order paid for now and delivered to the forecourt later today.</summary>
+    [Serializable]
+    public class SupplierOrder
+    {
+        public ProductCategory Category;
+        public int             Units;
+        public float           Cost;
+        /// <summary>Point in the trading day (0–1) at which the van pulls up.</summary>
+        public float           ArrivalProgress;
+        public bool            Delivered;
     }
 
     [Serializable]
@@ -254,6 +363,7 @@ namespace PetShop.Commerce
         public float            NetChange;
         public float            Reputation;
         public float            ClosingBalance;
+        public float            Spend;
         public List<SaleRecord> Records = new();
     }
 }

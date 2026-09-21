@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using PetShop.Core;
+using PetShop.UI;
 
 namespace PetShop.Commerce
 {
@@ -33,7 +34,8 @@ namespace PetShop.Commerce
         public UnityEvent<ShelfUnit> OnStockChanged = new();
 
         private readonly List<StockLine> _lines = new();
-        private Transform _visualRoot;
+        private Transform  _visualRoot;
+        private WorldLabel _priceTag;
 
         // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -69,6 +71,56 @@ namespace PetShop.Commerce
 
         // ── Stock management ────────────────────────────────────────────────────
 
+        private void Start()
+        {
+            // Price tag above the unit. Genre standard: the player should never have to open
+            // a panel to see what a shelf is selling or how empty it is.
+            _priceTag = WorldLabel.Create(transform, new Vector3(0f, ShelfHeight + 0.26f, ShelfDepth * 0.5f),
+                                          "", 0.085f, UIFactory.Ink, width: 1.7f);
+            RefreshLabel();
+
+            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            if (shop != null) shop.OnPriceChanged.AddListener(_ => RefreshLabel());
+        }
+
+        /// <summary>
+        /// Category, marked-up price and stock, colour-coded so a nearly-empty shelf reads
+        /// from across the room.
+        /// </summary>
+        public void RefreshLabel()
+        {
+            if (_priceTag == null) return;
+
+            if (_lines.Count == 0)
+            {
+                _priceTag.SetText($"{Category}\n<size=70%>empty — press E</size>");
+                _priceTag.SetColour(UIFactory.Bad);
+                return;
+            }
+
+            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            float lowest = float.MaxValue, highest = 0f;
+            foreach (var line in _lines)
+            {
+                if (line.Product == null) continue;
+                float price = shop != null ? shop.PriceOf(line.Product.basePrice) : line.Product.basePrice;
+                lowest  = Mathf.Min(lowest, price);
+                highest = Mathf.Max(highest, price);
+            }
+
+            int capacity = Mathf.Max(1, _lines.Count * MaxPerLine);
+            float fill   = TotalUnits / (float)capacity;
+
+            string priceText = Mathf.Approximately(lowest, highest)
+                ? $"€ {lowest:0.00}"
+                : $"€ {lowest:0.00} – {highest:0.00}";
+
+            _priceTag.SetText($"{Category}   {priceText}\n<size=75%>{TotalUnits} / {capacity} in stock</size>");
+            _priceTag.SetColour(fill <= 0.01f ? UIFactory.Bad
+                              : fill < 0.3f   ? new Color(0.95f, 0.72f, 0.35f)
+                                              : UIFactory.Ink);
+        }
+
         /// <summary>Add units of a product. Returns how many were actually added.</summary>
         public int AddStock(ProductItem product, int units)
         {
@@ -87,6 +139,7 @@ namespace PetShop.Commerce
 
             line.Units += added;
             RefreshVisuals();
+            RefreshLabel();
             OnStockChanged.Invoke(this);
             return added;
         }
@@ -100,17 +153,29 @@ namespace PetShop.Commerce
             var line = stocked[Random.Range(0, stocked.Count)];
             line.Units--;
             RefreshVisuals();
+            RefreshLabel();
             OnStockChanged.Invoke(this);
             return line.Product;
         }
 
-        /// <summary>
-        /// Fill every line to capacity, paying <see cref="ProductItem.unitCost"/> per unit.
-        /// An empty shelf first picks products from the catalog for its category.
-        /// Returns the amount spent.
-        /// </summary>
-        public float Restock(ShopManager shop, ItemDatabase catalog)
+        /// <summary>What one restock did: how much went on the shelf, and what it cost.</summary>
+        public struct RestockResult
         {
+            public int   Units;
+            public int   FromWarehouse;
+            public float Spent;
+        }
+
+        /// <summary>
+        /// Fill every line to capacity. Units already delivered to the stockroom go on for
+        /// free (they were paid for when ordered); anything beyond that is bought on the spot
+        /// at cash-and-carry prices, which is deliberately dearer than ordering ahead.
+        /// An empty shelf first picks products from the catalog for its category.
+        /// </summary>
+        public RestockResult Restock(ShopManager shop, ItemDatabase catalog)
+        {
+            var result = new RestockResult();
+
             if (_lines.Count == 0 && catalog != null)
             {
                 var available = catalog.GetByCategory(Category);
@@ -118,22 +183,34 @@ namespace PetShop.Commerce
                     _lines.Add(new StockLine { Product = available[i], Units = 0 });
             }
 
-            float spent = 0f;
             foreach (var line in _lines)
             {
                 if (line.Product == null) continue;
                 while (line.Units < MaxPerLine)
                 {
-                    if (shop != null && !shop.ChangeBalance(-line.Product.unitCost, $"Restock {line.Product.displayName}"))
+                    // Stockroom first — it is already paid for.
+                    if (shop != null && shop.TakeFromWarehouse(Category, 1) == 1)
+                    {
+                        line.Units++;
+                        result.Units++;
+                        result.FromWarehouse++;
+                        continue;
+                    }
+
+                    float price = line.Product.unitCost * ShopManager.EmergencyMarkup;
+                    if (shop != null && !shop.ChangeBalance(-price, $"Cash-and-carry {line.Product.displayName}"))
                         goto done;
+
                     line.Units++;
-                    spent += line.Product.unitCost;
+                    result.Units++;
+                    result.Spent += price;
                 }
             }
         done:
             RefreshVisuals();
+            RefreshLabel();
             OnStockChanged.Invoke(this);
-            return spent;
+            return result;
         }
 
         public void Clear()
