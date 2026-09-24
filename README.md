@@ -9,7 +9,9 @@ order of preference, with each tier falling back to the next. All audio is synth
 startup; there are no sound files.
 
 > The Asset Store packs are licensed to the project owner's Unity account and are **not**
-> redistributable — see [`THIRD-PARTY.md`](THIRD-PARTY.md) before sharing this repo.
+> in this repository — they are gitignored and purged from history. A fresh clone runs on the
+> Kenney kits and procedural fallbacks; `./build.sh assets` restores the packs once downloaded.
+> See [`THIRD-PARTY.md`](THIRD-PARTY.md).
 
 ![Unity 6000.6.2f1](https://img.shields.io/badge/Unity-6000.6.2f1-black) ![Built-in RP](https://img.shields.io/badge/pipeline-Built--in-blue)
 
@@ -25,6 +27,11 @@ Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Pl
 
 A fresh clone needs one setup pass (`./build.sh setup`) before the first editor Play session,
 because TextMesh Pro's essential resources are not checked in.
+
+A fresh clone works without the Asset Store packs — the game falls back to the Kenney kits and
+procedural geometry. To restore the full art, download the packs listed in
+[`THIRD-PARTY.md`](THIRD-PARTY.md) through Package Manager → My Assets, then run
+`./build.sh assets` (`./build.sh assets?` shows which are present).
 
 ## Controls
 
@@ -139,9 +146,10 @@ Assets/
 
 3D models are Kenney's CC0 kits (city, roads, cars, nature, furniture, food) — public domain,
 no attribution required, credited anyway in [`THIRD-PARTY.md`](THIRD-PARTY.md). Unity Asset
-Store packages are *not* used: they can only be downloaded through an authenticated Unity
-account, so they cannot be fetched by a build script. `THIRD-PARTY.md` explains how to drop one
-in yourself if you want to.
+Store packages *are* used when installed locally, and preferred over the Kenney kits, but they
+are not stored in the repository: they are licensed to the owner's Unity account and can only be
+downloaded through it. After downloading them via Package Manager → My Assets, `./build.sh assets`
+imports them. `THIRD-PARTY.md` lists every pack, its folder and licence status.
 
 ## Command-line flags
 

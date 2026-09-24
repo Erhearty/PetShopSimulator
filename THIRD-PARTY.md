@@ -1,13 +1,14 @@
 # Third-party assets
 
-> **This project is no longer freely redistributable.** The Asset Store packs below are
-> *Extension Assets* under the Unity Asset Store EULA: they are tied to the account that
-> claimed them and may not be redistributed in project source. Do not commit
-> `Assets/Resources/Packs/`, `Assets/100 People - Animated Characters Pack/`,
-> `Assets/LowpolyStreetPack/`, `Assets/SimpleNaturePack/`,
-> `Assets/SimplePoly City - Low Poly Assets/` or
-> `Assets/Low-Poly Furniture Kit - Stylized Wooden Set/` to a public repository.
-> The Kenney kits are CC0 and remain safe to share.
+> **The Asset Store packs below are not in this repository.** They are *Extension Assets*
+> under the Unity Asset Store EULA (or, where marked, of unverified licence), tied to the
+> account that claimed them and not redistributable in project source. Their folders are
+> gitignored and have been purged from the repository history.
+>
+> A fresh clone builds and runs without them, on the CC0 Kenney kits plus procedural
+> fallbacks. To restore the full art, download each pack through Package Manager →
+> My Assets, then run `./build.sh assets` (`./build.sh assets?` reports which packs are
+> present).
 
 ## Unity Asset Store packs — Standard EULA, Extension Asset
 
@@ -15,16 +16,30 @@ Claimed to the project owner's Unity account and downloaded through Package Mana
 My Assets. Prefabs were moved under `Assets/Resources/Packs/` so the runtime loader can
 reach them; their meshes, materials and textures stay in each pack's own folder.
 
-| Pack | Publisher | Used for |
-|---|---|---|
-| 100 People – Animated Characters | Marcin's Assets | the shopkeeper and every customer — 100 bodies, 17 animations, one shared animator controller |
-| SimplePoly City | VenCreations | the parade of shops, the block opposite, parked cars, skyline |
-| Low Poly Street Pack | Dynamic Art | road tiles, crossing, lamp posts, benches, street props, trees |
-| Low-Poly Furniture Kit – Stylized Wooden Set | Morphara Studio | shop counter, wall shelving, seating, tables |
-| Low-Poly Simple Nature Pack | JustCreate | street trees and planting |
+| Pack | Publisher | Folder | Licence | Used for |
+|---|---|---|---|---|
+| 100 People – Animated Characters | Marcin's Assets | `Assets/100 People - Animated Characters Pack` | Standard EULA | the shopkeeper and every customer — 100 bodies, 17 animations, one shared animator controller |
+| SimplePoly City | VenCreations | `Assets/SimplePoly City - Low Poly Assets` | Standard EULA | the parade of shops, the block opposite, parked cars, skyline |
+| Low Poly Street Pack | Dynamic Art | `Assets/LowpolyStreetPack` | Standard EULA | road tiles, crossing, lamp posts, benches, street props, trees |
+| Low-Poly Furniture Kit – Stylized Wooden Set | Morphara Studio | `Assets/Low-Poly Furniture Kit - Stylized Wooden Set` | Standard EULA | shop counter, wall shelving, seating, tables |
+| Low-Poly Simple Nature Pack | JustCreate | `Assets/SimpleNaturePack` | Standard EULA | street trees and planting |
+| City People | Denys Almaral | `Assets/DenysAlmaral` | licence unverified — treated as non-redistributable | customer and shopkeeper character models (`Packs/CityPeople/…`, preferred by `CharacterFactory` when installed) |
+| Animals FREE | ithappy | `Assets/ithappy` | licence unverified — treated as non-redistributable | animal models for the pets in the pens |
+| Cube Animals Free | CuteMagic | `Assets/CuteMagic_CubeAnimals_Free` | licence unverified — treated as non-redistributable | cube-style animal models (candidate pet models) |
 
-Re-importing on a fresh machine: download the five via Package Manager → My Assets, then
-`./build.sh assets`.
+The relocated prefabs live under `Assets/Resources/Packs/`, which is likewise not in the
+repository.
+
+Re-importing on a fresh machine: download all eight via Package Manager → My Assets, then
+`./build.sh assets`. `./build.sh assets?` reports which packs are present.
+
+## Repository history
+
+Earlier commits contained the pack files above and a stray built Linux player in the
+project root (`PetShop.x86_64`, `PetShop_Data/`, `UnityPlayer.so`, …). Both were removed
+from **all** history with `Tools/purge_history.sh` (`--verify` re-checks it). Clones made
+before that rewrite have different commit SHAs from the first pack commit onward (and still
+hold the purged files), so they must be deleted and re-cloned — never merged or pushed back.
 
 ## Kenney asset kits — CC0 1.0 (public domain)
 

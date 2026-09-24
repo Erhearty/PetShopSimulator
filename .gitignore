@@ -8,3 +8,37 @@ UserSettings/
 *.sln
 *.slnx
 *.rpm
+
+# ---------------------------------------------------------------------------
+# Third-party Asset Store packs — NOT redistributable, never commit them.
+# They are installed locally via Package Manager → My Assets + `./build.sh assets`.
+# See THIRD-PARTY.md. Keep this list identical to PURGE_PATHS in
+# Tools/purge_history.sh. (Assets/Resources/Kenney is CC0 and stays tracked.)
+# ---------------------------------------------------------------------------
+/Assets/Resources/Packs/
+/Assets/Resources/Packs.meta
+/Assets/SimplePoly City - Low Poly Assets/
+/Assets/SimplePoly City - Low Poly Assets.meta
+/Assets/Low-Poly Furniture Kit - Stylized Wooden Set/
+/Assets/Low-Poly Furniture Kit - Stylized Wooden Set.meta
+/Assets/LowpolyStreetPack/
+/Assets/LowpolyStreetPack.meta
+/Assets/SimpleNaturePack/
+/Assets/SimpleNaturePack.meta
+/Assets/100 People - Animated Characters Pack/
+/Assets/100 People - Animated Characters Pack.meta
+/Assets/DenysAlmaral/
+/Assets/DenysAlmaral.meta
+/Assets/ithappy/
+/Assets/ithappy.meta
+/Assets/CuteMagic_CubeAnimals_Free/
+/Assets/CuteMagic_CubeAnimals_Free.meta
+
+# Stray Linux player accidentally built into the project root (real builds go
+# to Build/Linux/, already ignored above).
+/PetShop.x86_64
+/PetShop_Data/
+/UnityPlayer.so
+/libdecor-0.so.0
+/libdecor-cairo.so
+/PetShop_BackUpThisFolder_ButDontShipItWithYourGame/

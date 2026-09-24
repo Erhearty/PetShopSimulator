@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "checks": [
+    {
+      "id": "shell-syntax",
+      "name": "Shell script syntax",
+      "kind": "lint",
+      "command": "bash -n build.sh && bash -n Tools/purge_history.sh",
+      "enabled": true,
+      "scope": "repo"
+    }
+  ]
+}
