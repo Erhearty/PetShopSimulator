@@ -1,7 +1,389 @@
 {
-  "components": [],
-  "connections": [],
-  "forestreeFormatVersion": false,
+  "components": [
+    {
+      "canvas": {
+        "widgets": [
+          {
+            "data": {
+              "text": "Single-player, first-person 3D shop-management sim. GameBootstrapper is the whole entry point: it builds the grid/shop/build/spawner/audio/manager systems, generates the shop room and street via procedural + Kenney-kit geometry, assembles the player and UI, then hands control to GameManager for the day loop (customers, stocking, breeding, rent). No backend/server - everything runs client-side in one Unity process; all furniture placement funnels through BuildMode.Place() -> FurnitureFactory.Spawn() and audio is synthesised at startup (no sound files)."
+            },
+            "h": 180,
+            "id": "widget-1790266201025-0",
+            "title": "Intent & Scope Description",
+            "type": "text",
+            "w": 350,
+            "x": 30,
+            "y": 30
+          },
+          {
+            "data": {
+              "techs": [
+                "Unity 6000.6.2f1",
+                "C#",
+                "Built-in Render Pipeline",
+                "UGUI (com.unity.ugui)",
+                "AI Navigation / NavMesh (com.unity.ai.navigation)",
+                "Unity Timeline",
+                "Unity Purchasing",
+                "Unity Test Framework"
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219547-1",
+            "title": "Tech Stack Profiles",
+            "type": "techstack",
+            "w": 350,
+            "x": 60,
+            "y": 60
+          },
+          {
+            "data": {
+              "blocks": [
+                {
+                  "desc": "entry point",
+                  "id": "bootstrapper",
+                  "label": "GameBootstrapper",
+                  "x": 24,
+                  "y": 24
+                },
+                {
+                  "desc": "GameManager, MeshBuilder, ModelLibrary, MaterialFactory, CharacterFactory, AudioManager, SaveSystem",
+                  "id": "core",
+                  "label": "Core",
+                  "x": 174,
+                  "y": 24
+                },
+                {
+                  "desc": "GridManager, BuildMode, FurnitureFactory, ShopGenerator, StreetGenerator",
+                  "id": "shop",
+                  "label": "Shop",
+                  "x": 324,
+                  "y": 24
+                },
+                {
+                  "desc": "PlayerController, cameras, InteractionSystem",
+                  "id": "player",
+                  "label": "Player",
+                  "x": 24,
+                  "y": 104
+                },
+                {
+                  "desc": "CustomerAI, CustomerSpawner",
+                  "id": "customer",
+                  "label": "Customer",
+                  "x": 174,
+                  "y": 104
+                },
+                {
+                  "desc": "ShopManager, ShelfUnit, ItemDatabase, CheckoutQueue, ProductItem, DeliveryCrate, StaffCandidate, Assistant",
+                  "id": "commerce",
+                  "label": "Commerce",
+                  "x": 324,
+                  "y": 104
+                },
+                {
+                  "desc": "Pet, PetPen, BreedingSystem",
+                  "id": "pets",
+                  "label": "Pets",
+                  "x": 24,
+                  "y": 184
+                },
+                {
+                  "desc": "GameUI/HUD, panels, UIFactory",
+                  "id": "ui",
+                  "label": "UI",
+                  "x": 174,
+                  "y": 184
+                },
+                {
+                  "desc": "screenshot/camera-tour/probe tools",
+                  "id": "dev",
+                  "label": "Dev",
+                  "x": 324,
+                  "y": 184
+                }
+              ],
+              "links": [
+                {
+                  "from": "bootstrapper",
+                  "to": "core"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "shop"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "player"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "ui"
+                },
+                {
+                  "from": "core",
+                  "to": "ui"
+                },
+                {
+                  "from": "shop",
+                  "to": "commerce"
+                },
+                {
+                  "from": "shop",
+                  "to": "pets"
+                },
+                {
+                  "from": "commerce",
+                  "to": "customer"
+                },
+                {
+                  "from": "customer",
+                  "to": "pets"
+                },
+                {
+                  "from": "commerce",
+                  "to": "ui"
+                },
+                {
+                  "from": "pets",
+                  "to": "ui"
+                },
+                {
+                  "from": "dev",
+                  "to": "core"
+                }
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219590-2",
+            "title": "Runtime module structure",
+            "type": "diagram",
+            "w": 350,
+            "x": 90,
+            "y": 90
+          },
+          {
+            "data": {
+              "vars": [
+                {
+                  "desc": "Length of a trading day in real seconds",
+                  "example": "210",
+                  "key": "-daylength <seconds>"
+                },
+                {
+                  "desc": "Capture PNGs of the running game then quit",
+                  "example": "Screenshots/",
+                  "key": "-screenshot <path>"
+                }
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219602-3",
+            "title": "Configuration & Environment",
+            "type": "config",
+            "w": 350,
+            "x": 120,
+            "y": 120
+          }
+        ]
+      },
+      "id": "pet-shop-simulator-game-client",
+      "name": "Pet Shop Simulator (Game Client)",
+      "type": "frontend"
+    },
+    {
+      "canvas": {
+        "widgets": [
+          {
+            "data": {
+              "text": "Editor-time / headless tooling (Assets/Editor, driven by root build.sh) that sets up the project (TextMesh Pro essentials, Always-Included Shaders), generates the scene (SceneBuilder, GameBuilder), imports/reports on Kenney and Asset Store art, verifies spawns/materials/shaders, and produces the Linux player build plus smoke-test screenshots. Runs only at build/dev time - never shipped in the game itself."
+            },
+            "h": 180,
+            "id": "widget-1790266201043-0",
+            "title": "Intent & Scope Description",
+            "type": "text",
+            "w": 350,
+            "x": 30,
+            "y": 30
+          },
+          {
+            "data": {
+              "techs": [
+                "Unity Editor scripting (UnityEditor)",
+                "Bash (build.sh)",
+                "Headless Linux batchmode build"
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219556-1",
+            "title": "Tech Stack Profiles",
+            "type": "techstack",
+            "w": 350,
+            "x": 60,
+            "y": 60
+          },
+          {
+            "data": {
+              "items": [
+                {
+                  "done": false,
+                  "text": "ProjectSetup / ShaderInclusion: TextMesh Pro essentials + Always Included Shaders (required before first Play)"
+                },
+                {
+                  "done": false,
+                  "text": "SceneBuilder / GameBuilder: generate MainScene.unity and produce the Linux player build"
+                },
+                {
+                  "done": false,
+                  "text": "AssetStoreImporter / KenneyAssetReport / KenneyModelPostprocessor: import & report on art assets"
+                },
+                {
+                  "done": false,
+                  "text": "SpawnVerify / MaterialRepair / FacingProbe / GfxProbe / KenneyBoundsDump: smoke-test/diagnostic checks after build"
+                },
+                {
+                  "done": false,
+                  "text": "SceneShot: screenshot capture for build.sh look"
+                }
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219625-2",
+            "title": "Quality Task List",
+            "type": "checklist",
+            "w": 350,
+            "x": 90,
+            "y": 90
+          }
+        ]
+      },
+      "id": "build-editor-tooling",
+      "name": "Build & Editor Tooling",
+      "type": "custom"
+    },
+    {
+      "canvas": {
+        "widgets": [
+          {
+            "data": {
+              "text": "Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - saves older than the current version are discarded rather than migrated."
+            },
+            "h": 180,
+            "id": "widget-1790266201279-0",
+            "title": "Intent & Scope Description",
+            "type": "text",
+            "w": 350,
+            "x": 30,
+            "y": 30
+          },
+          {
+            "data": {
+              "techs": [
+                "JsonUtility (Unity built-in JSON)",
+                "Local filesystem (Application.persistentDataPath)"
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790266219578-1",
+            "title": "Tech Stack Profiles",
+            "type": "techstack",
+            "w": 350,
+            "x": 60,
+            "y": 60
+          },
+          {
+            "data": {
+              "fields": [
+                {
+                  "flags": "-",
+                  "name": "Version",
+                  "notes": "Save format version; saves below current version are discarded, not migrated",
+                  "type": "int"
+                },
+                {
+                  "flags": "-",
+                  "name": "Balance",
+                  "notes": "-",
+                  "type": "float"
+                },
+                {
+                  "flags": "-",
+                  "name": "Reputation",
+                  "notes": "-",
+                  "type": "float"
+                },
+                {
+                  "flags": "-",
+                  "name": "Day",
+                  "notes": "-",
+                  "type": "int"
+                },
+                {
+                  "flags": "-",
+                  "name": "Staff",
+                  "notes": "-",
+                  "type": "int"
+                },
+                {
+                  "flags": "-",
+                  "name": "PriceMultiplier",
+                  "notes": "-",
+                  "type": "float"
+                },
+                {
+                  "flags": "-",
+                  "name": "SavedAt",
+                  "notes": "ISO-8601 UTC timestamp",
+                  "type": "string"
+                },
+                {
+                  "flags": "-",
+                  "name": "Stock",
+                  "notes": "id + qty pairs, shelf stock",
+                  "type": "StockEntry[]"
+                },
+                {
+                  "flags": "-",
+                  "name": "Warehouse",
+                  "notes": "delivered units still in the stockroom, keyed by category",
+                  "type": "StockEntry[]"
+                },
+                {
+                  "flags": "-",
+                  "name": "PlacedObjects",
+                  "notes": "catalogId, cellX/cellY, variant, rotation, shelfStock[], pets[] (PetSaveData)",
+                  "type": "PlacedItem[]"
+                }
+              ]
+            },
+            "h": 240,
+            "id": "widget-1790266219613-2",
+            "title": "Database Table Schema",
+            "type": "schema",
+            "w": 440,
+            "x": 90,
+            "y": 90
+          }
+        ]
+      },
+      "id": "local-save-file",
+      "name": "Local Save File",
+      "type": "storage"
+    }
+  ],
+  "connections": [
+    {
+      "from": "build-editor-tooling",
+      "protocol": "Unity Editor build pipeline (headless build.sh)",
+      "to": "pet-shop-simulator-game-client"
+    },
+    {
+      "from": "pet-shop-simulator-game-client",
+      "protocol": "Local filesystem I/O (JsonUtility JSON)",
+      "to": "local-save-file"
+    }
+  ],
+  "forestreeFormatVersion": true,
   "globalRules": {
     "custom": {
       "accessibility": "",
@@ -235,6 +617,52 @@
   },
   "groups": [],
   "projectName": "Forestree Agent Workspace",
-  "topologyLayout": {},
+  "repoId": "cca103e0-e40e-475f-8726-8a6fee94529d",
+  "topologyLayout": {
+    "build-editor-tooling": {
+      "x": 56,
+      "y": 442
+    },
+    "local-save-file": {
+      "x": 216,
+      "y": 112
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-calibration-tool": {
+      "x": 761,
+      "y": 730
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-collection-db": {
+      "x": 80,
+      "y": 401
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-game-data-builder": {
+      "x": 814,
+      "y": 420
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-game-data-db": {
+      "x": 610,
+      "y": 548
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-ios-shortcut": {
+      "x": 393,
+      "y": 698
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-iv-solver": {
+      "x": 599,
+      "y": 268
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-ntfy-push": {
+      "x": 284,
+      "y": 136
+    },
+    "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-shortcut-server": {
+      "x": 337,
+      "y": 405
+    },
+    "pet-shop-simulator-game-client": {
+      "x": 288,
+      "y": 341
+    }
+  },
   "version": "1.0.0"
 }
