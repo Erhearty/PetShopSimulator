@@ -23,9 +23,24 @@ startup; there are no sound files.
 ./build.sh run        # play it
 ./build.sh look       # render screenshots of the running game into Screenshots/
 ./build.sh test       # run the EditMode unit tests headless
+./build.sh playtest   # spawnverify + PlayMode tests + smoke + economy soak, one PASS/FAIL/SKIP line each
 ```
 
 Tests live in `Assets/Tests/EditMode` (assembly `PetShop.Tests.EditMode`) and results go to `Logs/build/editmode-results.xml`.
+
+### Automated playtest
+
+| Target | What it does |
+|--------|--------------|
+| `./build.sh playmode` | PlayMode tests (`Assets/Tests/PlayMode`, assembly `PetShop.Tests.PlayMode`). Tests tagged `[Category("KnownIssue")]` run separately afterwards and are reported as `⚠ known issue` without failing the run. |
+| `./build.sh spawnverify` | Spawns key pack models and checks their size and grounding. With no asset pack installed it reports SKIP; a partial install fails. |
+| `./build.sh soak` | Seeded headless run of the Linux player (`SEED`, default 1; `SOAK_DAYS`, default 15) that writes `Logs/build/soak.jsonl` and fails when any day leaves the soak bands. |
+| `./build.sh playtest` | All of the above plus `smoke`. Every stage runs even if an earlier one fails; exits 1 if any stage failed. Needs a Linux build (`./build.sh linux`). |
+| `./build.sh look-diff` | `look`, then compares `Screenshots/` against the approved `Tests/Baselines/Screenshots/` and prints each image's difference; diff images go to `Logs/screenshot-diff/`. Never fails. |
+| `./build.sh look-approve` | Copies the current `Screenshots/` over the baselines. |
+
+The soak band values in `Assets/Scripts/Dev/SoakBands.cs` are placeholders, to be set from the
+first real 15-day run.
 
 Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Play.
 
@@ -163,6 +178,11 @@ imports them. `THIRD-PARTY.md` lists every pack, its folder and licence status.
 |------|--------|
 | `-daylength <seconds>` | Length of a trading day (default 210) |
 | `-screenshot <path>` | Capture PNGs of the running game, then quit |
+| `-seed <N>` | Seed gameplay randomness so a run is repeatable |
+| `-nopacks` | Ignore installed asset packs and use the fallbacks |
+| `-savepath <file>` | Use this save file instead of the default slot |
+| `-telemetry <file.jsonl>` | Append one JSON line per closed day, then a summary line |
+| `-quitafterdays <N>` | Quit after N days: exit code 0 when every soak band held, 3 otherwise |
 
 ## Licence
 
