@@ -6,6 +6,7 @@ using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Customer;
+using PetShop.Progression;
 
 namespace PetShop.Core
 {
@@ -28,6 +29,7 @@ namespace PetShop.Core
         [HideInInspector] public AudioManager    Audio;
         [HideInInspector] public ShopGenerator   Generator;
         [HideInInspector] public CheckoutQueue    Queue;
+        [HideInInspector] public ProgressionDirector Progression;
 
         // ── Events for UI ─────────────────────────────────────────────────────
         public UnityEvent<DaySummary> OnDayEnded     = new();
@@ -260,7 +262,7 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
-            DaySummary summary = Shop.CloseDay();
+            DaySummary summary = CloseDayWithProgression();
             SaveGame();
 
             Audio?.PlaySfx("day_end");
@@ -285,6 +287,30 @@ namespace PetShop.Core
                 yield return new WaitForSeconds(0.5f);
                 StartNewDay();
             }
+        }
+
+        /// <summary>
+        /// Closes the day's books, running any due inspection first, then adds the inspection
+        /// result and any tier-ups to the summary's headlines.
+        /// </summary>
+        private DaySummary CloseDayWithProgression()
+        {
+            // The inspector grades the day being closed, so the result lands in its books.
+            var inspection = Progression?.RunInspectionIfDue(Shop.Day);
+            DaySummary summary = Shop.CloseDay();
+            CollectProgressionHeadlines(summary, inspection);
+            return summary;
+        }
+
+        /// <summary>Adds the inspection result and any tier-ups to the day's summary.</summary>
+        private void CollectProgressionHeadlines(DaySummary summary, List<string> inspection)
+        {
+            if (inspection != null)
+                foreach (var line in inspection) { summary.Headlines.Add(line); Notify(line); }
+            if (Progression == null) return;
+            // The director notifies milestones itself; only the summary needs them here.
+            Progression.CheckMilestones();
+            summary.Headlines.AddRange(Progression.LatestMilestones);
         }
 
         // ── Staff (delegated to StaffRoster) ─────────────────────────────────

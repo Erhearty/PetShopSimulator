@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using PetShop.Core;
+using PetShop.Progression;
 
 namespace PetShop.Tests
 {
@@ -14,13 +15,24 @@ namespace PetShop.Tests
     {
         private const float Tolerance = 1e-5f;
 
-        /// <summary>A current-version save with every migrated field off its default.</summary>
-        private const string V2Json =
-            "{\"Version\":2,\"Balance\":1234.5,\"Reputation\":67.25,\"Day\":9,\"Staff\":3," +
+        /// <summary>A current-version (v3) save with every migrated field off its default.</summary>
+        private const string V3Json =
+            "{\"Version\":3,\"ProgressionTier\":2,\"Balance\":1234.5,\"Reputation\":67.25,\"Day\":9,\"Staff\":3," +
             "\"PriceMultiplier\":1.25,\"SavedAt\":\"2024-01-01T00:00:00Z\"," +
             "\"Stock\":[{\"id\":\"kibble\",\"qty\":12}],\"Warehouse\":[{\"id\":\"toys\",\"qty\":4}]," +
             "\"PlacedObjects\":[{\"catalogId\":\"pen_small\",\"cellX\":4,\"cellY\":7,\"variant\":\"\",\"rotation\":90.0," +
             "\"shelfStock\":[],\"pets\":[{\"species\":\"Cat\",\"petName\":\"Pip\",\"ageDays\":2}]}]}";
+
+        /// <summary>A version 2 save: no ProgressionTier field, reputation 72.</summary>
+        private const string V2Json =
+            "{\"Version\":2,\"Balance\":500.0,\"Reputation\":72.0,\"Day\":14,\"Staff\":2," +
+            "\"PriceMultiplier\":1.0,\"Stock\":[],\"Warehouse\":[],\"PlacedObjects\":[]}";
+
+        /// <summary>The tier reputation 72 earns: Trusted Name (70 ≤ 72 &lt; 85).</summary>
+        private const int Reputation72Tier = 2;
+
+        /// <summary>The save format version this build writes.</summary>
+        private const int Version3 = 3;
 
         /// <summary>A version 1 save with invalid staff/multiplier and a placed item lacking lists.</summary>
         private const string V1Json =
@@ -32,15 +44,23 @@ namespace PetShop.Tests
             "{\"Balance\":10.0,\"Day\":1,\"Staff\":0,\"PriceMultiplier\":-2.0," +
             "\"PlacedObjects\":[{\"catalogId\":\"pen_small\",\"cellX\":0,\"cellY\":0}]}";
 
+        /// <summary>Reputation high enough to earn a tier above the starting one.</summary>
+        private const float HighReputation = 90f;
+
+        /// <summary>A version 1 save with high reputation, to check the tier seed runs through the chain.</summary>
+        private const string V1HighReputationJson =
+            "{\"Version\":1,\"Balance\":50.0,\"Reputation\":90.0,\"Day\":30,\"Staff\":1,\"PriceMultiplier\":1.0}";
+
         private const string MalformedJson = "{ this is not json";
 
         [Test]
         public void Migrate_CurrentVersion_RoundTripsUnchanged()
         {
-            var data = SaveMigrator.Migrate(V2Json);
+            var data = SaveMigrator.Migrate(V3Json);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(2, data.Version);
+            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(2, data.ProgressionTier);
             Assert.AreEqual(1234.5f, data.Balance, Tolerance);
             Assert.AreEqual(67.25f, data.Reputation, Tolerance);
             Assert.AreEqual(9, data.Day);
@@ -76,6 +96,47 @@ namespace PetShop.Tests
 
             AssertMigratedWithDefaults(data);
             Assert.AreEqual(10f, data.Balance, Tolerance);
+        }
+
+        [Test]
+        public void Migrate_Version2_SeedsProgressionTierFromReputation()
+        {
+            var data = SaveMigrator.Migrate(V2Json);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(Reputation72Tier, data.ProgressionTier);
+            Assert.AreEqual(ProgressionRules.TierForReputation(72f), data.ProgressionTier);
+            Assert.AreEqual(72f, data.Reputation, Tolerance);
+            Assert.AreEqual(14, data.Day);
+        }
+
+        [Test]
+        public void Migrate_Version1_SeedsProgressionTierFromReputation()
+        {
+            var data = SaveMigrator.Migrate(V1HighReputationJson);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(ProgressionRules.TierForReputation(HighReputation), data.ProgressionTier);
+            Assert.Greater(data.ProgressionTier, 0);
+        }
+
+        [Test]
+        public void Migrate_MissingVersion_ReachesVersion3()
+        {
+            var data = SaveMigrator.Migrate(LegacyJson);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(Version3, data.Version);
+        }
+
+        [Test]
+        public void Migrate_VersionWithoutStep_ReturnsNullWithError()
+        {
+            LogAssert.Expect(LogType.Error, new Regex("No migration from save version -1"));
+
+            Assert.IsNull(SaveMigrator.Migrate("{\"Version\":-1,\"Balance\":1.0}"));
         }
 
         [Test]

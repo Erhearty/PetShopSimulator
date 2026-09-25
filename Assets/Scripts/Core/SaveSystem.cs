@@ -14,6 +14,8 @@ namespace PetShop.Core
     public class SaveData
     {
         public int    Version = SaveMigrator.CurrentVersion;
+        /// <summary>Permanent reputation tier reached (see ProgressionRules).</summary>
+        public int    ProgressionTier;
         public float  Balance;
         public float  Reputation;
         public int    Day;

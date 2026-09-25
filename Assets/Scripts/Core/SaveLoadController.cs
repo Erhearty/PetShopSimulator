@@ -87,6 +87,7 @@ namespace PetShop.Core
                 Day             = shop.Day,
                 Staff           = _game.StaffCount,
                 PriceMultiplier = shop.PriceMultiplier,
+                ProgressionTier = _game.Progression?.Tier ?? 0,
             };
 
             foreach (var kvp in shop.Stock)
@@ -155,6 +156,9 @@ namespace PetShop.Core
             foreach (var entry in data.Warehouse)
                 if (System.Enum.TryParse(entry.id, out ProductCategory category))
                     shop.AddToWarehouse(category, entry.qty);
+
+            // Unlocked lot stages must be buildable before saved furniture is placed on them.
+            _game.Progression?.Restore(data.ProgressionTier);
 
             foreach (var item in data.PlacedObjects)
             {
