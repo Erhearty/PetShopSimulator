@@ -45,9 +45,16 @@ namespace PetShop.Core
         private static readonly Dictionary<string, GameObject> _prefabs = new();
         private static readonly Dictionary<string, Bounds>     _bounds  = new();
         private static readonly HashSet<string>                _missing = new();
+        private static readonly Dictionary<string, string>     _packFallbacks = new();
 
         /// <summary>Prefix shared by every Asset Store pack path.</summary>
         private const string PacksPrefix = "Packs/";
+
+        /// <summary>Value recorded in <see cref="PackFallbacks"/> when no candidate at all was installed.</summary>
+        private const string NoFallback = "(none)";
+
+        /// <summary>Bounds reported for a model that is not installed (or has no path): a unit cube at the origin.</summary>
+        private static readonly Bounds MissingBounds = new(Vector3.zero, Vector3.one);
 
         /// <summary>
         /// When set (by <c>-nopacks</c>), every model under Resources/Packs/ is treated as absent
@@ -55,8 +62,22 @@ namespace PetShop.Core
         /// </summary>
         public static bool ForceProcedural;
 
-        /// <summary>Every resource path that was looked up and found missing since the last cache reset.</summary>
+        /// <summary>
+        /// Every resource path that was loaded for use (<see cref="Prefab"/>, <see cref="Spawn"/>,
+        /// <see cref="SpawnRaw"/>, <see cref="LocalBounds"/>) and found missing since the last cache
+        /// reset. Probes (<see cref="TryPrefab"/>, <see cref="Has"/>, <see cref="FirstAvailable"/>,
+        /// <see cref="AnyAvailable"/>) never add to it; a pack model those probes had to fall back
+        /// from is recorded in <see cref="PackFallbacks"/> instead.
+        /// </summary>
         public static IReadOnlyCollection<string> MissingPaths => _missing;
+
+        /// <summary>
+        /// Candidate groups passed to <see cref="FirstAvailable"/> or <see cref="AnyAvailable"/> that
+        /// named at least one Asset Store pack model but had none of them installed, since the last
+        /// cache reset. Key: the group's first Packs/ candidate. Value: the path actually chosen, or
+        /// "(none)" when nothing was. Never recorded while <see cref="ForceProcedural"/> is set.
+        /// </summary>
+        public static IReadOnlyDictionary<string, string> PackFallbacks => _packFallbacks;
 
         /// <summary>How a model should be sized when it is spawned.</summary>
         public enum Fit { None, Width, Height, Depth, Largest }
@@ -65,22 +86,43 @@ namespace PetShop.Core
 
         /// <summary>
         /// The prefab at Resources/<paramref name="resourcePath"/>, cached; null when it is not
-        /// installed or when <see cref="ForceProcedural"/> hides the Asset Store packs.
+        /// installed, when <paramref name="resourcePath"/> is null or empty, or when
+        /// <see cref="ForceProcedural"/> hides the Asset Store packs.
         /// </summary>
         public static GameObject Prefab(string resourcePath)
         {
-            if (ForceProcedural && resourcePath != null && resourcePath.StartsWith(PacksPrefix, System.StringComparison.Ordinal)) return null;
+            var prefab = TryPrefab(resourcePath);
+            // FirstAvailable returns null when nothing is installed; callers pass that straight on.
+            if (prefab != null || string.IsNullOrEmpty(resourcePath) || IsHiddenPack(resourcePath)) return prefab;
+
+            if (_missing.Add(resourcePath))
+                Debug.LogWarning($"[Kenney] model not found: Resources/{resourcePath}");
+            return null;
+        }
+
+        /// <summary>
+        /// Same as <see cref="Prefab"/> but a probe: a model that is not installed is NOT recorded in
+        /// <see cref="MissingPaths"/>, so trying several spellings of a name leaves no false misses.
+        /// </summary>
+        public static GameObject TryPrefab(string resourcePath)
+        {
+            if (string.IsNullOrEmpty(resourcePath) || IsHiddenPack(resourcePath)) return null;
             if (_prefabs.TryGetValue(resourcePath, out var cached)) return cached;
 
             var prefab = Resources.Load<GameObject>(resourcePath);
-            if (prefab == null && _missing.Add(resourcePath))
-                Debug.LogWarning($"[Kenney] model not found: Resources/{resourcePath}");
-
             _prefabs[resourcePath] = prefab;
             return prefab;
         }
 
-        public static bool Has(string resourcePath) => Prefab(resourcePath) != null;
+        /// <summary>True when <see cref="ForceProcedural"/> hides this Asset Store pack path.</summary>
+        private static bool IsHiddenPack(string resourcePath) =>
+            ForceProcedural && resourcePath.StartsWith(PacksPrefix, System.StringComparison.Ordinal);
+
+        /// <summary>
+        /// True when the model at <paramref name="resourcePath"/> is installed; false for a null or
+        /// empty path. A probe: a miss is not recorded in <see cref="MissingPaths"/>.
+        /// </summary>
+        public static bool Has(string resourcePath) => TryPrefab(resourcePath) != null;
 
         /// <summary>
         /// The first of these models that is actually installed, or null.
@@ -89,9 +131,11 @@ namespace PetShop.Core
         /// </summary>
         public static string FirstAvailable(params string[] resourcePaths)
         {
+            string chosen = null;
             foreach (string path in resourcePaths)
-                if (!string.IsNullOrEmpty(path) && Has(path)) return path;
-            return null;
+                if (!string.IsNullOrEmpty(path) && Has(path)) { chosen = path; break; }
+            RecordPackFallback(resourcePaths, chosen);
+            return chosen;
         }
 
         /// <summary>Picks one at random from those that are installed, or null.</summary>
@@ -100,7 +144,46 @@ namespace PetShop.Core
             var found = new List<string>();
             foreach (string path in resourcePaths)
                 if (!string.IsNullOrEmpty(path) && Has(path)) found.Add(path);
-            return found.Count == 0 ? null : found[rng.Next(found.Count)];
+            string chosen = found.Count == 0 ? null : found[rng.Next(found.Count)];
+            RecordPackFallback(resourcePaths, chosen);
+            return chosen;
+        }
+
+        /// <summary>
+        /// Records <paramref name="chosen"/> in <see cref="PackFallbacks"/> when the group names at
+        /// least one Packs/ candidate and none of its Packs/ candidates is installed. Several
+        /// spellings of one pack model count as one group, so a single hit among them is no miss.
+        /// </summary>
+        private static void RecordPackFallback(string[] resourcePaths, string chosen)
+        {
+            if (ForceProcedural) return;
+            string firstPack = null;
+            foreach (string path in resourcePaths)
+            {
+                if (string.IsNullOrEmpty(path) || !path.StartsWith(PacksPrefix, System.StringComparison.Ordinal)) continue;
+                if (Has(path)) return;
+                firstPack ??= path;
+            }
+            if (firstPack != null) _packFallbacks[firstPack] = chosen ?? NoFallback;
+        }
+
+        /// <summary>
+        /// One line naming up to <paramref name="max"/> entries of <see cref="PackFallbacks"/> as
+        /// 'pack path -> fallback', with '(+K more)' when capped; null when nothing fell back.
+        /// </summary>
+        public static string PackFallbackReport(int max)
+        {
+            if (_packFallbacks.Count == 0) return null;
+            var shown = new List<string>();
+            foreach (var pair in _packFallbacks)
+            {
+                if (shown.Count >= max) break;
+                shown.Add($"{pair.Key} -> {pair.Value}");
+            }
+            string report = $"[Models] {_packFallbacks.Count} pack model(s) missing, using fallbacks: "
+                          + string.Join(", ", shown);
+            int more = _packFallbacks.Count - shown.Count;
+            return more > 0 ? $"{report} (+{more} more)" : report;
         }
 
         /// <summary>
@@ -224,6 +307,7 @@ namespace PetShop.Core
         /// </summary>
         public static Bounds LocalBounds(string resourcePath)
         {
+            if (string.IsNullOrEmpty(resourcePath)) return MissingBounds;
             if (_bounds.TryGetValue(resourcePath, out var cached)) return cached;
 
             var prefab = Prefab(resourcePath);
@@ -329,9 +413,10 @@ namespace PetShop.Core
             _prefabs.Clear();
             _bounds.Clear();
             _missing.Clear();
+            _packFallbacks.Clear();
         }
 
-        /// <summary>Forgets every cached prefab, measured bounds and missing path (same as <see cref="ClearCache"/>).</summary>
+        /// <summary>Forgets every cached prefab, measured bounds, missing path and pack fallback (same as <see cref="ClearCache"/>).</summary>
         public static void ResetCache() => ClearCache();
     }
 }

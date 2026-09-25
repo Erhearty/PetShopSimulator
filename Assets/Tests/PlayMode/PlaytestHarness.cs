@@ -1,9 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 using PetShop.Core;
 using PetShop.UI;
 
@@ -34,6 +36,23 @@ namespace PetShop.Tests
         /// <summary>The save file itself plus the backup and scratch files SaveSystem writes beside it.</summary>
         private static readonly string[] SaveFileSuffixes = { "", ".bak", ".tmp" };
 
+        /// <summary>
+        /// The only error tolerated while the world builds: editor-only, raised when the runtime
+        /// NavMesh bake meets a pack mesh imported without read/write access.
+        /// </summary>
+        private const string ToleratedBootErrorPattern =
+            @"RuntimeNavMeshBuilder: Source mesh .* does not allow read access";
+
+        /// <summary>Most boot errors listed in a failure message.</summary>
+        private const int MaxBootErrorsInMessage = 10;
+
+        private static readonly Regex ToleratedBootError = new(ToleratedBootErrorPattern);
+        /// <summary>Error / exception / assert logs captured during the last world build.</summary>
+        private static readonly List<string> _bootErrors = new();
+        private static bool _capturingBootLogs;
+        /// <summary>LogAssert.ignoreFailingMessages as it was before the capture started.</summary>
+        private static bool _savedIgnoreFailingMessages;
+
         private static readonly HashSet<GameObject> _preexistingRoots = new();
         private static bool   _booted;
         private static string _savePath;
@@ -58,6 +77,22 @@ namespace PetShop.Tests
         /// <param name="dayLength">Game seconds per trading day (GameManager.DayLengthSeconds).</param>
         public static IEnumerator Boot(bool packs, int seed, float timeScale, float dayLength)
         {
+            StartCapturingBootLogs();
+            try
+            {
+                yield return BuildWorld(packs, seed, dayLength);
+            }
+            finally
+            {
+                StopCapturingBootLogs();
+            }
+            AssertNoBootErrors();
+            Time.timeScale = timeScale;
+        }
+
+        /// <summary>Adds the bootstrapper and waits until the first trading day is running.</summary>
+        private static IEnumerator BuildWorld(bool packs, int seed, float dayLength)
+        {
             RememberPreexistingRoots();
             PrepareStatics(packs, seed);
 
@@ -71,7 +106,6 @@ namespace PetShop.Tests
             if (!game.IsDayRunning) BeginManually(game);
 
             yield return WaitForDayRunning(game);
-            Time.timeScale = timeScale;
         }
 
         /// <summary>
@@ -80,6 +114,8 @@ namespace PetShop.Tests
         /// </summary>
         public static void Teardown()
         {
+            // A boot that failed part-way never reached its finally; stop capturing here too.
+            StopCapturingBootLogs();
             Time.timeScale = 1f;
             if (_booted) DestroyBootedRoots();
 
@@ -96,7 +132,7 @@ namespace PetShop.Tests
         /// <summary>
         /// True when the Asset Store packs are on disk. Ignores ForceProcedural for the check.
         /// Probed once and cached: only that first probe (made before any world boots) clears the
-        /// model cache, so later calls never wipe ModelLibrary.MissingPaths between Boot and the
+        /// model cache, so later calls never wipe ModelLibrary.MissingPaths or ModelLibrary.PackFallbacks between Boot and the
         /// assertions. Boot/Teardown's own ResetCache is what clears the cache between worlds.
         /// </summary>
         public static bool PacksInstalled()
@@ -121,6 +157,40 @@ namespace PetShop.Tests
 
             string list = string.Join(", ", head);
             return names.Count > cap ? $"{list} (+{names.Count - cap} more)" : list;
+        }
+
+        /// <summary>Stops boot errors failing the test by themselves and records them instead.</summary>
+        private static void StartCapturingBootLogs()
+        {
+            StopCapturingBootLogs();
+            _bootErrors.Clear();
+            _savedIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
+            Application.logMessageReceived += OnBootLog;
+            _capturingBootLogs = true;
+        }
+
+        /// <summary>Unsubscribes and restores LogAssert.ignoreFailingMessages. Safe to call more than once.</summary>
+        private static void StopCapturingBootLogs()
+        {
+            if (!_capturingBootLogs) return;
+            Application.logMessageReceived -= OnBootLog;
+            LogAssert.ignoreFailingMessages = _savedIgnoreFailingMessages;
+            _capturingBootLogs = false;
+        }
+
+        private static void OnBootLog(string condition, string stackTrace, LogType type)
+        {
+            if (type == LogType.Log || type == LogType.Warning) return;
+            if (ToleratedBootError.IsMatch(condition)) return;
+            _bootErrors.Add($"{type}: {condition}");
+        }
+
+        private static void AssertNoBootErrors()
+        {
+            if (_bootErrors.Count == 0) return;
+            Assert.Fail($"{_bootErrors.Count} error logs while building the world: "
+                        + ListNames(_bootErrors, MaxBootErrorsInMessage));
         }
 
         private static void RememberPreexistingRoots()

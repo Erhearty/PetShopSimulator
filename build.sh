@@ -19,6 +19,9 @@
 #    ./build.sh look-approve  copy the current Screenshots/ over the baselines
 #    ./build.sh assets     import Asset Store packages you've downloaded via Package Manager
 #    ./build.sh assets?    report which downloaded packages are present
+#    ./build.sh kenney     restore the CC0 Kenney kits (other checkout → Library/kenney-cache → kenney.nl)
+#
+#  Most targets run the kenney step first; KENNEY_SRC=/path/to/checkout picks where kits are copied from.
 #
 #  Override the editor with:  UNITY=/path/to/Unity ./build.sh
 #  soak takes SEED (default 1) and SOAK_DAYS (default 15) from the environment.
@@ -356,6 +359,16 @@ do_look() {
     ls "$out"/*.png 2>/dev/null | sed "s|^|  |"
 }
 
+# The Kenney kits are gitignored, so a fresh clone or worktree has none; restore them first.
+ensure_kenney() {
+    bash "$PROJECT/Tools/fetch_kenney.sh" "$PROJECT" || exit 1
+}
+
+case "${1:-all}" in
+    setup|scene|linux|windows|test|playmode|soak|spawnverify|playtest|look|look-diff|all|assets)
+        ensure_kenney ;;
+esac
+
 case "${1:-all}" in
     setup)   do_setup ;;
     scene)   run_editor SceneBuilder.BuildMainScene scene ;;
@@ -387,6 +400,7 @@ case "${1:-all}" in
         ;;
     assets?) run_editor AssetStoreImporter.Report    assetstore-report ;;
     run)     exec "$PLAYER" ;;
+    kenney)  ensure_kenney ;;
     all)
         do_setup
         run_editor SceneBuilder.BuildMainScene scene

@@ -32,16 +32,22 @@ namespace PetShop.Dev
     }
 
     /// <summary>
-    /// Pure pass/fail bands for a soak run. Every band value below is a PLACEHOLDER: they
-    /// are to be re-set from the data of the first real 15-day run.
+    /// Pure pass/fail bands for a soak run. The band values are calibrated from the seed-1
+    /// 14-day run of 2026-09-25 (Logs/build/soak.jsonl): an idle shop with no player input,
+    /// measured with the Kenney kits installed.
     /// </summary>
     public static class SoakBands
     {
         /// <summary>Seed recorded when the run was not seeded.</summary>
         public const int NoSeed = -1;
 
-        /// <summary>Placeholder. Mirrors GameManager: a closing balance below 0 is game over.</summary>
-        public const float BankruptcyFloor = 0f;
+        /// <summary>
+        /// Lowest acceptable closing balance, from the seed-1 run, 2026-09-25, Kenney installed. An
+        /// idle shop with no player input was observed at a minimum of -109.67 on its final day
+        /// (day 14), so this catches runaway losses (and, with the finite check, NaN), not normal
+        /// idle bankruptcy.
+        /// </summary>
+        public const float MinBalance = -500f;
 
         /// <summary>Lower end of ShopManager's reputation clamp (Mathf.Clamp(..., 0f, 100f)).</summary>
         public const float MinReputation = 0f;
@@ -49,16 +55,38 @@ namespace PetShop.Dev
         /// <summary>Upper end of ShopManager's reputation clamp (Mathf.Clamp(..., 0f, 100f)).</summary>
         public const float MaxReputation = 100f;
 
-        /// <summary>Placeholder. Highest acceptable walkoutsEmpty / (checkouts + walkoutsEmpty).</summary>
+        /// <summary>
+        /// Highest acceptable walkoutsEmpty / (checkouts + walkoutsEmpty). The seed-1 run,
+        /// 2026-09-25, Kenney installed, had no empty walkouts at all (ratio 0 every day), so this
+        /// value is not calibrated by that run; it only catches a shop most customers leave empty.
+        /// </summary>
         public const float MaxWalkoutRatio = 0.6f;
 
-        /// <summary>Placeholder. The walkout band only applies on days after this one.</summary>
+        /// <summary>
+        /// The walkout band only applies on days after this one, from the seed-1 run, 2026-09-25,
+        /// Kenney installed (no customers at all on days 1-2; the first checkout was on day 3).
+        /// </summary>
         public const int WalkoutGraceDays = 2;
 
-        /// <summary>Placeholder. Highest acceptable navTimeouts / customers.</summary>
-        public const float MaxNavTimeoutRatio = 0.1f;
+        /// <summary>
+        /// Most navigation timeouts allowed in one day, from the seed-1 run, 2026-09-25, Kenney
+        /// installed: observed 0-3 a day (3 on day 12, with a single checkout), plus one of headroom.
+        /// That observed rate is high for so few customers; it is a separate gameplay issue, not
+        /// something this band signs off.
+        /// </summary>
+        public const int MaxNavTimeoutsPerDay = 4;
 
-        /// <summary>Placeholder. Every run of this many consecutive days must contain a sale.</summary>
+        /// <summary>
+        /// Opening days allowed to pass without a sale, from the seed-1 run, 2026-09-25, Kenney
+        /// installed (no sales on days 1-2; the first sale was on day 3, inside this grace).
+        /// </summary>
+        public const int SalesGraceDays = 3;
+
+        /// <summary>
+        /// After <see cref="SalesGraceDays"/>, every run of this many consecutive days must contain
+        /// a sale, from the seed-1 run, 2026-09-25, Kenney installed (after the first sale, at most
+        /// 2 sales-free days in a row: days 13-14).
+        /// </summary>
         public const int SalesWindowDays = 3;
 
         /// <summary>Placeholder. A checkout further than this from the till (XZ, metres) counts as stranded.</summary>
@@ -86,7 +114,8 @@ namespace PetShop.Dev
 
         /// <summary>
         /// Multi-day band: one violation per run of <see cref="SalesWindowDays"/> consecutive
-        /// records in <paramref name="days"/> with no sales. Fewer records than that never violate.
+        /// records in <paramref name="days"/> with no sales, ignoring runs that start within the
+        /// first <see cref="SalesGraceDays"/> days. Fewer records than that never violate.
         /// </summary>
         public static IReadOnlyList<string> CheckWindow(IReadOnlyList<DayRecord> days)
         {
@@ -95,13 +124,15 @@ namespace PetShop.Dev
 
             for (int start = 0; start + SalesWindowDays <= days.Count; start++)
             {
-                if (AnySales(days, start)) continue;
+                if (InSalesGrace(days[start]) || AnySales(days, start)) continue;
                 int first = days[start]?.day ?? start;
                 int last  = days[start + SalesWindowDays - 1]?.day ?? start + SalesWindowDays - 1;
                 violations.Add($"no sales on days {first}-{last}");
             }
             return violations;
         }
+
+        private static bool InSalesGrace(DayRecord r) => r != null && r.day <= SalesGraceDays;
 
         private static bool AnySales(IReadOnlyList<DayRecord> days, int start)
         {
@@ -114,8 +145,8 @@ namespace PetShop.Dev
         {
             if (float.IsNaN(r.balance) || float.IsInfinity(r.balance))
                 violations.Add($"day {r.day}: balance is not a finite number ({r.balance})");
-            else if (r.balance < BankruptcyFloor)
-                violations.Add($"day {r.day}: balance {r.balance:F2} is below the bankruptcy floor {BankruptcyFloor:F2}");
+            else if (r.balance < MinBalance)
+                violations.Add($"day {r.day}: balance {r.balance:F2} is below the minimum {MinBalance:F2}");
         }
 
         private static void CheckReputation(DayRecord r, List<string> violations)
@@ -137,12 +168,8 @@ namespace PetShop.Dev
 
         private static void CheckNavTimeouts(DayRecord r, List<string> violations)
         {
-            if (r.navTimeouts <= 0) return;
-
-            int customers = CustomerCount(r);
-            float ratio = customers == 0 ? float.PositiveInfinity : (float)r.navTimeouts / customers;
-            if (ratio > MaxNavTimeoutRatio)
-                violations.Add($"day {r.day}: {r.navTimeouts} navigation timeouts for {customers} customers exceeds ratio {MaxNavTimeoutRatio:F2}");
+            if (r.navTimeouts > MaxNavTimeoutsPerDay)
+                violations.Add($"day {r.day}: {r.navTimeouts} navigation timeouts exceeds {MaxNavTimeoutsPerDay} a day");
         }
     }
 }

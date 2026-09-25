@@ -38,11 +38,16 @@ namespace PetShop.Core
 
         private GameUI _ui;
 
+        /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
+        private const int MaxPackFallbacksReported = 10;
+
         private void Awake()
         {
             PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
             BuildSystems();
             BuildWorld();
+            string packFallbacks = ModelLibrary.PackFallbackReport(MaxPackFallbacksReported);
+            if (packFallbacks != null) Debug.LogWarning(packFallbacks);
             BuildUI();
             WireEverything();
         }

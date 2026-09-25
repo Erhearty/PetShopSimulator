@@ -152,10 +152,13 @@ namespace PetShop.Shop
             float step  = streetPack ? size.z : size.x;   // length once turned along X
             if (step < 1f) step = RoadWidth;
 
-            int tiles = Mathf.CeilToInt(HalfLength * 2f / step) + 1;
-            for (int i = 0; i <= tiles; i++)
+            // An odd number of tiles centred on x = 0 (so the crossing sits mid-street), with just
+            // enough on each side for the outer tile's far edge to reach HalfLength. The old
+            // count laid one or two extra tiles, and the road ran well past the pavement ends.
+            int half = Mathf.Max(0, Mathf.CeilToInt((HalfLength - step * 0.5f) / step));
+            for (int i = -half; i <= half; i++)
             {
-                float x = -tiles * step * 0.5f + i * step;
+                float x = i * step;
                 string model = Mathf.Abs(x) < step * 0.5f && StreetModels.Crossing != null ? StreetModels.Crossing : tile;
 
                 var go = ModelLibrary.Spawn(model, StreetRoot, new Vector3(x, -0.02f, RoadCentreZ),

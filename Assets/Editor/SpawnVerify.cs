@@ -77,13 +77,20 @@ public static class SpawnVerify
         if (Application.isBatchMode) EditorApplication.Exit(exitCode);
     }
 
-    /// <summary>Spawns one model, logs its measured bounds and returns how many problems it has.</summary>
+    /// <summary>Spawns one model and returns how many problems it has.</summary>
     private static int CheckCase(string path, ModelLibrary.Fit fit, float size, string expect)
     {
         var go = ModelLibrary.Spawn(path, null, Vector3.zero, 0f, fit, size);
         if (go == null) { Debug.LogWarning($"[Verify] SPAWN FAILED  {path}"); return 1; }
 
         Bounds b = ModelLibrary.WorldBounds(go);
+        Object.DestroyImmediate(go);
+        return MeasureCase(path, fit, size, expect, b);
+    }
+
+    /// <summary>Logs one spawned model's measured bounds and returns how many problems they show.</summary>
+    private static int MeasureCase(string path, ModelLibrary.Fit fit, float size, string expect, Bounds b)
+    {
         string flag = "";
         int bad = 0;
 
@@ -97,8 +104,6 @@ public static class SpawnVerify
         Debug.Log($"[Verify] {System.IO.Path.GetFileName(path),-34} " +
                   $"{b.size.x,6:F2} x {b.size.y,6:F2} x {b.size.z,6:F2}   " +
                   $"base.y={b.min.y,6:F2}   expect {expect}{flag}");
-
-        Object.DestroyImmediate(go);
         return bad;
     }
 
