@@ -159,12 +159,30 @@ namespace PetShop.Tests
             Assert.AreEqual(Pet.SpeciesBasePrice(Pet.Species.Horse), _restored.basePrice, Tolerance);
         }
 
+        /// <summary>An outdated save is migrated in memory; the file on disk is not rewritten.</summary>
         [Test]
-        public void Load_OutdatedVersion_ReturnsNullWithWarning()
+        public void Load_OutdatedVersion_MigratesWithoutRewritingFile()
         {
             File.WriteAllText(_path, JsonUtility.ToJson(new SaveData { Version = OutdatedVersion }));
-            LogAssert.Expect(LogType.Warning, new Regex("older build"));
-            Assert.IsNull(SaveSystem.Load(_path));
+
+            var loaded = SaveSystem.Load(_path);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, loaded.Version);
+            Assert.AreEqual(OutdatedVersion, ReadRaw(_path).Version);
+        }
+
+        /// <summary>A hand-written version 1 save file loads as the current version.</summary>
+        [Test]
+        public void Load_Version1JsonFile_ReturnsCurrentVersion()
+        {
+            const string v1Json = "{\"Version\":1,\"Balance\":50.0,\"Day\":3,\"Staff\":0,\"PriceMultiplier\":0.0}";
+            File.WriteAllText(_path, v1Json);
+
+            var loaded = SaveSystem.Load(_path);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, loaded.Version);
         }
 
         [Test]

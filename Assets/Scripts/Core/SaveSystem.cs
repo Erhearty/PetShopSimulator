@@ -13,7 +13,7 @@ namespace PetShop.Core
     [Serializable]
     public class SaveData
     {
-        public int    Version = 2;
+        public int    Version = SaveMigrator.CurrentVersion;
         public float  Balance;
         public float  Reputation;
         public int    Day;
@@ -140,12 +140,13 @@ namespace PetShop.Core
             }
         }
 
-        /// <summary>Reads the default save slot; null when absent, unreadable or outdated.</summary>
+        /// <summary>Reads the default save slot; null when absent, unreadable or unmigratable.</summary>
         public static SaveData Load() => Load(SavePath);
 
         /// <summary>
         /// Reads the save at <paramref name="path"/>, falling back to its backup when the main file
-        /// is absent, unreadable or outdated. Null when neither yields a usable save.
+        /// is absent, unreadable or unmigratable. Older saves are migrated in memory via
+        /// <see cref="SaveMigrator"/>. Null when neither yields a usable save.
         /// </summary>
         public static SaveData Load(string path)
         {
@@ -158,19 +159,16 @@ namespace PetShop.Core
             return data;
         }
 
-        /// <summary>Parses the save at <paramref name="path"/>; null when absent, unreadable or outdated.</summary>
+        /// <summary>
+        /// Parses and migrates the save at <paramref name="path"/>; null when absent, unreadable or
+        /// unmigratable. Migrated data is not written back.
+        /// </summary>
         private static SaveData TryRead(string path)
         {
             if (!File.Exists(path)) return null;
             try
             {
-                var data = JsonUtility.FromJson<SaveData>(File.ReadAllText(path));
-                if (data == null || data.Version < 2)
-                {
-                    Debug.LogWarning("[SaveSystem] Save is from an older build — starting fresh.");
-                    return null;
-                }
-                return data;
+                return SaveMigrator.Migrate(File.ReadAllText(path));
             }
             catch (Exception e)
             {
