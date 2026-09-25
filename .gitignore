@@ -13,10 +13,13 @@ UserSettings/
 # Third-party Asset Store packs — NOT redistributable, never commit them.
 # They are installed locally via Package Manager → My Assets + `./build.sh assets`.
 # See THIRD-PARTY.md. Keep this list identical to PURGE_PATHS in
-# Tools/purge_history.sh. (Assets/Resources/Kenney is CC0 and stays tracked.)
+# Tools/purge_history.sh. The Kenney kits are CC0 but are also kept out of the
+# repo to keep it small; see THIRD-PARTY.md for how to restore them.
 # ---------------------------------------------------------------------------
 /Assets/Resources/Packs/
 /Assets/Resources/Packs.meta
+/Assets/Resources/Kenney/
+/Assets/Resources/Kenney.meta
 /Assets/SimplePoly City - Low Poly Assets/
 /Assets/SimplePoly City - Low Poly Assets.meta
 /Assets/Low-Poly Furniture Kit - Stylized Wooden Set/

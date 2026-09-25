@@ -26,6 +26,8 @@ set -euo pipefail
 readonly PURGE_PATHS=(
     "Assets/Resources/Packs"
     "Assets/Resources/Packs.meta"
+    "Assets/Resources/Kenney"
+    "Assets/Resources/Kenney.meta"
     "Assets/SimplePoly City - Low Poly Assets"
     "Assets/SimplePoly City - Low Poly Assets.meta"
     "Assets/Low-Poly Furniture Kit - Stylized Wooden Set"
