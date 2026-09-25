@@ -53,38 +53,113 @@ namespace PetShop.Core
 
     public static class SaveSystem
     {
+        /// <summary>Suffix of the scratch file a save is written to before being swapped in.</summary>
+        private const string TempSuffix = ".tmp";
+
+        /// <summary>Suffix of the copy of the previous save kept after a successful swap.</summary>
+        private const string BackupSuffix = ".bak";
+
         public static string SavePath =>
             Path.Combine(Application.persistentDataPath, "petshop_save.json");
 
-        public static bool HasSave() => File.Exists(SavePath);
+        /// <summary>True when the default slot has a main save or a backup to fall back on.</summary>
+        public static bool HasSave() => HasSave(SavePath);
+
+        /// <summary>True when <paramref name="path"/> or its backup exists.</summary>
+        public static bool HasSave(string path) =>
+            File.Exists(path) || File.Exists(path + BackupSuffix);
 
         /// <summary>Writes <paramref name="data"/> to the default save slot.</summary>
         /// <returns>True when the file was written; false when the write failed (error is logged).</returns>
         public static bool Save(SaveData data) => Save(data, SavePath);
 
-        /// <summary>Writes <paramref name="data"/> as JSON to <paramref name="path"/>, stamping SavedAt.</summary>
+        /// <summary>
+        /// Writes <paramref name="data"/> as JSON to <paramref name="path"/>, stamping SavedAt.
+        /// The JSON goes to a temp file first and is then swapped in, keeping the previous save
+        /// as a backup; a failed write leaves the existing save untouched.
+        /// </summary>
         /// <returns>True when the file was written; false when serialisation or the write threw (error is logged).</returns>
         public static bool Save(SaveData data, string path)
         {
+            string tmp = path + TempSuffix;
             try
             {
                 data.SavedAt = DateTime.UtcNow.ToString("o");
-                File.WriteAllText(path, JsonUtility.ToJson(data, prettyPrint: true));
+                File.WriteAllText(tmp, JsonUtility.ToJson(data, prettyPrint: true));
+                SwapIn(tmp, path);
                 Debug.Log($"[SaveSystem] Saved to {path}");
                 return true;
             }
             catch (Exception e)
             {
                 Debug.LogError($"[SaveSystem] Save failed: {e.Message}");
+                TryDeleteQuietly(tmp);
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Moves the freshly written <paramref name="tmp"/> onto <paramref name="path"/>. When a save
+        /// already exists it becomes the backup; falls back to copy/delete/move where File.Replace
+        /// is unsupported or fails.
+        /// </summary>
+        private static void SwapIn(string tmp, string path)
+        {
+            if (!File.Exists(path))
+            {
+                File.Move(tmp, path);
+                return;
+            }
+            string bak = path + BackupSuffix;
+            try
+            {
+                File.Replace(tmp, path, bak);
+            }
+            catch (Exception e) when (e is NotSupportedException || e is IOException)
+            {
+                // Replace may have already moved main to .bak before failing.
+                if (File.Exists(path))
+                {
+                    File.Copy(path, bak, overwrite: true);
+                    File.Delete(path);
+                }
+                File.Move(tmp, path);
+            }
+        }
+
+        /// <summary>Best-effort removal of a leftover file; any exception is swallowed.</summary>
+        private static void TryDeleteQuietly(string path)
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch (Exception)
+            {
+                // Best effort only — a stale temp file is overwritten by the next save.
             }
         }
 
         /// <summary>Reads the default save slot; null when absent, unreadable or outdated.</summary>
         public static SaveData Load() => Load(SavePath);
 
-        /// <summary>Reads the save at <paramref name="path"/>; null when absent, unreadable or outdated.</summary>
-        internal static SaveData Load(string path)
+        /// <summary>
+        /// Reads the save at <paramref name="path"/>, falling back to its backup when the main file
+        /// is absent, unreadable or outdated. Null when neither yields a usable save.
+        /// </summary>
+        public static SaveData Load(string path)
+        {
+            var data = TryRead(path);
+            if (data != null) return data;
+            string bak = path + BackupSuffix;
+            data = TryRead(bak);
+            if (data != null)
+                Debug.LogWarning($"[SaveSystem] Main save unusable — loaded backup {bak}.");
+            return data;
+        }
+
+        /// <summary>Parses the save at <paramref name="path"/>; null when absent, unreadable or outdated.</summary>
+        private static SaveData TryRead(string path)
         {
             if (!File.Exists(path)) return null;
             try
@@ -104,9 +179,15 @@ namespace PetShop.Core
             }
         }
 
-        public static void Delete()
+        /// <summary>Removes the default save slot together with its backup and temp files.</summary>
+        public static void Delete() => Delete(SavePath);
+
+        /// <summary>Removes <paramref name="path"/> and its backup and temp files, where present.</summary>
+        public static void Delete(string path)
         {
-            if (File.Exists(SavePath)) File.Delete(SavePath);
+            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path + BackupSuffix)) File.Delete(path + BackupSuffix);
+            if (File.Exists(path + TempSuffix)) File.Delete(path + TempSuffix);
         }
 
         // ── Pet serialisation ───────────────────────────────────────────────────
