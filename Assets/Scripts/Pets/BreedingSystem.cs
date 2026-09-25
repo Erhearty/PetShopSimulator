@@ -12,7 +12,7 @@ namespace PetShop.Pets
     {
         private const float MutationChance       = 0.10f;
         private const float MutationStrength     = 0.15f;
-        private const float RarityUpgradeChance  = 0.05f;
+        internal const float RarityUpgradeChance = 0.05f;
         private const float BreedChancePerNight  = 0.45f;
 
         // ── Public API ───────────────────────────────────────────────
@@ -176,11 +176,28 @@ namespace PetShop.Pets
 
         // ── Trait helpers ────────────────────────────────────────────
 
+        /// <summary>
+        /// Random trait inheritance. Draw order is fixed: blend weight, mutation roll, then the
+        /// mutation offset only when the roll succeeds.
+        /// </summary>
         private static float Inherit(float a, float b)
         {
-            float v = Mathf.Lerp(a, b, Random.value);
-            if (Random.value < MutationChance)
-                v = Mathf.Clamp01(v + Random.Range(-MutationStrength, MutationStrength));
+            float t = Random.value;
+            float? mutation = Random.value < MutationChance
+                ? Random.Range(-MutationStrength, MutationStrength)
+                : (float?)null;
+            return Inherit(a, b, t, mutation);
+        }
+
+        /// <summary>
+        /// Pure trait inheritance: lerps between the parents by <paramref name="t"/>, then, if a
+        /// <paramref name="mutationOffset"/> is given, adds it and clamps to [0, 1].
+        /// </summary>
+        internal static float Inherit(float a, float b, float t, float? mutationOffset)
+        {
+            float v = Mathf.Lerp(a, b, t);
+            if (mutationOffset.HasValue)
+                v = Mathf.Clamp01(v + mutationOffset.Value);
             return v;
         }
 
@@ -198,10 +215,18 @@ namespace PetShop.Pets
             return c;
         }
 
-        private static Pet.Rarity InheritRarity(Pet.Rarity a, Pet.Rarity b)
+        /// <summary>Random rarity inheritance; draws exactly one Random.value.</summary>
+        private static Pet.Rarity InheritRarity(Pet.Rarity a, Pet.Rarity b) =>
+            InheritRarity(a, b, Random.value);
+
+        /// <summary>
+        /// Pure rarity inheritance: the lower parent tier, stepped up one tier when
+        /// <paramref name="upgradeRoll"/> is below RarityUpgradeChance (never past Legendary).
+        /// </summary>
+        internal static Pet.Rarity InheritRarity(Pet.Rarity a, Pet.Rarity b, float upgradeRoll)
         {
             int baseTier = Mathf.Min((int)a, (int)b);
-            if (Random.value < RarityUpgradeChance && baseTier < (int)Pet.Rarity.Legendary)
+            if (upgradeRoll < RarityUpgradeChance && baseTier < (int)Pet.Rarity.Legendary)
                 baseTier++;
             return (Pet.Rarity)baseTier;
         }
