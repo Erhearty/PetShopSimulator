@@ -9,6 +9,7 @@
 #    ./build.sh windows    build the Windows player
 #    ./build.sh run        run the last Linux build
 #    ./build.sh smoke      headless multi-day run, fails on any exception
+#    ./build.sh test       run EditMode unit tests headless (results in Logs/build/)
 #    ./build.sh look       render screenshots of the running game into Screenshots/
 #    ./build.sh assets     import Asset Store packages you've downloaded via Package Manager
 #    ./build.sh assets?    report which downloaded packages are present
@@ -87,6 +88,49 @@ do_smoke() {
     echo "✔ smoke run clean"
 }
 
+# EditMode unit tests. No -quit: -runTests exits the editor itself once the run finishes.
+# Exit codes: 0 all passed, 2 some tests failed, anything else = the run itself broke.
+do_test() {
+    local results="$LOG_DIR/editmode-results.xml"
+    local log="$LOG_DIR/editmode-tests.log"
+    rm -f "$results"
+
+    echo "▶ EditMode tests"
+    local rc=0
+    "$UNITY" -batchmode -nographics -projectPath "$PROJECT" \
+             -runTests -testPlatform EditMode -testResults "$results" \
+             -logFile "$log" || rc=$?
+
+    case "$rc" in
+        0)
+            if [[ ! -f "$results" ]]; then
+                echo "✘ Unity exited 0 but wrote no results ($results) — run unconfirmed" >&2
+                echo "  full log: $log" >&2
+                exit 1
+            fi
+            local run attr total="" passed="" failed=""
+            run=$(grep -o '<test-run [^>]*>' "$results" | head -1 || true)
+            for attr in total passed failed; do
+                printf -v "$attr" '%s' "$(echo "$run" | grep -o " $attr=\"[0-9]*\"" | sed -E 's/.*="([0-9]*)"/\1/' || true)"
+            done
+            echo "✔ EditMode tests passed (total ${total:-?}, passed ${passed:-?}, failed ${failed:-?})"
+            ;;
+        2)
+            echo "✘ EditMode tests failed:" >&2
+            grep -o '<test-case [^>]*result="Failed"[^>]*>' "$results" \
+                | sed -E 's/.*fullname="([^"]*)".*/  \1/' >&2 || true
+            echo "  results: $results" >&2
+            exit 1
+            ;;
+        *)
+            echo "✘ EditMode test run failed (exit $rc) — compiler errors:" >&2
+            grep -E "error CS[0-9]+" "$log" | sort -u | head -40 >&2 || true
+            echo "  full log: $log" >&2
+            exit 1
+            ;;
+    esac
+}
+
 # Photograph the running game so it can be reviewed without sitting in front of it.
 # Deliberately NOT -nographics: the editor needs a real graphics device to render, and it
 # gets one from the DRM render node given DISPLAY and XAUTHORITY — even where opening an
@@ -120,6 +164,7 @@ case "${1:-all}" in
     linux)   run_editor GameBuilder.BuildLinux   player-linux ;;
     windows) run_editor GameBuilder.BuildWindows player-windows ;;
     smoke)   do_smoke ;;
+    test)    do_test ;;
     look)    do_look ;;
     assets)
         # Unity's own package importer cannot be driven from batch mode: any package

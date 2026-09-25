@@ -58,13 +58,17 @@ namespace PetShop.Core
 
         public static bool HasSave() => File.Exists(SavePath);
 
-        public static void Save(SaveData data)
+        /// <summary>Writes <paramref name="data"/> to the default save slot.</summary>
+        public static void Save(SaveData data) => Save(data, SavePath);
+
+        /// <summary>Writes <paramref name="data"/> as JSON to <paramref name="path"/>, stamping SavedAt.</summary>
+        internal static void Save(SaveData data, string path)
         {
             try
             {
                 data.SavedAt = DateTime.UtcNow.ToString("o");
-                File.WriteAllText(SavePath, JsonUtility.ToJson(data, prettyPrint: true));
-                Debug.Log($"[SaveSystem] Saved to {SavePath}");
+                File.WriteAllText(path, JsonUtility.ToJson(data, prettyPrint: true));
+                Debug.Log($"[SaveSystem] Saved to {path}");
             }
             catch (Exception e)
             {
@@ -72,12 +76,16 @@ namespace PetShop.Core
             }
         }
 
-        public static SaveData Load()
+        /// <summary>Reads the default save slot; null when absent, unreadable or outdated.</summary>
+        public static SaveData Load() => Load(SavePath);
+
+        /// <summary>Reads the save at <paramref name="path"/>; null when absent, unreadable or outdated.</summary>
+        internal static SaveData Load(string path)
         {
-            if (!File.Exists(SavePath)) return null;
+            if (!File.Exists(path)) return null;
             try
             {
-                var data = JsonUtility.FromJson<SaveData>(File.ReadAllText(SavePath));
+                var data = JsonUtility.FromJson<SaveData>(File.ReadAllText(path));
                 if (data == null || data.Version < 2)
                 {
                     Debug.LogWarning("[SaveSystem] Save is from an older build — starting fresh.");

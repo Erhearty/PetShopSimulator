@@ -35,6 +35,15 @@ namespace PetShop.Customer
         [Tooltip("Chance per browsing stop that a customer falls for one of the animals.")]
         [Range(0f, 1f)] public float PetBuyChance = 0.12f;
 
+        /// <summary>Chance per browsing stop, at normal prices, of taking something off a shelf.</summary>
+        private const float ShelfBuyChance = 0.7f;
+
+        /// <summary>
+        /// Pure purchase decision: buys when <paramref name="roll"/> falls below the base chance
+        /// scaled by the shop's current <paramref name="demand"/> factor.
+        /// </summary>
+        internal static bool WillBuy(float roll, float baseChance, float demand) => roll < baseChance * demand;
+
         public CustomerState State { get; private set; } = CustomerState.Entering;
 
         private readonly List<(string id, string label, float price)> _basket = new();
@@ -299,7 +308,7 @@ namespace PetShop.Customer
             var preferred = stocked.FindAll(s => s.Category == PreferredCategory);
             if (preferred.Count > 0) stocked = preferred;
 
-            if (stocked.Count > 0 && Random.value < 0.7f * demand)
+            if (stocked.Count > 0 && WillBuy(Random.value, ShelfBuyChance, demand))
             {
                 var shelf   = stocked[Random.Range(0, stocked.Count)];
                 var product = shelf.TakeOne();
@@ -322,7 +331,7 @@ namespace PetShop.Customer
                 }
             }
 
-            if (!_boughtPet && WantsPet && Random.value < PetBuyChance * 3f * demand)
+            if (!_boughtPet && WantsPet && WillBuy(Random.value, PetBuyChance * 3f, demand))
             {
                 var pens = PetPens.FindAll(p => p != null && p.HasAdults);
                 if (pens.Count > 0)

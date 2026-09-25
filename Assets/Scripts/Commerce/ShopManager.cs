@@ -77,7 +77,21 @@ namespace PetShop.Commerce
         /// How willing shoppers are to buy at the current markup. 1 at normal prices, falling
         /// away steeply as you get greedy and rising when you undercut.
         /// </summary>
-        public float DemandFactor => Mathf.Clamp(Mathf.Pow(1f / PriceMultiplier, 1.6f), 0.25f, 1.6f);
+        public float DemandFactor => ComputeDemandFactor(PriceMultiplier);
+
+        /// <summary>Exponent controlling how sharply demand reacts to the price markup.</summary>
+        private const float DemandElasticity = 1.6f;
+        /// <summary>Floor on demand however greedy the pricing.</summary>
+        private const float MinDemand = 0.25f;
+        /// <summary>Ceiling on demand however deep the discount.</summary>
+        private const float MaxDemand = 1.6f;
+
+        /// <summary>
+        /// Pure demand curve: (1 / <paramref name="priceMultiplier"/>) ^ elasticity, clamped to
+        /// [MinDemand, MaxDemand]. Returns 1 at normal prices.
+        /// </summary>
+        public static float ComputeDemandFactor(float priceMultiplier) =>
+            Mathf.Clamp(Mathf.Pow(1f / priceMultiplier, DemandElasticity), MinDemand, MaxDemand);
 
         public void SetPriceMultiplier(float value)
         {
@@ -86,7 +100,14 @@ namespace PetShop.Commerce
         }
 
         /// <summary>Rent charged at the end of the current day.</summary>
-        public float DailyRent => BaseDailyRent + RentGrowthPerDay * (Day - 1);
+        public float DailyRent => ComputeRent(BaseDailyRent, RentGrowthPerDay, Day);
+
+        /// <summary>
+        /// Pure rent formula: <paramref name="baseRent"/> on day 1, growing by
+        /// <paramref name="growthPerDay"/> for every day after that.
+        /// </summary>
+        public static float ComputeRent(float baseRent, float growthPerDay, int day) =>
+            baseRent + growthPerDay * (day - 1);
 
         /// <summary>Everything owed at close of business.</summary>
         public float DailyOutgoings => DailyRent + DailyWages;

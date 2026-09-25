@@ -22,7 +22,10 @@ startup; there are no sound files.
 ./build.sh            # sets up, builds the scene and a Linux player, then smoke-tests it
 ./build.sh run        # play it
 ./build.sh look       # render screenshots of the running game into Screenshots/
+./build.sh test       # run the EditMode unit tests headless
 ```
+
+Tests live in `Assets/Tests/EditMode` (assembly `PetShop.Tests.EditMode`) and results go to `Logs/build/editmode-results.xml`.
 
 Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Play.
 
