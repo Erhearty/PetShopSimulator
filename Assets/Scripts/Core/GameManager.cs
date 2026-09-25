@@ -595,7 +595,23 @@ namespace PetShop.Core
 
         // ── Save / load ───────────────────────────────────────────────────────
 
-        public void SaveGame()
+        /// <summary>
+        /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
+        /// </summary>
+        /// <returns>True when the save was written; false when it failed.</returns>
+        public bool SaveGame()
+        {
+            if (SaveSystem.Save(BuildSaveData()))
+            {
+                Notify("Game saved.");
+                return true;
+            }
+            Notify("Save FAILED — progress not written. Check disk space/permissions.");
+            return false;
+        }
+
+        /// <summary>Captures money, stock, warehouse and every placed object into a SaveData.</summary>
+        private SaveData BuildSaveData()
         {
             var data = new SaveData
             {
@@ -617,41 +633,46 @@ namespace PetShop.Core
             }
 
             foreach (var entry in Grid.GetAllPlaced())
+                if (entry.Data != null)
+                    data.PlacedObjects.Add(BuildPlacedItem(entry));
+
+            return data;
+        }
+
+        /// <summary>Serialises one grid entry, including shelf stock or pen residents.</summary>
+        private static SaveData.PlacedItem BuildPlacedItem(GridEntry entry)
+        {
+            var item = new SaveData.PlacedItem
             {
-                if (entry.Data == null) continue;
-                var item = new SaveData.PlacedItem
-                {
-                    catalogId = entry.Data.Id,
-                    cellX     = entry.Root.x,
-                    cellY     = entry.Root.y,
-                    variant   = entry.Variant,
-                    rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
-                };
+                catalogId = entry.Data.Id,
+                cellX     = entry.Root.x,
+                cellY     = entry.Root.y,
+                variant   = entry.Variant,
+                rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
+            };
+            if (entry.Instance != null) AddInstanceContents(item, entry.Instance);
+            return item;
+        }
 
-                if (entry.Instance != null)
-                {
-                    var shelf = entry.Instance.GetComponent<ShelfUnit>();
-                    if (shelf != null)
-                    {
-                        item.variant = shelf.Category.ToString();
-                        foreach (var line in shelf.Lines)
-                            if (line.Product != null)
-                                item.shelfStock.Add(new SaveData.StockEntry { id = line.Product.id, qty = line.Units });
-                    }
-
-                    var pen = entry.Instance.GetComponent<PetPen>();
-                    if (pen != null)
-                    {
-                        item.variant = pen.PenSpecies.ToString();
-                        foreach (var pet in pen.Residents)
-                            item.pets.Add(SaveSystem.PetToSaveData(pet));
-                    }
-                }
-                data.PlacedObjects.Add(item);
+        /// <summary>Copies shelf stock or pen residents from a spawned object into its save entry.</summary>
+        private static void AddInstanceContents(SaveData.PlacedItem item, GameObject instance)
+        {
+            var shelf = instance.GetComponent<ShelfUnit>();
+            if (shelf != null)
+            {
+                item.variant = shelf.Category.ToString();
+                foreach (var line in shelf.Lines)
+                    if (line.Product != null)
+                        item.shelfStock.Add(new SaveData.StockEntry { id = line.Product.id, qty = line.Units });
             }
 
-            SaveSystem.Save(data);
-            Notify("Game saved.");
+            var pen = instance.GetComponent<PetPen>();
+            if (pen != null)
+            {
+                item.variant = pen.PenSpecies.ToString();
+                foreach (var pet in pen.Residents)
+                    item.pets.Add(SaveSystem.PetToSaveData(pet));
+            }
         }
 
         private void LoadGame(SaveData data)

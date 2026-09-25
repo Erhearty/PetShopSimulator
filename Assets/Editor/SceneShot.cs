@@ -42,10 +42,11 @@ public static class SceneShot
         // Always photograph a brand-new shop. Left alone, the tour picks up whatever save the
         // last run left behind — which is how a set of "empty pens" screenshots happened:
         // the save was from day 5, by which point customers had bought every animal.
-        string save = Path.Combine(Application.persistentDataPath, "petshop_save.json");
-        if (File.Exists(save))
+        // Go through SaveSystem so the .bak/.tmp siblings are cleared too — otherwise Load would
+        // fall back to the backup and the tour would still pick up an old shop.
+        if (PetShop.Core.SaveSystem.HasSave())
         {
-            File.Delete(save);
+            PetShop.Core.SaveSystem.Delete();
             Debug.Log("[SceneShot] cleared the existing save so the tour shows a fresh shop.");
         }
 

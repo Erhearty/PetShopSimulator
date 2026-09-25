@@ -17,22 +17,25 @@ namespace PetShop.Tests
         private const float Tolerance = 1e-5f;
         private const int   OutdatedVersion = 1;
 
+        private string _dir;
         private string _path;
         private Pet _source;
         private Pet _restored;
 
-        /// <summary>Picks a fresh temp path for each test.</summary>
+        /// <summary>Creates a fresh temp directory and save path inside it for each test.</summary>
         [SetUp]
         public void SetUp()
         {
-            _path = Path.Combine(Path.GetTempPath(), $"petshop_test_{System.Guid.NewGuid()}.json");
+            _dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString());
+            Directory.CreateDirectory(_dir);
+            _path = Path.Combine(_dir, "petshop_test.json");
         }
 
-        /// <summary>Removes the temp file and any pets the test created.</summary>
+        /// <summary>Removes the temp directory and any pets the test created.</summary>
         [TearDown]
         public void TearDown()
         {
-            if (File.Exists(_path)) File.Delete(_path);
+            if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true);
             if (_source != null)   Object.DestroyImmediate(_source);
             if (_restored != null) Object.DestroyImmediate(_restored);
         }
@@ -104,6 +107,22 @@ namespace PetShop.Tests
         }
 
         [Test]
+        public void Save_ValidPath_ReturnsTrueAndWritesFile()
+        {
+            Assert.IsTrue(SaveSystem.Save(BuildSample(), _path));
+            Assert.IsTrue(File.Exists(_path));
+        }
+
+        [Test]
+        public void Save_MissingDirectory_ReturnsFalseWithError()
+        {
+            var badPath = Path.Combine(_dir, "does_not_exist", "petshop_test.json");
+            LogAssert.Expect(LogType.Error, new Regex("Save failed"));
+            Assert.IsFalse(SaveSystem.Save(BuildSample(), badPath));
+            Assert.IsFalse(File.Exists(badPath));
+        }
+
+        [Test]
         public void PetRoundTrip_PreservesPersistedFields()
         {
             _source   = BuildPet();
@@ -140,12 +159,30 @@ namespace PetShop.Tests
             Assert.AreEqual(Pet.SpeciesBasePrice(Pet.Species.Horse), _restored.basePrice, Tolerance);
         }
 
+        /// <summary>An outdated save is migrated in memory; the file on disk is not rewritten.</summary>
         [Test]
-        public void Load_OutdatedVersion_ReturnsNullWithWarning()
+        public void Load_OutdatedVersion_MigratesWithoutRewritingFile()
         {
             File.WriteAllText(_path, JsonUtility.ToJson(new SaveData { Version = OutdatedVersion }));
-            LogAssert.Expect(LogType.Warning, new Regex("older build"));
-            Assert.IsNull(SaveSystem.Load(_path));
+
+            var loaded = SaveSystem.Load(_path);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, loaded.Version);
+            Assert.AreEqual(OutdatedVersion, ReadRaw(_path).Version);
+        }
+
+        /// <summary>A hand-written version 1 save file loads as the current version.</summary>
+        [Test]
+        public void Load_Version1JsonFile_ReturnsCurrentVersion()
+        {
+            const string v1Json = "{\"Version\":1,\"Balance\":50.0,\"Day\":3,\"Staff\":0,\"PriceMultiplier\":0.0}";
+            File.WriteAllText(_path, v1Json);
+
+            var loaded = SaveSystem.Load(_path);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, loaded.Version);
         }
 
         [Test]
@@ -153,6 +190,103 @@ namespace PetShop.Tests
         {
             Assert.IsFalse(File.Exists(_path));
             Assert.IsNull(SaveSystem.Load(_path));
+        }
+
+        // ── Atomic write / backup ───────────────────────────────────────────────
+
+        private const string TmpSuffix = ".tmp";
+        private const string BakSuffix = ".bak";
+
+        /// <summary>A valid sample save with a distinguishing balance.</summary>
+        private static SaveData SampleWithBalance(float balance)
+        {
+            var data = BuildSample();
+            data.Balance = balance;
+            return data;
+        }
+
+        /// <summary>Parses a save file directly, bypassing SaveSystem.</summary>
+        private static SaveData ReadRaw(string path) =>
+            JsonUtility.FromJson<SaveData>(File.ReadAllText(path));
+
+        [Test]
+        public void Save_FirstSave_CreatesOnlyMainFile()
+        {
+            Assert.IsTrue(SaveSystem.Save(BuildSample(), _path));
+            Assert.IsTrue(File.Exists(_path));
+            Assert.IsFalse(File.Exists(_path + BakSuffix));
+            Assert.IsFalse(File.Exists(_path + TmpSuffix));
+        }
+
+        [Test]
+        public void Save_SecondSave_KeepsPreviousAsBackup()
+        {
+            Assert.IsTrue(SaveSystem.Save(SampleWithBalance(100f), _path));
+            Assert.IsTrue(SaveSystem.Save(SampleWithBalance(200f), _path));
+
+            Assert.AreEqual(200f, ReadRaw(_path).Balance, Tolerance);
+            Assert.IsTrue(File.Exists(_path + BakSuffix));
+            Assert.AreEqual(100f, ReadRaw(_path + BakSuffix).Balance, Tolerance);
+            Assert.IsFalse(File.Exists(_path + TmpSuffix));
+        }
+
+        [Test]
+        public void Save_TempWriteFails_LeavesPriorMainIntact()
+        {
+            Assert.IsTrue(SaveSystem.Save(SampleWithBalance(100f), _path));
+            Directory.CreateDirectory(_path + TmpSuffix);
+
+            LogAssert.Expect(LogType.Error, new Regex("Save failed"));
+            Assert.IsFalse(SaveSystem.Save(SampleWithBalance(200f), _path));
+
+            Assert.IsTrue(File.Exists(_path));
+            Assert.AreEqual(100f, ReadRaw(_path).Balance, Tolerance);
+        }
+
+        [Test]
+        public void Load_CorruptMainWithValidBackup_ReturnsBackup()
+        {
+            File.WriteAllText(_path, "{ this is not json");
+            File.WriteAllText(_path + BakSuffix, JsonUtility.ToJson(SampleWithBalance(42f)));
+            LogAssert.ignoreFailingMessages = true;
+            LogAssert.Expect(LogType.Warning, new Regex("loaded backup"));
+
+            var loaded = SaveSystem.Load(_path);
+
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual(42f, loaded.Balance, Tolerance);
+        }
+
+        [Test]
+        public void Load_MainAndBackupCorrupt_ReturnsNull()
+        {
+            File.WriteAllText(_path, "{ this is not json");
+            File.WriteAllText(_path + BakSuffix, "also not json }");
+            LogAssert.ignoreFailingMessages = true;
+
+            Assert.IsNull(SaveSystem.Load(_path));
+        }
+
+        [Test]
+        public void Delete_RemovesMainBackupAndTemp()
+        {
+            File.WriteAllText(_path, "main");
+            File.WriteAllText(_path + BakSuffix, "bak");
+            File.WriteAllText(_path + TmpSuffix, "tmp");
+
+            SaveSystem.Delete(_path);
+
+            Assert.IsFalse(File.Exists(_path));
+            Assert.IsFalse(File.Exists(_path + BakSuffix));
+            Assert.IsFalse(File.Exists(_path + TmpSuffix));
+        }
+
+        [Test]
+        public void HasSave_OnlyBackupPresent_ReturnsTrue()
+        {
+            File.WriteAllText(_path + BakSuffix, JsonUtility.ToJson(BuildSample()));
+            Assert.IsFalse(File.Exists(_path));
+            Assert.IsTrue(SaveSystem.HasSave(_path));
         }
     }
 }

@@ -19,5 +19,5 @@ Canonical component names projected from the architecture canvas.
 <!-- generated:end comp:build-editor-tooling -->
 
 <!-- generated:start comp:local-save-file -->
-- **Local Save File** (`local-save-file`) - storage component. Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - saves older than the current version are discarded rather than migrated.
+- **Local Save File** (`local-save-file`) - storage component. Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them.
 <!-- generated:end comp:local-save-file -->
