@@ -57,6 +57,9 @@ namespace PetShop.Shop
         private readonly List<GameObject> _barriers = new();
         private StreetBuildContext _ctx;
 
+        /// <summary>How many street objects the last <see cref="Generate"/> built.</summary>
+        public int PropCount => _props.Count;
+
         [Header("City behind the street")]
         public float CityHalfWidth = 190f;
         public float BlockWidth    = 60f;

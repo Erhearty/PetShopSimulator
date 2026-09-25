@@ -40,6 +40,7 @@ namespace PetShop.Core
 
         private void Awake()
         {
+            PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
             BuildSystems();
             BuildWorld();
             BuildUI();
@@ -220,6 +221,18 @@ namespace PetShop.Core
                 var interaction = player.GetComponent<Player.InteractionSystem>();
                 if (interaction != null) interaction.PromptText = _ui.HUD.PromptLabel;
             }
+
+            AttachTelemetry();
+        }
+
+        /// <summary>Adds the soak-run recorder, but only when -telemetry or -quitafterdays asked for it.</summary>
+        private void AttachTelemetry()
+        {
+            string path = PlaytestOptions.TelemetryPath;
+            int?   days = PlaytestOptions.QuitAfterDays;
+            if (string.IsNullOrEmpty(path) && !days.HasValue) return;
+
+            gameObject.AddComponent<Dev.DayTelemetry>().Init(_game, _shop, path, days);
         }
     }
 }

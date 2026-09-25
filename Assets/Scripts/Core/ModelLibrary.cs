@@ -46,13 +46,30 @@ namespace PetShop.Core
         private static readonly Dictionary<string, Bounds>     _bounds  = new();
         private static readonly HashSet<string>                _missing = new();
 
+        /// <summary>Prefix shared by every Asset Store pack path.</summary>
+        private const string PacksPrefix = "Packs/";
+
+        /// <summary>
+        /// When set (by <c>-nopacks</c>), every model under Resources/Packs/ is treated as absent
+        /// — silently — so the procedural and CC0 Kenney fallbacks are exercised.
+        /// </summary>
+        public static bool ForceProcedural;
+
+        /// <summary>Every resource path that was looked up and found missing since the last cache reset.</summary>
+        public static IReadOnlyCollection<string> MissingPaths => _missing;
+
         /// <summary>How a model should be sized when it is spawned.</summary>
         public enum Fit { None, Width, Height, Depth, Largest }
 
         // ── Loading ─────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// The prefab at Resources/<paramref name="resourcePath"/>, cached; null when it is not
+        /// installed or when <see cref="ForceProcedural"/> hides the Asset Store packs.
+        /// </summary>
         public static GameObject Prefab(string resourcePath)
         {
+            if (ForceProcedural && resourcePath != null && resourcePath.StartsWith(PacksPrefix, System.StringComparison.Ordinal)) return null;
             if (_prefabs.TryGetValue(resourcePath, out var cached)) return cached;
 
             var prefab = Resources.Load<GameObject>(resourcePath);
@@ -313,5 +330,8 @@ namespace PetShop.Core
             _bounds.Clear();
             _missing.Clear();
         }
+
+        /// <summary>Forgets every cached prefab, measured bounds and missing path (same as <see cref="ClearCache"/>).</summary>
+        public static void ResetCache() => ClearCache();
     }
 }

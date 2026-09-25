@@ -59,8 +59,21 @@ namespace PetShop.Core
         /// <summary>Suffix of the copy of the previous save kept after a successful swap.</summary>
         private const string BackupSuffix = ".bak";
 
-        public static string SavePath =>
-            Path.Combine(Application.persistentDataPath, "petshop_save.json");
+        /// <summary>
+        /// When non-empty (set by <c>-savepath</c>), replaces the default save slot so a
+        /// playtest never touches the player's real save.
+        /// </summary>
+        public static string PathOverride;
+
+        /// <summary>The default save slot: <see cref="PathOverride"/> when set, else the persistent-data file.</summary>
+        public static string SavePath
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(PathOverride)) return PathOverride;
+                return Path.Combine(Application.persistentDataPath, "petshop_save.json");
+            }
+        }
 
         /// <summary>True when the default slot has a main save or a backup to fall back on.</summary>
         public static bool HasSave() => HasSave(SavePath);
