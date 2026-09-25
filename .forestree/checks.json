@@ -2,6 +2,14 @@
   "version": 2,
   "checks": [
     {
+      "id": "unity-smoke",
+      "name": "Unity scene build + headless smoke",
+      "kind": "external",
+      "command": "./build.sh assets && ./build.sh scene && ./build.sh linux && ./build.sh smoke",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
       "id": "shell-syntax",
       "name": "Shell script syntax",
       "kind": "lint",

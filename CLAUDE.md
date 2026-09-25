@@ -342,7 +342,10 @@ Assets/
     │
     ├── Core/
     │   ├── GameBootstrapper.cs     ← entry point; builds systems → world → UI → wiring
-    │   ├── GameManager.cs          ← singleton; day cycle, save/load, interactions, catalog
+    │   ├── GameManager.cs          ← singleton; day loop, furniture registry, public facade
+    │   ├── SaveLoadController.cs   ← new game, starter shelves, save snapshot and load
+    │   ├── ShopFloorActions.cs     ← orders, deliveries, restocking, pens, counter, shop summary
+    │   ├── StaffRoster.cs          ← payroll, daily applicants, hire and fire
     │   ├── GameLayers.cs           ← named layer lookups + masks
     │   ├── CharacterFactory.cs     ← City People bodies; CharacterVisual animator bridge; procedural humanoid fallback
 │   ├── ModelLibrary.cs         ← path constants for all Kenney + Asset Store packs; Prefab(path) with Fit scaling
@@ -353,8 +356,20 @@ Assets/
     │   └── SaveSystem.cs           ← JSON save incl. full furniture layout
     │
     ├── Shop/
-    │   ├── ShopGenerator.cs        ← room, shopfront, facade, lighting, player, NavMesh, layout
-    │   ├── StreetGenerator.cs      ← pavement, road, terrace, block opposite, skyline, props
+    │   ├── ShopGenerator.cs        ← orchestrates the shop builders; NavMesh, starter layout
+    │   ├── StreetGenerator.cs      ← orchestrates the street builders; pavement, road, parade, block opposite, barriers
+    │   ├── Generation/
+    │   │   ├── ShopBuildContext.cs     ← shared state + placement helpers for one ShopGenerator run
+    │   │   ├── ShopBuildingBuilder.cs  ← yard ground, perimeter, railing; shop shell and roof plant
+    │   │   ├── ShopFrontBuilder.cs     ← glazed shopfront, awning, sign, storeys above
+    │   │   ├── ShopInteriorBuilder.cs  ← floor grid, lighting, interior dressing
+    │   │   ├── YardDresser.cs          ← yard surfaces, paddock, planting, props (seeded)
+    │   │   └── PlayerRigSpawner.cs     ← spawns the shopkeeper and the camera rig
+    │   ├── Street/
+    │   │   ├── StreetBuildContext.cs   ← shared state, seeded RNG + place/track helpers for one street run
+    │   │   ├── StreetModels.cs         ← model path tables, best pack first
+    │   │   ├── CityBlockBuilder.cs     ← city blocks behind the street, backdrop row
+    │   │   └── StreetFurnitureBuilder.cs ← lamps, traffic lights, trees, parked cars
     │   ├── GridManager.cs          ← CellSize 2 m, XZ plane, footprint helpers
     │   ├── FurnitureFactory.cs     ← BuildCatalog (ids/costs/sizes) + Spawn()
     │   └── BuildMode.cs            ← floor-plane cursor, ghost, placement, refunds

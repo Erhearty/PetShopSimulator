@@ -10,8 +10,11 @@ using PetShop.Customer;
 namespace PetShop.Core
 {
     /// <summary>
-    /// Top-level orchestrator. Owns the day cycle, the furniture registry, save/load and
-    /// the keyboard shortcuts that are not tied to the player character.
+    /// Top-level orchestrator. Owns the day loop, the furniture registry and the keyboard
+    /// shortcuts that are not tied to the player character, and is the public facade the
+    /// rest of the game talks to. Save/load and new-game setup are delegated to
+    /// <see cref="SaveLoadController"/>, shop-floor interactions to
+    /// <see cref="ShopFloorActions"/>, and hiring/firing to <see cref="StaffRoster"/>.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -65,7 +68,6 @@ namespace PetShop.Core
 
         private readonly List<ShelfUnit> _shelves    = new();
         private readonly List<PetPen>    _pens       = new();
-        private readonly List<Assistant> _assistants = new();
 
         /// <summary>Where staff stand, and which way they face. Set by the bootstrapper.</summary>
         [HideInInspector] public Transform StaffStation;
@@ -82,12 +84,20 @@ namespace PetShop.Core
         private float _dayElapsed;
         private bool  _autoContinue;
 
+        // ── Collaborators (created in Awake) ──────────────────────────────────
+        private SaveLoadController _saveLoad;
+        private ShopFloorActions   _floor;
+        private StaffRoster        _roster;
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void Awake()
         {
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
+            _saveLoad = new SaveLoadController(this);
+            _floor    = new ShopFloorActions(this);
+            _roster   = new StaffRoster(this);
             Catalog  = ItemDatabase.Load();
             ApplyCommandLineOverrides();
         }
@@ -100,11 +110,11 @@ namespace PetShop.Core
         /// <summary>Called by GameBootstrapper once the room and player exist.</summary>
         public void Begin()
         {
-            Shop?.OnDeliveryArrived.AddListener(OnDeliveryArrived);
+            Shop?.OnDeliveryArrived.AddListener(_floor.OnDeliveryArrived);
 
             var save = SaveSystem.Load();
-            if (save != null) LoadGame(save);
-            else              NewGame();
+            if (save != null) _saveLoad.LoadGame(save);
+            else              _saveLoad.NewGame();
 
             Generator?.BakeNavMesh();
             StartDay();
@@ -154,43 +164,6 @@ namespace PetShop.Core
             _autoContinue = Application.isBatchMode;
         }
 
-        // ── New game / layout ─────────────────────────────────────────────────
-
-        private void NewGame()
-        {
-            foreach (var p in Generator.StarterLayout(Grid))
-            {
-                var def = BuildCatalog.Get(p.CatalogId);
-                var go  = Build.Place(p.Cell, def, p.Variant, p.Rotation, charge: false);
-                if (go == null) continue;
-
-                var shelf = go.GetComponent<ShelfUnit>();
-                if (shelf != null) SeedShelf(shelf);
-
-                var pen = go.GetComponent<PetPen>();
-                if (pen != null)
-                {
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                }
-            }
-            // You inherit one member of staff — without anyone on the till a new shop cannot
-            // trade at all while you are out in the yard. Inherited, so no sign-on fee.
-            var inherited = StaffCandidate.Generate();
-            inherited.SignOnFee = 0f;
-            HireCandidate(inherited);
-            Notify("Welcome to your pet shop! B to build, E to interact, Enter to close up.");
-        }
-
-        /// <summary>Stocks a fresh shelf for free — the starter inventory.</summary>
-        private void SeedShelf(ShelfUnit shelf)
-        {
-            if (Catalog == null) return;
-            var products = Catalog.GetByCategory(shelf.Category);
-            for (int i = 0; i < products.Count && i < shelf.MaxLines; i++)
-                shelf.AddStock(products[i], shelf.MaxPerLine);
-        }
-
         // ── Furniture registry ────────────────────────────────────────────────
 
         public void RegisterFurniture(GameObject go)
@@ -226,177 +199,29 @@ namespace PetShop.Core
             Spawner.PetPens = _pens;
         }
 
-        // ── Interactions ──────────────────────────────────────────────────────
+        // ── Interactions (delegated to ShopFloorActions) ─────────────────────
 
         /// <summary>Orders a pallet of stock for a category, to arrive later today.</summary>
-        public bool OrderStock(ProductCategory category, int units)
-        {
-            if (Shop == null) return false;
-
-            float unitCost = Catalog != null ? Catalog.AverageUnitCost(category) : 3.2f;
-            var order = Shop.PlaceOrder(category, units, unitCost, DayProgress);
-            if (order == null)
-            {
-                Notify("Not enough money for that order.");
-                Audio?.PlaySfx("deny");
-                return false;
-            }
-
-            Notify($"Ordered {units} {category} units for €{order.Cost:N2} — the van is on its way.");
-            Audio?.PlaySfx("restock");
-            return true;
-        }
-
-        /// <summary>Puts the pallet on the forecourt and tells the player it has landed.</summary>
-        private void OnDeliveryArrived(SupplierOrder order)
-        {
-            Vector3 spot = Generator != null ? Generator.ForecourtPosition : Vector3.zero;
-            // Spread pallets out so two deliveries never stack in the same spot.
-            spot += new Vector3(UnityEngine.Random.Range(-2.4f, 2.4f), 0f, UnityEngine.Random.Range(-1f, 1.4f));
-
-            DeliveryCrate.Spawn(spot, order.Category, order.Units);
-            Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. Press E to collect.");
-            Audio?.PlaySfx("restock");
-        }
+        public bool OrderStock(ProductCategory category, int units) => _floor.OrderStock(category, units);
 
         /// <summary>Carries a delivered pallet into the stockroom.</summary>
-        public void CollectDelivery(DeliveryCrate crate)
-        {
-            if (crate == null) return;
+        public void CollectDelivery(DeliveryCrate crate) => _floor.CollectDelivery(crate);
 
-            int units = crate.Collect(Shop);
-            Notify($"Collected {units} units — they are in the stockroom, ready to shelve.");
-            Audio?.PlaySfx("restock");
-        }
-
-        public void RestockShelf(ShelfUnit shelf)
-        {
-            if (shelf == null) return;
-
-            var result = shelf.Restock(Shop, Catalog);
-
-            if (result.Units <= 0)
-                Notify(shelf.HasSpace ? "Not enough money to restock." : "Shelf is already full.");
-            else if (result.Spent <= 0.01f)
-                Notify($"Shelved {result.Units} {shelf.Category} units from the stockroom " +
-                       $"({Shop.Warehouse(shelf.Category)} left).");
-            else if (result.FromWarehouse > 0)
-                Notify($"Shelved {result.FromWarehouse} from the stockroom and bought {result.Units - result.FromWarehouse} " +
-                       $"at the cash-and-carry for €{result.Spent:N2}.");
-            else
-                Notify($"Restocked {shelf.Category} for €{result.Spent:N2} at cash-and-carry prices " +
-                       $"— ordering ahead is {(1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f:0}% cheaper.");
-
-            Audio?.PlaySfx(result.Units > 0 ? "restock" : "deny");
-            OnInfoPanel.Invoke(shelf.Describe());
-        }
+        public void RestockShelf(ShelfUnit shelf) => _floor.RestockShelf(shelf);
 
         /// <summary>
         /// Interacting with a pen buys a young pet from the breeder when there is room —
         /// without this the pens could be sold out for good and the shop would stall.
         /// </summary>
-        public void InspectPen(PetPen pen)
-        {
-            if (pen == null) return;
-
-            // Care comes first: an animal that needs feeding matters more than buying another.
-            if (pen.NeedsService)
-            {
-                float cost = pen.ServiceCost;
-                if (Shop.ChangeBalance(-cost, "Pen upkeep"))
-                {
-                    pen.Service();
-                    Notify($"Fed and mucked out the {pen.PenSpecies} pen — €{cost:N2}");
-                    Audio?.PlaySfx("restock");
-                }
-                else
-                {
-                    Notify($"Servicing that pen costs €{cost:N2} — not enough money.");
-                    Audio?.PlaySfx("deny");
-                }
-                OnInfoPanel.Invoke(pen.Describe());
-                return;
-            }
-
-            if (pen.HasSpace)
-            {
-                float price = Pet.WholesalePrice(pen.PenSpecies);
-                if (Shop.ChangeBalance(-price, $"Buy {pen.PenSpecies}"))
-                {
-                    var pet = BreedingSystem.GenerateRandom(pen.PenSpecies);
-                    pet.growthStage = Pet.GrowthStage.Juvenile;
-                    pet.ageDays     = 1;
-                    pen.AddPet(pet);
-                    Notify($"Bought {pet.DisplayName()} for €{price:N2}");
-                    Audio?.PlaySfx("restock");
-                }
-                else
-                {
-                    Notify($"A {pen.PenSpecies} costs €{price:N2} — not enough money.");
-                    Audio?.PlaySfx("deny");
-                }
-            }
-            else
-            {
-                Audio?.PlaySfx("click");
-            }
-
-            OnInfoPanel.Invoke(pen.Describe());
-        }
+        public void InspectPen(PetPen pen) => _floor.InspectPen(pen);
 
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
         /// it just opens the books.
         /// </summary>
-        public void UseCounter()
-        {
-            if (Queue != null && Queue.AnyWaiting)
-            {
-                var shopper = Queue.Front;
-                float value = shopper.BasketValue;
-                int   items = shopper.BasketCount;
+        public void UseCounter() => _floor.UseCounter();
 
-                Queue.ServeFront();
-                Audio?.PlaySfx("sale");
-                Notify($"Served {shopper.ShopperName} — {items} item(s), €{value:N2}");
-
-                if (Queue.AnyWaiting)
-                    Notify($"{Queue.Length} still waiting (€{Queue.WaitingValue:N0}).");
-                return;
-            }
-
-            OpenShopSummary();
-        }
-
-        public void OpenShopSummary()
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Day {Shop.Day}   ·   Balance €{Shop.Balance:N2}   ·   Rep {Shop.Reputation:0}/100");
-            sb.AppendLine($"Rent due tonight: €{Shop.DailyRent:N2}");
-            sb.AppendLine($"Prices at {Shop.PriceMultiplier * 100f:0}% — demand {Shop.DemandFactor * 100f:0}%");
-            sb.AppendLine($"Shelves: {_shelves.Count}   Pens: {_pens.Count}");
-            sb.AppendLine();
-
-            if (Shop.TodaysSales.Count == 0)
-            {
-                sb.AppendLine("No sales yet today.");
-            }
-            else
-            {
-                sb.AppendLine("Today's sales:");
-                float total = 0f;
-                int shown = 0;
-                foreach (var s in Shop.TodaysSales)
-                {
-                    total += s.Revenue;
-                    if (shown++ < 8) sb.AppendLine($"  {s.Label}  €{s.Revenue:0.00}");
-                }
-                if (Shop.TodaysSales.Count > 8) sb.AppendLine($"  ... and {Shop.TodaysSales.Count - 8} more");
-                sb.AppendLine($"  Total: €{total:N2}");
-            }
-            OnInfoPanel.Invoke(sb.ToString().TrimEnd());
-            Audio?.PlaySfx("click");
-        }
+        public void OpenShopSummary() => _floor.OpenShopSummary();
 
         // ── Day cycle ─────────────────────────────────────────────────────────
 
@@ -462,104 +287,31 @@ namespace PetShop.Core
             }
         }
 
-        // ── Staff ─────────────────────────────────────────────────────────────
+        // ── Staff (delegated to StaffRoster) ─────────────────────────────────
 
-        public int StaffCount => _assistants.Count;
+        public int StaffCount => _roster.StaffCount;
 
         /// <summary>Everyone currently on the payroll, for the staff board.</summary>
-        public IReadOnlyList<Assistant> Staff => _assistants;
+        public IReadOnlyList<Assistant> Staff => _roster.Staff;
 
-        /// <summary>Hire one assistant. Their first day's wage is due at close, not now.</summary>
         /// <summary>The three people currently looking for work. Refreshed every morning.</summary>
-        public IReadOnlyList<StaffCandidate> Candidates => _candidates;
+        public IReadOnlyList<StaffCandidate> Candidates => _roster.Candidates;
 
-        private readonly List<StaffCandidate> _candidates = new();
-
-        public void RefreshCandidates()
-        {
-            _candidates.Clear();
-            for (int i = 0; i < 3; i++) _candidates.Add(StaffCandidate.Generate());
-        }
+        public void RefreshCandidates() => _roster.RefreshCandidates();
 
         /// <summary>Total wages owed tonight, from the people actually on the payroll.</summary>
-        public float Payroll
-        {
-            get
-            {
-                float total = 0f;
-                foreach (var a in _assistants) if (a != null) total += a.DailyWage;
-                return total;
-            }
-        }
+        public float Payroll => _roster.Payroll;
 
-        public bool HireAssistant() => HireCandidate(StaffCandidate.Generate());
+        /// <summary>Hire one assistant. Their first day's wage is due at close, not now.</summary>
+        public bool HireAssistant() => _roster.HireAssistant();
 
         /// <summary>Takes a named applicant on: pays their sign-on fee and puts them on the till.</summary>
-        public bool HireCandidate(StaffCandidate candidate)
-        {
-            if (candidate == null) return false;
+        public bool HireCandidate(StaffCandidate candidate) => _roster.HireCandidate(candidate);
 
-            if (_assistants.Count >= 3)
-            {
-                Notify("There is no room behind that counter for another assistant.");
-                return false;
-            }
-
-            if (candidate.SignOnFee > 0f &&
-                !Shop.ChangeBalance(-candidate.SignOnFee, $"Sign-on fee for {candidate.Name}"))
-            {
-                Notify($"You cannot cover {candidate.Name}'s €{candidate.SignOnFee:N0} sign-on fee.");
-                Audio?.PlaySfx("deny");
-                return false;
-            }
-
-            Vector3 station = StaffStation != null ? StaffStation.position : Vector3.zero;
-            Vector3 facing  = StaffStation != null ? StaffStation.forward  : Vector3.forward;
-            Vector3 offset  = Vector3.right * (_assistants.Count * 1.1f - 0.55f);
-
-            var assistant = Assistant.Create(transform, station + offset, facing,
-                                             Queue, Shop, _assistants.Count);
-            assistant.DailyWage      = candidate.DailyWage;
-            assistant.ServiceSeconds = candidate.ServiceSeconds;
-            assistant.StaffName      = candidate.Name;
-            _assistants.Add(assistant);
-
-            _candidates.Remove(candidate);
-
-            Shop.SetStaff(_assistants.Count);
-            Shop.SetPayroll(Payroll);
-            Notify($"Hired {candidate.Name} — {candidate.SpeedWord} at the till, " +
-                   $"€{candidate.DailyWage:N0} a day, {_assistants.Count} on the payroll.");
-            return true;
-        }
-
-        public bool FireAssistant()
-        {
-            if (_assistants.Count == 0) { Notify("There is nobody to let go."); return false; }
-            return FireAssistant(_assistants[_assistants.Count - 1]);
-        }
+        public bool FireAssistant() => _roster.FireAssistant();
 
         /// <summary>Lets one named member of staff go, rather than whoever happens to be last.</summary>
-        public bool FireAssistant(Assistant member)
-        {
-            if (member == null || !_assistants.Contains(member))
-            {
-                Notify("There is nobody to let go.");
-                return false;
-            }
-
-            string name = member.StaffName;
-            _assistants.Remove(member);
-            Destroy(member.gameObject);
-
-            Shop.SetStaff(_assistants.Count);
-            Shop.SetPayroll(Payroll);
-
-            // People talk: sacking staff costs you a little standing locally.
-            Shop.ChangeReputation(-0.5f);
-            Notify($"Let {name} go — {_assistants.Count} left on the payroll.");
-            return true;
-        }
+        public bool FireAssistant(Assistant member) => _roster.FireAssistant(member);
 
         /// <summary>Nudge shelf prices up or down. Wired to the ledger's price buttons.</summary>
         public void AdjustPrices(float delta)
@@ -593,129 +345,13 @@ namespace PetShop.Core
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
         }
 
-        // ── Save / load ───────────────────────────────────────────────────────
+        // ── Save / load (delegated to SaveLoadController) ─────────────────────
 
         /// <summary>
         /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
         /// </summary>
         /// <returns>True when the save was written; false when it failed.</returns>
-        public bool SaveGame()
-        {
-            if (SaveSystem.Save(BuildSaveData()))
-            {
-                Notify("Game saved.");
-                return true;
-            }
-            Notify("Save FAILED — progress not written. Check disk space/permissions.");
-            return false;
-        }
-
-        /// <summary>Captures money, stock, warehouse and every placed object into a SaveData.</summary>
-        private SaveData BuildSaveData()
-        {
-            var data = new SaveData
-            {
-                Balance         = Shop.Balance,
-                Reputation      = Shop.Reputation,
-                Day             = Shop.Day,
-                Staff           = _assistants.Count,
-                PriceMultiplier = Shop.PriceMultiplier,
-            };
-
-            foreach (var kvp in Shop.Stock)
-                data.Stock.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
-
-            foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
-            {
-                int units = Shop.Warehouse(category);
-                if (units > 0)
-                    data.Warehouse.Add(new SaveData.StockEntry { id = category.ToString(), qty = units });
-            }
-
-            foreach (var entry in Grid.GetAllPlaced())
-                if (entry.Data != null)
-                    data.PlacedObjects.Add(BuildPlacedItem(entry));
-
-            return data;
-        }
-
-        /// <summary>Serialises one grid entry, including shelf stock or pen residents.</summary>
-        private static SaveData.PlacedItem BuildPlacedItem(GridEntry entry)
-        {
-            var item = new SaveData.PlacedItem
-            {
-                catalogId = entry.Data.Id,
-                cellX     = entry.Root.x,
-                cellY     = entry.Root.y,
-                variant   = entry.Variant,
-                rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
-            };
-            if (entry.Instance != null) AddInstanceContents(item, entry.Instance);
-            return item;
-        }
-
-        /// <summary>Copies shelf stock or pen residents from a spawned object into its save entry.</summary>
-        private static void AddInstanceContents(SaveData.PlacedItem item, GameObject instance)
-        {
-            var shelf = instance.GetComponent<ShelfUnit>();
-            if (shelf != null)
-            {
-                item.variant = shelf.Category.ToString();
-                foreach (var line in shelf.Lines)
-                    if (line.Product != null)
-                        item.shelfStock.Add(new SaveData.StockEntry { id = line.Product.id, qty = line.Units });
-            }
-
-            var pen = instance.GetComponent<PetPen>();
-            if (pen != null)
-            {
-                item.variant = pen.PenSpecies.ToString();
-                foreach (var pet in pen.Residents)
-                    item.pets.Add(SaveSystem.PetToSaveData(pet));
-            }
-        }
-
-        private void LoadGame(SaveData data)
-        {
-            Shop.SetBalance(data.Balance);
-            Shop.SetReputation(data.Reputation);
-            Shop.SetDay(data.Day);
-
-            foreach (var entry in data.Stock)
-                Shop.ChangeStock(entry.id, entry.qty);
-
-            foreach (var entry in data.Warehouse)
-                if (System.Enum.TryParse(entry.id, out ProductCategory category))
-                    Shop.AddToWarehouse(category, entry.qty);
-
-            foreach (var item in data.PlacedObjects)
-            {
-                var def = BuildCatalog.Get(item.catalogId);
-                if (def == null) continue;
-
-                var go = Build.Place(new Vector2Int(item.cellX, item.cellY), def,
-                                     item.variant, item.rotation, charge: false);
-                if (go == null) continue;
-
-                var shelf = go.GetComponent<ShelfUnit>();
-                if (shelf != null)
-                    foreach (var line in item.shelfStock)
-                    {
-                        var product = Catalog?.Get(line.id);
-                        if (product != null) shelf.AddStock(product, line.qty);
-                    }
-
-                var pen = go.GetComponent<PetPen>();
-                if (pen != null)
-                    foreach (var petData in item.pets)
-                        pen.AddPet(SaveSystem.SaveDataToPet(petData));
-            }
-
-            for (int i = 0; i < Mathf.Max(1, data.Staff); i++) HireAssistant();
-            Shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);
-
-            Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");
-        }
+        public bool SaveGame() => _saveLoad.SaveGame();
 
         // ── Utility ───────────────────────────────────────────────────────────
 
