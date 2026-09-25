@@ -1,7 +1,7 @@
 <!-- generated:start cap:overview-intro -->
 # Architecture Overview
 
-3 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
+4 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
 <!-- generated:end cap:overview-intro -->
 
 <!-- generated:start comp:pet-shop-simulator-game-client -->
@@ -54,3 +54,9 @@ Single JSON save file at Application.persistentDataPath/petshop_save.json, writt
 
 **Tech:** JsonUtility (Unity built-in JSON), Local filesystem (Application.persistentDataPath)
 <!-- generated:end comp:local-save-file -->
+
+<!-- generated:start comp:soak-telemetry-log -->
+## Soak Telemetry Log (JSONL) (`soak-telemetry-log`, STORAGE)
+
+Dev-only JSON-lines file written by DayTelemetry (Assets/Scripts/Dev/DayTelemetry.cs) during soak runs: one JSON record appended per in-game day plus a final run-summary record, via File.AppendAllText. Only produced when GameBootstrapper.AttachTelemetry attaches the component because -telemetry or -quitafterdays was passed on the command line; normal play never writes it. Separate from the Local Save File and never read back by the game.
+<!-- generated:end comp:soak-telemetry-log -->

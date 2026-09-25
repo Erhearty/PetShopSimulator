@@ -38,10 +38,16 @@ namespace PetShop.Core
 
         private GameUI _ui;
 
+        /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
+        private const int MaxPackFallbacksReported = 10;
+
         private void Awake()
         {
+            PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
             BuildSystems();
             BuildWorld();
+            string packFallbacks = ModelLibrary.PackFallbackReport(MaxPackFallbacksReported);
+            if (packFallbacks != null) Debug.LogWarning(packFallbacks);
             BuildUI();
             WireEverything();
         }
@@ -220,6 +226,18 @@ namespace PetShop.Core
                 var interaction = player.GetComponent<Player.InteractionSystem>();
                 if (interaction != null) interaction.PromptText = _ui.HUD.PromptLabel;
             }
+
+            AttachTelemetry();
+        }
+
+        /// <summary>Adds the soak-run recorder, but only when -telemetry or -quitafterdays asked for it.</summary>
+        private void AttachTelemetry()
+        {
+            string path = PlaytestOptions.TelemetryPath;
+            int?   days = PlaytestOptions.QuitAfterDays;
+            if (string.IsNullOrEmpty(path) && !days.HasValue) return;
+
+            gameObject.AddComponent<Dev.DayTelemetry>().Init(_game, _shop, path, days);
         }
     }
 }

@@ -53,8 +53,10 @@ namespace PetShop.Shop
 
             foreach (float x in new[] { leftEnd, rightEnd })
             {
-                var pier = MeshBuilder.CreateBox(0.5f, 2.2f, 0.5f, wallMat, "GatePier");
-                _ctx.Attach(pier, new Vector3(x, 0f, hd));
+                const float pierHeight = 2.2f;
+                var pier = MeshBuilder.CreateBox(0.5f, pierHeight, 0.5f, wallMat, "GatePier");
+                // Attach overwrites CreateBox's base lift, so place the pier at its mid-height.
+                _ctx.Attach(pier, new Vector3(x, pierHeight * 0.5f, hd));
             }
         }
 

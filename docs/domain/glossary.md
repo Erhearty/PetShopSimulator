@@ -21,3 +21,7 @@ Canonical component names projected from the architecture canvas.
 <!-- generated:start comp:local-save-file -->
 - **Local Save File** (`local-save-file`) - storage component. Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them.
 <!-- generated:end comp:local-save-file -->
+
+<!-- generated:start comp:soak-telemetry-log -->
+- **Soak Telemetry Log (JSONL)** (`soak-telemetry-log`) - storage component. Dev-only JSON-lines file written by DayTelemetry (Assets/Scripts/Dev/DayTelemetry.cs) during soak runs: one JSON record appended per in-game day plus a final run-summary record, via File.AppendAllText. Only produced when GameBootstrapper.AttachTelemetry attaches the component because -telemetry or -quitafterdays was passed on the command line; normal play never writes it. Separate from the Local Save File and never read back by the game.
+<!-- generated:end comp:soak-telemetry-log -->

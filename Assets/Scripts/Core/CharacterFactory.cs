@@ -172,6 +172,9 @@ namespace PetShop.Core
         private Func<Vector3> _velocity;
         private int           _lastMove = -1;
 
+        /// <summary>Locomotion band last sent to the animator: 0 idle, 1 walk, 2 run, -1 before the first update.</summary>
+        public int CurrentMove => _lastMove;
+
         private bool _usesParameters;
         private int  _idleHash, _walkHash, _runHash;
 

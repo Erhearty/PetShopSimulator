@@ -64,8 +64,15 @@ decent thing to do, not because the licence demands it.
 | Furniture Kit | counter, benches, plants, rugs, boxes, ceiling lamps, wall shelving | https://kenney.nl/assets/furniture-kit |
 | Food Kit | the products that sit on the shop shelves | https://kenney.nl/assets/food-kit |
 
-Restoring them on a fresh clone: download each kit from its URL above, and copy the `.fbx`
-models you need, plus the kit's `License.txt`, into `Assets/Resources/Kenney/<Kit>/`. The
+Restoring them on a fresh clone is automatic: `build.sh` runs `Tools/fetch_kenney.sh` before
+every target that needs the art (or on its own with `./build.sh kenney`). Each missing kit is
+copied from another checkout (`$KENNEY_SRC`, else the main checkout of a git worktree), else
+unpacked from a zip cached in `Library/kenney-cache/`, else downloaded from its URL above into
+that cache. Installing from a zip copies the kit's whole `Models/FBX format/` folder plus its
+`License.txt`.
+
+Manual fallback (e.g. offline with no cache): download each kit from its URL above, and copy the
+`.fbx` models you need, plus the kit's `License.txt`, into `Assets/Resources/Kenney/<Kit>/`. The
 folders are `Cars`, `Commercial`, `Food`, `Furniture`, `Nature`, `Roads` and `Suburban`.
 Models are loaded by file name, and any that are missing fall back to procedural geometry.
 
