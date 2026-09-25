@@ -46,8 +46,8 @@ namespace PetShop.UI
                 new Vector2(0.10f, 0.52f), new Vector2(0.90f, 0.61f), 17f);
             save.onClick.AddListener(() =>
             {
-                _game.SaveGame();
-                if (_status != null) _status.text = "Saved.";
+                bool saved = _game.SaveGame();
+                if (_status != null) _status.text = saved ? "Saved." : "Save failed — see log.";
             });
 
             var music = UIFactory.Button("Music", panel.transform, "",
@@ -61,7 +61,11 @@ namespace PetShop.UI
 
             var quit = UIFactory.Button("Quit", panel.transform, "Save & quit",
                 new Vector2(0.10f, 0.13f), new Vector2(0.90f, 0.22f), 17f);
-            quit.onClick.AddListener(() => { _game.SaveGame(); Application.Quit(); });
+            quit.onClick.AddListener(() =>
+            {
+                if (_game.SaveGame()) { Application.Quit(); return; }
+                if (_status != null) _status.text = "Save failed — not quitting.";
+            });
 
             UIFactory.Label("Version", panel.transform, "Esc to resume",
                 new Vector2(0.08f, 0.04f), new Vector2(0.92f, 0.10f), 13f, UIFactory.InkMuted,

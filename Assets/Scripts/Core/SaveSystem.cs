@@ -59,20 +59,24 @@ namespace PetShop.Core
         public static bool HasSave() => File.Exists(SavePath);
 
         /// <summary>Writes <paramref name="data"/> to the default save slot.</summary>
-        public static void Save(SaveData data) => Save(data, SavePath);
+        /// <returns>True when the file was written; false when the write failed (error is logged).</returns>
+        public static bool Save(SaveData data) => Save(data, SavePath);
 
         /// <summary>Writes <paramref name="data"/> as JSON to <paramref name="path"/>, stamping SavedAt.</summary>
-        internal static void Save(SaveData data, string path)
+        /// <returns>True when the file was written; false when serialisation or the write threw (error is logged).</returns>
+        public static bool Save(SaveData data, string path)
         {
             try
             {
                 data.SavedAt = DateTime.UtcNow.ToString("o");
                 File.WriteAllText(path, JsonUtility.ToJson(data, prettyPrint: true));
                 Debug.Log($"[SaveSystem] Saved to {path}");
+                return true;
             }
             catch (Exception e)
             {
                 Debug.LogError($"[SaveSystem] Save failed: {e.Message}");
+                return false;
             }
         }
 

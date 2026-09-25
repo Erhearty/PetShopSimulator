@@ -17,22 +17,25 @@ namespace PetShop.Tests
         private const float Tolerance = 1e-5f;
         private const int   OutdatedVersion = 1;
 
+        private string _dir;
         private string _path;
         private Pet _source;
         private Pet _restored;
 
-        /// <summary>Picks a fresh temp path for each test.</summary>
+        /// <summary>Creates a fresh temp directory and save path inside it for each test.</summary>
         [SetUp]
         public void SetUp()
         {
-            _path = Path.Combine(Path.GetTempPath(), $"petshop_test_{System.Guid.NewGuid()}.json");
+            _dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString());
+            Directory.CreateDirectory(_dir);
+            _path = Path.Combine(_dir, "petshop_test.json");
         }
 
-        /// <summary>Removes the temp file and any pets the test created.</summary>
+        /// <summary>Removes the temp directory and any pets the test created.</summary>
         [TearDown]
         public void TearDown()
         {
-            if (File.Exists(_path)) File.Delete(_path);
+            if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true);
             if (_source != null)   Object.DestroyImmediate(_source);
             if (_restored != null) Object.DestroyImmediate(_restored);
         }
@@ -101,6 +104,22 @@ namespace PetShop.Tests
             p.temperament = 0.11f; p.energyLevel = 0.22f; p.friendliness = 0.33f;
             p.ageDays = 12; p.daysToMature = 9; p.basePrice = 140f;
             return p;
+        }
+
+        [Test]
+        public void Save_ValidPath_ReturnsTrueAndWritesFile()
+        {
+            Assert.IsTrue(SaveSystem.Save(BuildSample(), _path));
+            Assert.IsTrue(File.Exists(_path));
+        }
+
+        [Test]
+        public void Save_MissingDirectory_ReturnsFalseWithError()
+        {
+            var badPath = Path.Combine(_dir, "does_not_exist", "petshop_test.json");
+            LogAssert.Expect(LogType.Error, new Regex("Save failed"));
+            Assert.IsFalse(SaveSystem.Save(BuildSample(), badPath));
+            Assert.IsFalse(File.Exists(badPath));
         }
 
         [Test]
