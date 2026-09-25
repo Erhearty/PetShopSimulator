@@ -9,7 +9,10 @@ order of preference, with each tier falling back to the next. All audio is synth
 startup; there are no sound files.
 
 > The Asset Store packs are licensed to the project owner's Unity account and are **not**
-> redistributable — see [`THIRD-PARTY.md`](THIRD-PARTY.md) before sharing this repo.
+> in this repository — they are gitignored and purged from history. The CC0 Kenney kits are kept
+> out too, to keep the repo small. A fresh clone runs on procedural geometry only;
+> `./build.sh assets` restores the packs once downloaded, and the Kenney kits are copied in by
+> hand. See [`THIRD-PARTY.md`](THIRD-PARTY.md).
 
 ![Unity 6000.6.2f1](https://img.shields.io/badge/Unity-6000.6.2f1-black) ![Built-in RP](https://img.shields.io/badge/pipeline-Built--in-blue)
 
@@ -25,6 +28,12 @@ Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Pl
 
 A fresh clone needs one setup pass (`./build.sh setup`) before the first editor Play session,
 because TextMesh Pro's essential resources are not checked in.
+
+A fresh clone works without the Asset Store packs and the Kenney kits — neither is in the
+repository, and the game falls back to procedural geometry. To restore the full art, download
+the packs listed in [`THIRD-PARTY.md`](THIRD-PARTY.md) through Package Manager → My Assets, then
+run `./build.sh assets` (`./build.sh assets?` shows which are present). Copy the Kenney kits
+into `Assets/Resources/Kenney/<Kit>/` as `THIRD-PARTY.md` describes.
 
 ## Controls
 
@@ -123,7 +132,7 @@ Three things are worth knowing before you change anything:
 Assets/
 ├── Editor/     headless setup, scene generation and player builds
 ├── Resources/
-│   └── Kenney/     CC0 model kits — see THIRD-PARTY.md
+│   └── Kenney/     CC0 model kits, not in the repo — see THIRD-PARTY.md
 └── Scripts/
     ├── Core/       bootstrap, game manager, mesh/material/model factories, audio, save
     ├── Shop/       grid, build mode, furniture catalog, shop and street generators
@@ -138,10 +147,12 @@ Assets/
 ## Assets
 
 3D models are Kenney's CC0 kits (city, roads, cars, nature, furniture, food) — public domain,
-no attribution required, credited anyway in [`THIRD-PARTY.md`](THIRD-PARTY.md). Unity Asset
-Store packages are *not* used: they can only be downloaded through an authenticated Unity
-account, so they cannot be fetched by a build script. `THIRD-PARTY.md` explains how to drop one
-in yourself if you want to.
+no attribution required, credited anyway in [`THIRD-PARTY.md`](THIRD-PARTY.md). They are not
+stored in the repository, to keep it small; `THIRD-PARTY.md` explains how to copy them in. Unity Asset
+Store packages *are* used when installed locally, and preferred over the Kenney kits, but they
+are not stored in the repository: they are licensed to the owner's Unity account and can only be
+downloaded through it. After downloading them via Package Manager → My Assets, `./build.sh assets`
+imports them. `THIRD-PARTY.md` lists every pack, its folder and licence status.
 
 ## Command-line flags
 
