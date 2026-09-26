@@ -3,6 +3,7 @@ using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Customer;
 using PetShop.Progression;
+using PetShop.Events;
 using PetShop.UI;
 
 namespace PetShop.Core
@@ -203,9 +204,20 @@ namespace PetShop.Core
             _game.Progression = progression;
         }
 
+        /// <summary>
+        /// Adds the seasonal event director and hands it the shop and spawner it tunes.
+        /// </summary>
+        private void WireEvents()
+        {
+            var events = _game.gameObject.AddComponent<ShopEventDirector>();
+            events.Init(_game, _shop, _spawner);
+            _game.Events = events;
+        }
+
         private void WireEverything()
         {
             WireProgression();
+            WireEvents();
 
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);

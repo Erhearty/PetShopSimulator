@@ -364,7 +364,7 @@ namespace PetShop.UI
                 foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
                 {
                     float unit  = catalog != null ? catalog.AverageUnitCost(category) : 3.2f;
-                    float order = unit * ShopManager.WholesaleDiscount * OrderSize;
+                    float order = unit * ShopManager.WholesaleDiscount * shop.SupplierPriceMultiplier * OrderSize;
                     int   ready = shop.Warehouse(category);
 
                     sb.AppendLine($"{category,-20}{ready + " in stockroom",-18}" +

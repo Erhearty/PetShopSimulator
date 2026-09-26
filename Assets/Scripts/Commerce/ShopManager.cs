@@ -197,7 +197,7 @@ namespace PetShop.Commerce
 
         public bool Restock(string itemId, int quantity, float unitCost)
         {
-            if (!ChangeBalance(-unitCost * quantity, $"Restock {quantity}x {itemId}")) return false;
+            if (!ChangeBalance(-unitCost * quantity * SupplierPriceMultiplier, $"Restock {quantity}x {itemId}")) return false;
             ChangeStock(itemId, quantity);
             return true;
         }
@@ -246,6 +246,9 @@ namespace PetShop.Commerce
         /// <summary>What a unit costs when ordered from the wholesaler, ahead of time.</summary>
         public const float WholesaleDiscount = 0.78f;
 
+        /// <summary>Event-driven multiplier on supplier costs (orders and restocks). 1 = normal.</summary>
+        public float SupplierPriceMultiplier { get; set; } = 1f;
+
         /// <summary>
         /// Buying off the shelf at the cash-and-carry when you have run out. Deliberately
         /// dearer than ordering: planning ahead is supposed to be worth something.
@@ -285,7 +288,7 @@ namespace PetShop.Commerce
         {
             if (units <= 0) return null;
 
-            float cost = unitCost * WholesaleDiscount * units;
+            float cost = unitCost * WholesaleDiscount * SupplierPriceMultiplier * units;
             if (!ChangeBalance(-cost, $"Order {units}x {category}")) return null;
 
             var order = new SupplierOrder

@@ -7,6 +7,7 @@ using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Customer;
 using PetShop.Progression;
+using PetShop.Events;
 
 namespace PetShop.Core
 {
@@ -30,6 +31,7 @@ namespace PetShop.Core
         [HideInInspector] public ShopGenerator   Generator;
         [HideInInspector] public CheckoutQueue    Queue;
         [HideInInspector] public ProgressionDirector Progression;
+        [HideInInspector] public ShopEventDirector   Events;
 
         // ── Events for UI ─────────────────────────────────────────────────────
         public UnityEvent<DaySummary> OnDayEnded     = new();
@@ -236,6 +238,7 @@ namespace PetShop.Core
             // A fresh set of applicants each morning gives the staff board a reason to be
             // checked more than once.
             RefreshCandidates();
+            Events?.BeginDay(Shop.Day);
             Spawner?.StartDay();
             OnDayStarted.Invoke(Shop.Day);
             Notify($"Day {Shop.Day} — open. Tonight: rent €{Shop.DailyRent:N0}" +
@@ -258,11 +261,12 @@ namespace PetShop.Core
             Spawner?.EndDay();
             yield return new WaitForSeconds(0.6f);
 
-            var born = BreedingSystem.AdvanceDay(_pens);
+            var born = BreedingSystem.AdvanceDay(_pens, Events?.CareDrainMultiplier ?? 1f);
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
             DaySummary summary = CloseDayWithProgression();
+            Events?.EndDay(summary);
             SaveGame();
 
             Audio?.PlaySfx("day_end");

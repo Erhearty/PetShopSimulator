@@ -21,4 +21,8 @@ Projected from `schema` widgets on the architecture canvas.
 | `Stock` | StockEntry[] | - | id + qty pairs, shelf stock |
 | `Warehouse` | StockEntry[] | - | delivered units still in the stockroom, keyed by category |
 | `PlacedObjects` | PlacedItem[] | - | catalogId, cellX/cellY, variant, rotation, shelfStock[], pets[] (PetSaveData) |
+| `ProgressionTier` | int |  | Highest reputation tier reached; v2 saves migrate from Reputation |
+| `EventSeed` | int |  | Seed for deterministic daily event rolls |
+| `ActiveEventId` | string |  | None\|SupplierSale\|Heatwave\|StreetFestival |
+| `EventDaysLeft` | int |  | Days remaining for the active event |
 <!-- generated:end comp:local-save-file -->
