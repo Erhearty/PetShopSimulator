@@ -353,6 +353,12 @@
                   "name": "PlacedObjects",
                   "notes": "catalogId, cellX/cellY, variant, rotation, shelfStock[], pets[] (PetSaveData)",
                   "type": "PlacedItem[]"
+                },
+                {
+                  "flags": "-",
+                  "name": "StaffList",
+                  "notes": "Save v3+: one record per assistant - name, role, skill (int), wage (float), serviceSeconds (float). Empty in pre-v3 saves; SaveMigrator (v2→v3 step) normalises it. Staff int head count is kept alongside it.",
+                  "type": "StaffSaveData[]"
                 }
               ]
             },
