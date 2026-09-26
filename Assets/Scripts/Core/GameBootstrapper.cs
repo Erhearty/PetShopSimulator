@@ -2,6 +2,8 @@ using UnityEngine;
 using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Customer;
+using PetShop.Progression;
+using PetShop.Events;
 using PetShop.UI;
 
 namespace PetShop.Core
@@ -197,8 +199,32 @@ namespace PetShop.Core
 
         // ── Wiring ──────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Adds the progression director to the game object and hands it the generator and
+        /// build mode, so tiers can open lot stages and pen species.
+        /// </summary>
+        private void WireProgression()
+        {
+            var progression = _game.gameObject.AddComponent<ProgressionDirector>();
+            progression.Init(_game, _generator, _build);
+            _game.Progression = progression;
+        }
+
+        /// <summary>
+        /// Adds the seasonal event director and hands it the shop and spawner it tunes.
+        /// </summary>
+        private void WireEvents()
+        {
+            var events = _game.gameObject.AddComponent<ShopEventDirector>();
+            events.Init(_game, _shop, _spawner);
+            _game.Events = events;
+        }
+
         private void WireEverything()
         {
+            WireProgression();
+            WireEvents();
+
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);
 

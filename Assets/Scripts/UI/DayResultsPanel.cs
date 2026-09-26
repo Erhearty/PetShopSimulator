@@ -106,6 +106,8 @@ namespace PetShop.UI
             _net.color = profit >= 0f ? UIFactory.Good : UIFactory.Bad;
 
             _advice.text = Advice(s, profit);
+            if (s.Headlines != null && s.Headlines.Count > 0)
+                _advice.text += "\n" + string.Join("\n", s.Headlines);
         }
 
         private void BuildBreakdown(DaySummary s)

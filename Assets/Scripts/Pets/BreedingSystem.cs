@@ -52,8 +52,9 @@ namespace PetShop.Pets
         /// <summary>
         /// End-of-day tick for every pen: age each resident, then let any pen with two
         /// adults and free space produce one baby. Returns the babies born tonight.
+        /// <paramref name="careDrainMultiplier"/> scales each pen's feed and bedding drain.
         /// </summary>
-        public static List<Pet> AdvanceDay(IEnumerable<PetPen> pens)
+        public static List<Pet> AdvanceDay(IEnumerable<PetPen> pens, float careDrainMultiplier = 1f)
         {
             var born = new List<Pet>();
             if (pens == null) return born;
@@ -61,7 +62,7 @@ namespace PetShop.Pets
             foreach (var pen in pens)
             {
                 if (pen == null) continue;
-                pen.AdvanceDay();
+                pen.AdvanceDay(careDrainMultiplier);
 
                 if (!pen.HasSpace || pen.AdultCount < 2) continue;
 

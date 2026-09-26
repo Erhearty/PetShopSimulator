@@ -14,12 +14,20 @@ namespace PetShop.Core
     public class SaveData
     {
         public int    Version = SaveMigrator.CurrentVersion;
+        /// <summary>Permanent reputation tier reached (see ProgressionRules).</summary>
+        public int    ProgressionTier;
         public float  Balance;
         public float  Reputation;
         public int    Day;
         public int    Staff = 1;
         public float  PriceMultiplier = 1f;
         public string SavedAt;
+        /// <summary>Seed for the seasonal event rolls; 0 in older saves (a fresh one is picked).</summary>
+        public int    EventSeed;
+        /// <summary>Name of the running ShopEventKind; "None" when no event is running.</summary>
+        public string ActiveEventId = "None";
+        /// <summary>Days the running seasonal event still has to go.</summary>
+        public int    EventDaysLeft;
 
         public List<StockEntry>   Stock         = new();
         /// <summary>Delivered units still in the stockroom, keyed by category name.</summary>

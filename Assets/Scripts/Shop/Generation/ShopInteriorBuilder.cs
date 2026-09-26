@@ -20,20 +20,79 @@ namespace PetShop.Shop
         /// <summary>
         /// Every cell inside the yard is buildable — that is the open red area in the brief,
         /// including the shop's own footprint, so shelves go indoors and pens outdoors
-        /// through exactly the same placement path.
+        /// through exactly the same placement path. A new shop starts on lot stage 0;
+        /// reputation tiers open the rest via <see cref="ApplyLotStage"/>.
         /// </summary>
         public void FillFloorGrid()
+        {
+            ApplyLotStage(ShopGenerator.StarterLotStage);
+            WarnIfStarterOutsideStage0();
+        }
+
+        /// <summary>
+        /// Makes every cell of lot <paramref name="stage"/> buildable. Stages only grow, so
+        /// cells from an earlier stage stay buildable; the doorway never is.
+        /// </summary>
+        public void ApplyLotStage(int stage)
+        {
+            RectInt area = LotStageCells(stage);
+            _ctx.Grid.FillFloorRect(area.position, area.size);
+            ClearDoorway();
+        }
+
+        /// <summary>Grid cells covered by a lot stage, clamped to the yard.</summary>
+        private RectInt LotStageCells(int stage)
         {
             float cs = GridManager.CellSize;
             int halfX = Mathf.FloorToInt(_ctx.YardWidth * 0.5f / cs);
             int halfZ = Mathf.FloorToInt(_ctx.YardDepth * 0.5f / cs);
-            _ctx.Grid.FillFloorRect(new Vector2Int(-halfX, -halfZ), new Vector2Int(halfX * 2, halfZ * 2));
+            var yard = new RectInt(-halfX, -halfZ, halfX * 2, halfZ * 2);
+            if (stage >= ShopGenerator.FullYardLotStage) return yard;
 
-            // Keep the shop doorway and the path through it clear of furniture
+            // Shop room and paddock bounding box, run forward to the street.
+            Vector3 shop = _ctx.ShopCentre;
+            Rect paddock = _ctx.PaddockArea;
+            float xMin = Mathf.Min(shop.x - _ctx.RoomWidth * 0.5f, paddock.xMin);
+            float xMax = Mathf.Max(shop.x + _ctx.RoomWidth * 0.5f, paddock.xMax);
+            float zMin = stage >= ShopGenerator.BackStripLotStage ? -_ctx.YardDepth * 0.5f
+                       : Mathf.Min(shop.z - _ctx.RoomDepth * 0.5f, paddock.yMin);
+
+            int x0 = Mathf.Max(yard.xMin, Mathf.FloorToInt(xMin / cs));
+            int x1 = Mathf.Min(yard.xMax, Mathf.CeilToInt(xMax / cs));
+            int z0 = Mathf.Max(yard.yMin, Mathf.FloorToInt(zMin / cs));
+            int z1 = Mathf.Min(yard.yMax, Mathf.CeilToInt(_ctx.Gen.YardFrontZ / cs));
+            return new RectInt(x0, z0, Mathf.Max(0, x1 - x0), Mathf.Max(0, z1 - z0));
+        }
+
+        /// <summary>Doorway rows kept clear behind the door cell (into the shop).</summary>
+        private const int DoorwayBehind = -1;
+        /// <summary>Doorway rows kept clear ahead of the door cell (out to the forecourt).</summary>
+        private const int DoorwayAhead  = 2;
+        /// <summary>Doorway columns kept clear left of the door cell.</summary>
+        private const int DoorwayLeft   = -1;
+        /// <summary>Doorway columns kept clear right of the door cell.</summary>
+        private const int DoorwayRight  = 0;
+
+        /// <summary>Keep the shop doorway and the path through it clear of furniture.</summary>
+        private void ClearDoorway()
+        {
             Vector2Int door = _ctx.Grid.WorldToGrid(_ctx.DoorPosition);
-            for (int dz = -1; dz <= 2; dz++)
-                for (int dx = -1; dx <= 0; dx++)
+            for (int dz = DoorwayBehind; dz <= DoorwayAhead; dz++)
+                for (int dx = DoorwayLeft; dx <= DoorwayRight; dx++)
                     _ctx.Grid.SetFloor(new Vector2Int(door.x + dx, door.y + dz), false);
+        }
+
+        /// <summary>A starter piece outside stage 0 would silently fail to place in a new game.</summary>
+        private void WarnIfStarterOutsideStage0()
+        {
+            RectInt area = LotStageCells(ShopGenerator.StarterLotStage);
+            foreach (var p in _ctx.Gen.StarterLayout(_ctx.Grid))
+            {
+                var size = BuildCatalog.Get(p.CatalogId)?.Size ?? Vector2Int.one;
+                bool inside = area.Contains(p.Cell) && area.Contains(p.Cell + size - Vector2Int.one);
+                if (!inside)
+                    Debug.LogWarning($"[ShopGenerator] Starter {p.CatalogId} at {p.Cell} is outside lot stage 0.");
+            }
         }
 
         // ── Lighting ────────────────────────────────────────────────────────────
