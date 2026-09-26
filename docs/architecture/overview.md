@@ -24,6 +24,7 @@ flowchart LR
     pets["Pets<br/><small>Pet, PetPen, BreedingSystem</small>"]
     ui["UI<br/><small>GameUI/HUD, panels, UIFactory</small>"]
     dev["Dev<br/><small>screenshot/camera-tour/probe tools</small>"]
+    progression["Progression<br/><small>ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants</small>"]
     bootstrapper --> core
     bootstrapper --> shop
     bootstrapper --> player
@@ -36,6 +37,11 @@ flowchart LR
     commerce --> ui
     pets --> ui
     dev --> core
+    bootstrapper --> progression
+    progression --> core
+    progression --> shop
+    progression --> commerce
+    progression --> pets
 ```
 <!-- generated:end comp:pet-shop-simulator-game-client -->
 

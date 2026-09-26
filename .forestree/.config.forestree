@@ -101,6 +101,13 @@
                   "label": "Dev",
                   "x": 324,
                   "y": 184
+                },
+                {
+                  "desc": "ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants",
+                  "id": "progression",
+                  "label": "Progression",
+                  "x": 24,
+                  "y": 264
                 }
               ],
               "links": [
@@ -151,6 +158,26 @@
                 {
                   "from": "dev",
                   "to": "core"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "progression"
+                },
+                {
+                  "from": "progression",
+                  "to": "core"
+                },
+                {
+                  "from": "progression",
+                  "to": "shop"
+                },
+                {
+                  "from": "progression",
+                  "to": "commerce"
+                },
+                {
+                  "from": "progression",
+                  "to": "pets"
                 }
               ]
             },
