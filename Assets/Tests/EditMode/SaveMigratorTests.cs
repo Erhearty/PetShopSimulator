@@ -40,7 +40,9 @@ namespace PetShop.Tests
             var data = SaveMigrator.Migrate(V2Json);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(2, data.Version);
+            // Version 2 is still accepted: it upgrades to current with every field intact.
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
+            Assert.IsNotNull(data.StaffList);
             Assert.AreEqual(1234.5f, data.Balance, Tolerance);
             Assert.AreEqual(67.25f, data.Reputation, Tolerance);
             Assert.AreEqual(9, data.Day);

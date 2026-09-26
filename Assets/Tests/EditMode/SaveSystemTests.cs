@@ -45,7 +45,7 @@ namespace PetShop.Tests
         {
             var data = new SaveData
             {
-                Version = 2, Balance = 1234.5f, Reputation = 67.25f, Day = 9,
+                Version = SaveMigrator.CurrentVersion, Balance = 1234.5f, Reputation = 67.25f, Day = 9,
                 Staff = 3, PriceMultiplier = 1.25f,
             };
             data.Stock.Add(new SaveData.StockEntry { id = "kibble", qty = 12 });

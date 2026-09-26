@@ -77,7 +77,16 @@ namespace PetShop.Commerce
         /// How willing shoppers are to buy at the current markup. 1 at normal prices, falling
         /// away steeply as you get greedy and rising when you undercut.
         /// </summary>
-        public float DemandFactor => ComputeDemandFactor(PriceMultiplier);
+        public float DemandFactor => DemandFor(DemandElasticity);
+
+        /// <summary>
+        /// Demand at the current markup for a shopper whose reaction to price is
+        /// <paramref name="sensitivity"/>: (1 / markup) ^ sensitivity, clamped to
+        /// [MinDemand, <paramref name="maxDemand"/>]. 1 at normal prices. A ceiling below the
+        /// floor is raised to the floor rather than inverting the clamp.
+        /// </summary>
+        public float DemandFor(float sensitivity, float maxDemand = MaxDemand) =>
+            Mathf.Clamp(Mathf.Pow(1f / PriceMultiplier, sensitivity), MinDemand, Mathf.Max(MinDemand, maxDemand));
 
         /// <summary>Exponent controlling how sharply demand reacts to the price markup.</summary>
         private const float DemandElasticity = 1.6f;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using PetShop.Commerce;
+using PetShop.Core;
 using PetShop.Pets;
 
 namespace PetShop.Customer
@@ -30,6 +31,23 @@ namespace PetShop.Customer
         public int   MaxCustomersPerDay  = 18;
         public int   MinCustomersPerDay  = 3;
         public int   MaxConcurrent       = 8;
+
+        [Header("Archetype mix")]
+        [Tooltip("Relative weight of ordinary shoppers.")]
+        [Min(0f)] public float RegularWeight         = CustomerProfile.DefaultRegularWeight;
+        [Tooltip("Relative weight of bargain hunters, who flock to discounts and flee markups.")]
+        [Min(0f)] public float BargainHunterWeight   = CustomerProfile.DefaultBargainHunterWeight;
+        [Tooltip("Relative weight of rare-pet collectors at zero reputation.")]
+        [Min(0f)] public float RareCollectorWeight   = CustomerProfile.DefaultRareCollectorWeight;
+        [Tooltip("Collector weight added at full reputation (scaled linearly), so famous shops draw collectors.")]
+        [Min(0f)] public float RareCollectorPerReputation = CustomerProfile.DefaultRareCollectorReputationBonus;
+        [Tooltip("Relative weight of parents bringing a child.")]
+        [Min(0f)] public float ParentWithChildWeight = CustomerProfile.DefaultParentWithChildWeight;
+
+        /// <summary>A child is drawn at this fraction of adult height.</summary>
+        private const float ChildHeightScale = 0.6f;
+        /// <summary>How far behind the parent the child first appears, in metres.</summary>
+        private const float ChildSpawnBehind = 0.5f;
 
         [HideInInspector] public List<ShelfUnit> Shelves = new();
         [HideInInspector] public List<PetPen>    PetPens = new();
@@ -116,11 +134,36 @@ namespace PetShop.Customer
             ai.Queue         = Queue;
             ai.Shelves       = new List<ShelfUnit>(Shelves);
             ai.PetPens       = new List<PetPen>(PetPens);
+            // Awake has run inside AddComponent; Start has not, so the archetype still takes effect.
+            ai.Archetype     = CustomerProfile.Roll(ShopManager != null ? ShopManager.Reputation : 0f, CurrentMix());
+            if (ai.Archetype == CustomerArchetype.ParentWithChild) SpawnChild(go);
 
             SpawnedToday++;
             LiveCustomers++;
         }
 
         private int Shop_Day() => ShopManager != null ? ShopManager.Day : 0;
+
+        private ArchetypeWeights CurrentMix() => new(RegularWeight, BargainHunterWeight, RareCollectorWeight,
+                                                     RareCollectorPerReputation, ParentWithChildWeight);
+
+        /// <summary>
+        /// A small companion that lerp-follows <paramref name="parent"/> and is destroyed with it.
+        /// Kept as a sibling rather than a child transform so it can trail behind smoothly, and
+        /// without a CustomerAI so it never counts towards the live-customer census.
+        /// </summary>
+        private void SpawnChild(GameObject parent)
+        {
+            var child = new GameObject($"{parent.name}_Child");
+            child.transform.SetParent(transform, false);
+            child.transform.SetPositionAndRotation(parent.transform.position - parent.transform.forward * ChildSpawnBehind,
+                                                   parent.transform.rotation);
+            child.layer = GameLayers.Character;
+
+            var follower = child.AddComponent<ChildFollower>();
+            follower.Target = parent.transform;
+            CharacterFactory.Attach(child, () => follower != null ? follower.Velocity : Vector3.zero,
+                                    height: CharacterFactory.AdultHeight * ChildHeightScale);
+        }
     }
 }

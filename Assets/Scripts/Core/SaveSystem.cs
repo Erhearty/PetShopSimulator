@@ -25,6 +25,19 @@ namespace PetShop.Core
         /// <summary>Delivered units still in the stockroom, keyed by category name.</summary>
         public List<StockEntry>   Warehouse     = new();
         public List<PlacedItem>   PlacedObjects = new();
+        /// <summary>Everyone on staff (save version 3+). Empty in older saves; see <see cref="Staff"/>.</summary>
+        public List<StaffSaveData> StaffList    = new();
+
+        /// <summary>One assistant as saved: who they are, their job, skill, wage and till speed.</summary>
+        [Serializable]
+        public class StaffSaveData
+        {
+            public string name;
+            public string role;
+            public int    skill;
+            public float  wage;
+            public float  serviceSeconds;
+        }
 
         [Serializable]
         public class StockEntry { public string id; public int qty; }

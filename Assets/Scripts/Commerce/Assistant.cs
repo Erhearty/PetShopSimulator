@@ -1,17 +1,21 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 using PetShop.Core;
 
 namespace PetShop.Commerce
 {
     /// <summary>
-    /// A hired shop assistant. Stands behind the till and serves the queue on their own,
-    /// more slowly than the player would, for a daily wage.
+    /// A hired shop assistant, working one of three jobs for a daily wage:
+    /// a <see cref="StaffRole.Cashier"/> stands behind the till and serves the queue, more
+    /// slowly than the player would; a <see cref="StaffRole.Restocker"/> carries delivered stock
+    /// from the stockroom onto the shelves; a <see cref="StaffRole.Feeder"/> keeps the pens fed
+    /// and clean, paying their upkeep from the till.
     ///
-    /// This is the counterweight to the checkout queue: without staff you must be behind the
-    /// counter whenever anyone is ready to pay, which makes the rest of the shop impossible
-    /// to run. Hiring trades margin for freedom.
+    /// This is the counterweight to running the shop alone: hiring trades margin for freedom.
+    /// Floor-work behaviour (restocking, feeding, walking) lives in Assistant.Floorwork.cs.
     /// </summary>
-    public class Assistant : MonoBehaviour
+    public partial class Assistant : MonoBehaviour
     {
         [Header("Work rate")]
         [Tooltip("Seconds to ring up one customer. The player is instant.")]
@@ -23,17 +27,44 @@ namespace PetShop.Commerce
         /// <summary>Who they are, for notifications and the staff board.</summary>
         public string StaffName = "Assistant";
 
+        /// <summary>The queue a cashier serves.</summary>
         public CheckoutQueue Queue;
+        /// <summary>The shop whose stockroom and balance this assistant works with.</summary>
         public ShopManager   Shop;
+        /// <summary>Products to put on a shelf that has nothing on it yet; optional.</summary>
+        public ItemDatabase  Catalog;
 
-        private float _timer;
+        /// <summary>The job they are doing now. Change it with <see cref="SetRole"/>.</summary>
+        public StaffRole Role { get; private set; } = StaffRole.Cashier;
+
+        /// <summary>How good they are, <see cref="StaffCandidate.MinSkill"/>..<see cref="StaffCandidate.MaxSkill"/>.</summary>
+        public int Skill { get; private set; } = StaffCandidate.MinSkill;
+
+        private float           _timer;
         private CharacterVisual _visual;
+        private NavMeshAgent    _agent;
+        private Coroutine       _routine;
+        private Vector3         _homePosition;
+        private Quaternion      _homeRotation;
+
+        // Agent tuning, matched to shoppers so staff and customers move alike.
+        private const float AgentSpeed            = 2.2f;
+        private const float AgentAngularSpeed     = 300f;
+        private const float AgentAcceleration     = 6f;
+        private const float AgentRadius           = 0.32f;
+        private const float AgentHeight           = 1.85f;
+        private const float AgentStoppingDistance = 0.6f;
+
+        /// <summary>True while walking to or working at a shelf or pen, away from the till.</summary>
+        private bool _away;
 
         /// <summary>Builds an assistant standing at the till, facing the queue.</summary>
         public static Assistant Create(Transform parent, Vector3 position, Vector3 facing,
                                        CheckoutQueue queue, ShopManager shop, int index)
         {
             var go = new GameObject($"Assistant_{index}") { layer = GameLayers.Character };
+            // Built inactive so the agent does not try to bind before the NavMesh is baked.
+            go.SetActive(false);
             go.transform.SetParent(parent, false);
             go.transform.position = position;
             if (facing.sqrMagnitude > 0.01f)
@@ -42,14 +73,88 @@ namespace PetShop.Commerce
             var assistant = go.AddComponent<Assistant>();
             assistant.Queue = queue;
             assistant.Shop  = shop;
+            assistant._homePosition = go.transform.position;
+            assistant._homeRotation = go.transform.rotation;
+            assistant._agent = CreateAgent(go);
+            assistant._visual = CharacterFactory.Attach(go, assistant.CurrentVelocity, variant: index + 3);
 
-            // Stationary, so the animator only ever needs the idle state.
-            assistant._visual = CharacterFactory.Attach(go, () => Vector3.zero, variant: index + 3);
+            go.SetActive(true);
             return assistant;
+        }
+
+        /// <summary>Adds a disabled NavMeshAgent, tuned like a shopper; enabled when a trip starts.</summary>
+        private static NavMeshAgent CreateAgent(GameObject go)
+        {
+            var agent = go.AddComponent<NavMeshAgent>();
+            agent.speed            = AgentSpeed;
+            agent.angularSpeed     = AgentAngularSpeed;
+            agent.acceleration     = AgentAcceleration;
+            agent.radius           = AgentRadius;
+            agent.height           = AgentHeight;
+            agent.stoppingDistance = AgentStoppingDistance;
+            agent.autoBraking      = true;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
+            agent.enabled          = false;
+            return agent;
+        }
+
+        /// <summary>Velocity for the animator: the agent's while walking, zero while standing.</summary>
+        private Vector3 CurrentVelocity() =>
+            _agent != null && _agent.enabled ? _agent.velocity : Vector3.zero;
+
+        /// <summary>
+        /// Sets the skill level, clamped to the valid range. Service speed is kept separately in
+        /// <see cref="ServiceSeconds"/> so a saved assistant comes back exactly as they were.
+        /// </summary>
+        public void SetSkill(int skill)
+        {
+            Skill = Mathf.Clamp(skill, StaffCandidate.MinSkill, StaffCandidate.MaxSkill);
+        }
+
+        /// <summary>
+        /// Puts the assistant on a different job. Anything they were carrying out is dropped
+        /// cleanly (no stock or cash is in flight between steps) and they start the new job.
+        /// </summary>
+        public void SetRole(StaffRole role)
+        {
+            if (role == Role && _routine != null) return;
+            Role = role;
+            RestartRoutine();
+        }
+
+        private void OnEnable() => RestartRoutine();
+
+        private void OnDisable()
+        {
+            _routine = null;
+        }
+
+        /// <summary>Stops the current job loop and starts the one for <see cref="Role"/>.</summary>
+        private void RestartRoutine()
+        {
+            if (!isActiveAndEnabled) return;
+            if (_routine != null) StopCoroutine(_routine);
+            _timer   = 0f;
+            _routine = StartCoroutine(RoleLoop());
+        }
+
+        /// <summary>The behaviour loop for the current role.</summary>
+        private IEnumerator RoleLoop() => Role switch
+        {
+            StaffRole.Restocker => RestockLoop(),
+            StaffRole.Feeder    => FeedLoop(),
+            _                   => CashierLoop(),
+        };
+
+        /// <summary>A cashier just needs to be back at the till; Update does the serving.</summary>
+        private IEnumerator CashierLoop()
+        {
+            if (_away) yield return ReturnToTill();
         }
 
         private void Update()
         {
+            if (Role != StaffRole.Cashier || _away) { _timer = 0f; return; }
             if (Queue == null || !Queue.AnyWaiting) { _timer = 0f; return; }
 
             _timer += Time.deltaTime;
@@ -64,5 +169,11 @@ namespace PetShop.Commerce
             AudioManager.Instance?.PlaySfx("sale", 0.6f);
             GameManager.Instance?.Notify($"{name.Replace('_', ' ')} served {shopper.ShopperName} — €{value:N2}");
         }
+
+        /// <summary>Name for notifications: the staff name, or the object name as a fallback.</summary>
+        private string DisplayName =>
+            string.IsNullOrEmpty(StaffName) ? name.Replace('_', ' ') : StaffName;
+
+        private static void Notify(string message) => GameManager.Instance?.Notify(message);
     }
 }

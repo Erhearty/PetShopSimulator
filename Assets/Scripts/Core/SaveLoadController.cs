@@ -45,6 +45,7 @@ namespace PetShop.Core
             // trade at all while you are out in the yard. Inherited, so no sign-on fee.
             var inherited = StaffCandidate.Generate();
             inherited.SignOnFee = 0f;
+            inherited.Role      = StaffRole.Cashier;
             _game.HireCandidate(inherited);
             _game.Notify("Welcome to your pet shop! B to build, E to interact, Enter to close up.");
         }
@@ -86,6 +87,7 @@ namespace PetShop.Core
                 Reputation      = shop.Reputation,
                 Day             = shop.Day,
                 Staff           = _game.StaffCount,
+                StaffList       = _game.StaffToSave(),
                 PriceMultiplier = shop.PriceMultiplier,
             };
 
@@ -179,7 +181,7 @@ namespace PetShop.Core
                         pen.AddPet(SaveSystem.SaveDataToPet(petData));
             }
 
-            for (int i = 0; i < Mathf.Max(1, data.Staff); i++) _game.HireAssistant();
+            _game.RestoreStaff(data);
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);
 
             _game.Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");

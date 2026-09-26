@@ -313,6 +313,12 @@ namespace PetShop.Core
         /// <summary>Lets one named member of staff go, rather than whoever happens to be last.</summary>
         public bool FireAssistant(Assistant member) => _roster.FireAssistant(member);
 
+        /// <summary>Everyone on staff, for the save file.</summary>
+        internal List<SaveData.StaffSaveData> StaffToSave() => _roster.ToSave();
+
+        /// <summary>Rebuilds staff from a save without charging sign-on fees.</summary>
+        internal void RestoreStaff(SaveData data) => _roster.Restore(data);
+
         /// <summary>Nudge shelf prices up or down. Wired to the ledger's price buttons.</summary>
         public void AdjustPrices(float delta)
         {
