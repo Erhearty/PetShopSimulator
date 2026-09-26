@@ -101,11 +101,10 @@ namespace PetShop.Commerce
 
         /// <summary>Plain-language skill level, for cards and the payroll.</summary>
         public static string SkillWordFor(int skill) =>
-            skill >= 5 ? "expert"
-          : skill == 4 ? "skilled"
-          : skill == 3 ? "capable"
-          : skill == 2 ? "learning"
-          :              "green";
+            SkillWords[Mathf.Clamp(skill, MinSkill, MaxSkill) - MinSkill];
+
+        /// <summary>Display word per skill level, indexed from <see cref="MinSkill"/>.</summary>
+        private static readonly string[] SkillWords = { "green", "learning", "capable", "skilled", "expert" };
 
         /// <summary>Plain-language skill level of this applicant.</summary>
         public string SkillWord => SkillWordFor(Skill);

@@ -113,6 +113,8 @@ namespace PetShop.Core
             assistant.DailyWage      = c.DailyWage;
             assistant.ServiceSeconds = c.ServiceSeconds;
             assistant.StaffName      = c.Name;
+            // Restockers need the catalogue to fill a shelf that has no product lines yet.
+            assistant.Catalog        = _game.Catalog;
             assistant.SetSkill(c.Skill);
             assistant.SetRole(c.Role);
             _assistants.Add(assistant);
@@ -200,13 +202,17 @@ namespace PetShop.Core
         {
             if (saved == null || _assistants.Count >= MaxStaff) return;
             if (!Enum.TryParse(saved.role, out StaffRole role)) role = StaffRole.Cashier;
+            int skill = Mathf.Clamp(saved.skill, StaffCandidate.MinSkill, StaffCandidate.MaxSkill);
+            // Hand-edited or damaged entries fall back to the skill's defaults rather than
+            // producing an instant-serving or negative-wage assistant.
             Spawn(new StaffCandidate
             {
-                Name           = saved.name,
+                Name           = string.IsNullOrEmpty(saved.name) ? "Assistant" : saved.name,
                 Role           = role,
-                Skill          = saved.skill,
-                DailyWage      = saved.wage,
-                ServiceSeconds = saved.serviceSeconds,
+                Skill          = skill,
+                DailyWage      = saved.wage >= 0f ? saved.wage : StaffCandidate.WageForSkill(skill),
+                ServiceSeconds = saved.serviceSeconds > 0f
+                               ? saved.serviceSeconds : StaffCandidate.ServiceSecondsForSkill(skill),
                 SignOnFee      = 0f,
             });
         }

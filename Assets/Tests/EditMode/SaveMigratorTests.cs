@@ -34,6 +34,36 @@ namespace PetShop.Tests
 
         private const string MalformedJson = "{ this is not json";
 
+        /// <summary>A version 3 save carrying a named staff list.</summary>
+        private const string V3Json =
+            "{\"Version\":3,\"Balance\":10.0,\"Day\":2,\"Staff\":1,\"PriceMultiplier\":1.0," +
+            "\"StaffList\":[{\"name\":\"Ada\",\"role\":\"Feeder\",\"skill\":4,\"wage\":72.5,\"serviceSeconds\":3.25}]}";
+
+        [Test]
+        public void Migrate_V3_KeepsStaffListExactly()
+        {
+            var data = SaveMigrator.Migrate(V3Json);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(3, data.Version);
+            Assert.AreEqual(1, data.StaffList.Count);
+            var s = data.StaffList[0];
+            Assert.AreEqual("Ada", s.name);
+            Assert.AreEqual("Feeder", s.role);
+            Assert.AreEqual(4, s.skill);
+            Assert.AreEqual(72.5f, s.wage, Tolerance);
+            Assert.AreEqual(3.25f, s.serviceSeconds, Tolerance);
+        }
+
+        [Test]
+        public void Migrate_V2_LeavesStaffListEmptyAndHeadCountIntact()
+        {
+            var data = SaveMigrator.Migrate(V2Json);
+
+            Assert.AreEqual(0, data.StaffList.Count);
+            Assert.AreEqual(3, data.Staff);
+        }
+
         [Test]
         public void Migrate_CurrentVersion_RoundTripsUnchanged()
         {
