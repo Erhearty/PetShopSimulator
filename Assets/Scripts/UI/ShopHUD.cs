@@ -32,6 +32,7 @@ namespace PetShop.UI
         private TMP_Text _prompt;
         private TMP_Text _buildHint;
         private GameObject _helpPanel;
+        private TMP_Text   _helpText;
         private GameObject _crosshair;
         private Image      _repFill;
 
@@ -217,23 +218,33 @@ namespace PetShop.UI
                                          new Color(0.07f, 0.09f, 0.13f, 0.80f),
                                          new Vector2(12f, 12f), new Vector2(268f, 244f));
 
-            UIFactory.Label("HelpText", _helpPanel.transform,
-                "<b>Controls</b>\n" +
-                "WASD  move  ·  Space  jump\n" +
-                "Mouse  look\n" +
-                
-                
-                "E  interact / restock\n" +
-                "1-8 or B  build mode\n" +
-                "LMB place · R rotate\n" +
-                "Middle-click  remove\n" +
-                "Enter  close up early\n" +
-                "E at the counter  serve the queue\n" +
-                "Tab  the ledger\n" +
-                "Esc  pause  ·  F5 save\n" +
-                "H  hide this panel",
+            _helpText = UIFactory.Label("HelpText", _helpPanel.transform, HelpText(),
                 new Vector2(0.06f, 0.04f), new Vector2(0.97f, 0.96f), 14.5f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
+        }
+
+        /// <summary>The controls cheat-sheet, built from the current key bindings.</summary>
+        private static string HelpText()
+        {
+            static string L(GameAction a) => InputBindings.Label(a);
+            return "<b>Controls</b>\n" +
+                $"{InputBindings.MoveLabel()}  move  ·  {L(GameAction.Jump)}  jump\n" +
+                "Mouse  look\n" +
+                $"{L(GameAction.Interact)}  interact / restock\n" +
+                $"1-{BuildCatalog.HotkeyOrder.Length} or {L(GameAction.BuildMode)}  build mode\n" +
+                $"LMB place · {L(GameAction.BuildRotate)} rotate\n" +
+                $"Middle-click / {L(GameAction.BuildRemove)}  remove\n" +
+                $"{L(GameAction.EndDay)}  close up early\n" +
+                $"{L(GameAction.Interact)} at the counter  serve the queue\n" +
+                $"{L(GameAction.Ledger)}  the ledger\n" +
+                $"Esc  pause  ·  {L(GameAction.QuickSave)} save\n" +
+                $"{L(GameAction.Help)}  hide this panel";
+        }
+
+        /// <summary>Rebuilds the controls cheat-sheet after a key has been rebound.</summary>
+        public void RefreshHelp()
+        {
+            if (_helpText != null) _helpText.text = HelpText();
         }
 
         // ── Runtime ─────────────────────────────────────────────────────────────
@@ -252,7 +263,7 @@ namespace PetShop.UI
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.H) && _helpPanel != null)
+            if (InputBindings.GetKeyDown(GameAction.Help) && _helpPanel != null && (_game == null || !_game.IsModalOpen))
                 _helpPanel.SetActive(!_helpPanel.activeSelf);
 
             if (_crosshair != null && _game != null)
@@ -298,7 +309,9 @@ namespace PetShop.UI
 
             if (_buildHint != null)
             {
-                _buildHint.text    = $"Placing {item.DisplayName} — LMB place · R rotate · middle-click remove · Esc cancel";
+                _buildHint.text    = $"Placing {item.DisplayName} — LMB place · " +
+                                     $"{InputBindings.Label(GameAction.BuildRotate)} rotate · " +
+                                     $"middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
                 _buildHint.enabled = true;
             }
         }
@@ -316,6 +329,7 @@ namespace PetShop.UI
             if (_alertLabel == null || _game == null || _shop == null) return;
 
             string message = null;
+            string e = InputBindings.Label(GameAction.Interact);
 
             int emptyShelves = 0;
             foreach (var shelf in _game.Shelves)
@@ -329,24 +343,24 @@ namespace PetShop.UI
 
             if (crates > 0)
                 message = crates == 1
-                    ? "A delivery is waiting on the forecourt — press E at it to take it in."
+                    ? $"A delivery is waiting on the forecourt — press {e} at it to take it in."
                     : $"{crates} deliveries are waiting on the forecourt.";
             else if (_game.Queue != null && _game.Queue.Length > 0)
                 message = _game.Queue.Length == 1
-                    ? "Someone is waiting at the till — press E behind the counter to serve them."
+                    ? $"Someone is waiting at the till — press {e} behind the counter to serve them."
                     : $"{_game.Queue.Length} people are waiting at the till.";
             else if (_game.PensNeedingService > 0)
                 message = _game.PensNeedingService == 1
-                    ? "A pen needs feeding — press E at it."
+                    ? $"A pen needs feeding — press {e} at it."
                     : $"{_game.PensNeedingService} pens need feeding and mucking out.";
             else if (_shop.Balance < _shop.DailyRent)
                 message = $"Rent tonight is € {_shop.DailyRent:N0} and you have € {_shop.Balance:N0} — sell something.";
             else if (emptyShelves > 0)
                 message = emptyShelves == 1
-                    ? "A shelf is empty — walk up to it and press E to restock."
-                    : $"{emptyShelves} shelves are empty — press E at each one to restock.";
+                    ? $"A shelf is empty — walk up to it and press {e} to restock."
+                    : $"{emptyShelves} shelves are empty — press {e} at each one to restock.";
             else if (emptyPens > 0)
-                message = $"{emptyPens} pen(s) are empty — press E at a pen to buy from the breeder.";
+                message = $"{emptyPens} pen(s) are empty — press {e} at a pen to buy from the breeder.";
             else if (_shop.Reputation < 30f)
                 message = "Reputation is low; keep the shelves stocked to bring customers back.";
 

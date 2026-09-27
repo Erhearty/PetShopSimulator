@@ -46,7 +46,9 @@ namespace PetShop.Core
             var inherited = StaffCandidate.Generate();
             inherited.SignOnFee = 0f;
             _game.HireCandidate(inherited);
-            _game.Notify("Welcome to your pet shop! B to build, E to interact, Enter to close up.");
+            _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
+                         $"{InputBindings.Label(GameAction.Interact)} to interact, " +
+                         $"{InputBindings.Label(GameAction.EndDay)} to close up.");
         }
 
         /// <summary>Stocks a fresh shelf for free — the starter inventory.</summary>

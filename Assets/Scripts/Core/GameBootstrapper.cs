@@ -65,7 +65,7 @@ namespace PetShop.Core
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin();
-                });
+                }, () => _ui.Settings.Show());
             }
 
             Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, 1-4 build, Tab ledger, Enter to close the day.");
@@ -81,7 +81,7 @@ namespace PetShop.Core
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                     ToggleBuild(ids[i]);
 
-            if (Input.GetKeyDown(KeyCode.B))
+            if (InputBindings.GetKeyDown(GameAction.BuildMode))
                 ToggleBuild(_build.CurrentItem != null ? _build.CurrentItem.Id : BuildCatalog.ShelfSmall);
         }
 

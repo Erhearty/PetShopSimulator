@@ -124,10 +124,10 @@ namespace PetShop.Core
         {
             if (IsGameOver || IsModalOpen) return;
 
-            if (Input.GetKeyDown(KeyCode.F5)) SaveGame();
+            if (InputBindings.GetKeyDown(GameAction.QuickSave)) SaveGame();
 
             if (!IsBuildModeActive &&
-                (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
+                (InputBindings.GetKeyDown(GameAction.EndDay) || Input.GetKeyDown(KeyCode.KeypadEnter)))
             {
                 EndDay();
                 return;

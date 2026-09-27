@@ -179,14 +179,14 @@ namespace PetShop.UI
                 refill += shelf.RestockCost();
             }
             if (emptyShelves > 0)
-                notes.Add($"· <color=#F27370>{emptyShelves} shelf/shelves are empty.</color> Press E at a shelf to refill — " +
+                notes.Add($"· <color=#F27370>{emptyShelves} shelf/shelves are empty.</color> Press {InputBindings.Label(GameAction.Interact)} at a shelf to refill — " +
                           $"the whole shop would cost € {refill:N0}.");
 
             int emptyPens = 0;
             foreach (var pen in _game.Pens)
                 if (pen != null && pen.Count == 0) emptyPens++;
             if (emptyPens > 0)
-                notes.Add($"· {emptyPens} pen(s) stand empty. Press E at a pen to buy from the breeder.");
+                notes.Add($"· {emptyPens} pen(s) stand empty. Press {InputBindings.Label(GameAction.Interact)} at a pen to buy from the breeder.");
 
             if (s.Reputation < 35f)
                 notes.Add("· Reputation is low, so few customers come. Keep stock on the shelves.");

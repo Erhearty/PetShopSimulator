@@ -21,6 +21,7 @@ namespace PetShop.UI
         private TMP_Text    _pensText;
         private TMP_Text    _catalogText;
         private TMP_Text    _headerText;
+        private TMP_Text    _closeLabel;
 
         private readonly List<Button> _tabs = new();
         private GameObject _shelvesPage, _pensPage, _catalogPage, _managePage;
@@ -69,9 +70,10 @@ namespace PetShop.UI
             BuildOrderControls(panel.transform);
             BuildAnimalControls(panel.transform);
 
-            var close = UIFactory.Button("Close", panel.transform, "Close  (Tab)",
+            var close = UIFactory.Button("Close", panel.transform, $"Close  ({InputBindings.Label(GameAction.Ledger)})",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
             close.onClick.AddListener(Hide);
+            _closeLabel = close.GetComponentInChildren<TMP_Text>();
 
             _root.SetActive(false);
         }
@@ -192,6 +194,7 @@ namespace PetShop.UI
         public void Show()
         {
             if (_root == null) return;
+            if (_closeLabel != null) _closeLabel.text = $"Close  ({InputBindings.Label(GameAction.Ledger)})";
             Refresh();
             _root.SetActive(true);
             ShowPage(0);
@@ -296,7 +299,7 @@ namespace PetShop.UI
                 sb.AppendLine($"{shelves.Count} shelves · {totalUnits} units on display · {empty} empty");
                 sb.AppendLine($"Refilling everything would cost <b>€ {restockBill:N2}</b>.");
                 sb.AppendLine();
-                sb.AppendLine("<color=#9FB2C4>Walk up to a shelf and press E to refill it.</color>");
+                sb.AppendLine($"<color=#9FB2C4>Walk up to a shelf and press {InputBindings.Label(GameAction.Interact)} to refill it.</color>");
             }
             _shelvesText.text = sb.ToString();
         }
@@ -320,7 +323,7 @@ namespace PetShop.UI
 
                     if (pen.Count == 0)
                     {
-                        sb.AppendLine("   <color=#F27370>empty — press E at the pen to buy one</color>");
+                        sb.AppendLine($"   <color=#F27370>empty — press {InputBindings.Label(GameAction.Interact)} at the pen to buy one</color>");
                     }
                     else
                     {

@@ -49,7 +49,7 @@ namespace PetShop.Commerce
         }
 
         private void RefreshLabel() =>
-            _label?.SetText($"delivery: {Category}\n<size=75%>{Units} units  ·  [E] to collect</size>");
+            _label?.SetText($"delivery: {Category}\n<size=75%>{Units} units  ·  [{InputBindings.Label(GameAction.Interact)}] to collect</size>");
 
         /// <summary>Moves the load into the stockroom and clears the forecourt.</summary>
         public int Collect(ShopManager shop)
@@ -59,6 +59,6 @@ namespace PetShop.Commerce
             return Units;
         }
 
-        public string Prompt => $"[E]  Collect {Units} {Category} units from the delivery";
+        public string Prompt => $"[{InputBindings.Label(GameAction.Interact)}]  Collect {Units} {Category} units from the delivery";
     }
 }

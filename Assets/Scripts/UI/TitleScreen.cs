@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Shop;
 
 namespace PetShop.UI
 {
@@ -14,10 +15,17 @@ namespace PetShop.UI
     {
         private GameObject _root;
         private Action<bool> _onStart;   // true = continue a save, false = fresh shop
+        private TMP_Text _hint;
+
+        // Menu buttons stack downwards from ButtonTop, one ButtonStep apart.
+        private const float ButtonTop    = 0.30f;
+        private const float ButtonStep   = 0.075f;
+        private const float ButtonHeight = 0.06f;
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
-        public void Build(Transform canvas, bool hasSave, Action<bool> onStart)
+        /// <summary>Builds and shows the title screen. <paramref name="onSettings"/> runs when Settings is clicked.</summary>
+        public void Build(Transform canvas, bool hasSave, Action<bool> onStart, Action onSettings = null)
         {
             _onStart = onStart;
 
@@ -45,32 +53,46 @@ namespace PetShop.UI
                 new Vector2(0.12f, 0.40f), new Vector2(0.95f, 0.53f), 17f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
 
-            float y = 0.30f;
+            float y = ButtonTop;
             if (hasSave)
             {
                 var cont = UIFactory.Button("Continue", slab.transform, "Continue",
-                    new Vector2(0.12f, y), new Vector2(0.72f, y + 0.07f), 20f, UIFactory.ButtonOn);
+                    new Vector2(0.12f, y), new Vector2(0.72f, y + ButtonHeight), 20f, UIFactory.ButtonOn);
                 cont.onClick.AddListener(() => Start(true));
-                y -= 0.09f;
+                y -= ButtonStep;
             }
 
             var fresh = UIFactory.Button("NewGame", slab.transform, hasSave ? "New shop" : "Open the shop",
-                new Vector2(0.12f, y), new Vector2(0.72f, y + 0.07f), 20f,
+                new Vector2(0.12f, y), new Vector2(0.72f, y + ButtonHeight), 20f,
                 hasSave ? UIFactory.ButtonBg : UIFactory.ButtonOn);
             fresh.onClick.AddListener(() => Start(false));
-            y -= 0.09f;
+            y -= ButtonStep;
 
             var quit = UIFactory.Button("Quit", slab.transform, "Quit",
-                new Vector2(0.12f, y), new Vector2(0.72f, y + 0.07f), 18f);
+                new Vector2(0.12f, y), new Vector2(0.72f, y + ButtonHeight), 18f);
             quit.onClick.AddListener(Application.Quit);
+            y -= ButtonStep;
 
-            UIFactory.Label("Hint", slab.transform,
-                "WASD move  ·  RMB orbit  ·  E interact  ·  1-4 build  ·  H help",
-                new Vector2(0.12f, 0.05f), new Vector2(0.95f, 0.10f), 13f, UIFactory.InkMuted);
+            var settings = UIFactory.Button("Settings", slab.transform, "Settings",
+                new Vector2(0.12f, y), new Vector2(0.72f, y + ButtonHeight), 18f);
+            settings.onClick.AddListener(() => onSettings?.Invoke());
+
+            _hint = UIFactory.Label("Hint", slab.transform, "",
+                new Vector2(0.12f, 0.015f), new Vector2(0.95f, 0.065f), 13f, UIFactory.InkMuted);
+            RefreshKeyHints();
 
             if (hasSave)
                 UIFactory.Label("SaveNote", slab.transform, "A saved shop was found.",
                     new Vector2(0.12f, 0.355f), new Vector2(0.95f, 0.39f), 13f, UIFactory.Good);
+        }
+
+        /// <summary>Rewrites the controls hint from the current key bindings.</summary>
+        public void RefreshKeyHints()
+        {
+            if (_hint == null) return;
+            _hint.text = $"{InputBindings.MoveLabel()} move  ·  RMB orbit  ·  " +
+                         $"{InputBindings.Label(GameAction.Interact)} interact  ·  " +
+                         $"1-{BuildCatalog.HotkeyOrder.Length} build  ·  {InputBindings.Label(GameAction.Help)} help";
         }
 
         private void Start(bool continueSave)

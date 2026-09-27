@@ -24,6 +24,9 @@ namespace PetShop.UI
         public StaffPanel      StaffBoard{ get; private set; }
         public TitleScreen     Title     { get; private set; }
 
+        /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
+        public SettingsPanel   Settings  { get; private set; }
+
         /// <summary>The canvas every panel lives under. Panels must parent here, not to GameUI:
         /// a plain Transform in the middle of a UI hierarchy breaks RectTransform anchoring.</summary>
         public Transform CanvasRoot { get; private set; }
@@ -39,6 +42,7 @@ namespace PetShop.UI
             (Stats    != null && Stats.IsOpen)    ||
             (Breeding != null && Breeding.IsOpen) ||
             (StaffBoard != null && StaffBoard.IsOpen) ||
+            (Settings != null && Settings.IsOpen) ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -81,6 +85,7 @@ namespace PetShop.UI
             StaffBoard = canvasGO.AddComponent<StaffPanel>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
+            Settings = canvasGO.AddComponent<SettingsPanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
             Info.Build(canvasGO.transform);
@@ -89,7 +94,8 @@ namespace PetShop.UI
             Stats.Build(canvasGO.transform, game);
             Breeding.Build(canvasGO.transform, game);
             StaffBoard.Build(canvasGO.transform, game);
-            Pause.Build(canvasGO.transform, game, audio);
+            Settings.Build(canvasGO.transform, game);
+            Pause.Build(canvasGO.transform, game, audio, Settings);
 
             return canvas;
         }
@@ -100,7 +106,7 @@ namespace PetShop.UI
 
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
-            if (Input.GetKeyDown(KeyCode.Tab) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen)
+            if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen)
                 Stats.Toggle();
         }
 
@@ -110,6 +116,8 @@ namespace PetShop.UI
         /// </summary>
         private void HandleEscape()
         {
+            if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
+            if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
             if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
             if (Breeding != null && Breeding.IsOpen) { Breeding.Hide();        return; }
