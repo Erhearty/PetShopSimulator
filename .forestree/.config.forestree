@@ -108,6 +108,13 @@
                   "label": "Progression",
                   "x": 24,
                   "y": 264
+                },
+                {
+                  "desc": "ShopEventDirector (PetShop.Events): seasonal events that tune supplier prices (ShopManager), customer spawning (CustomerSpawner) and pet care drain (GameManager); wired by GameBootstrapper.WireEvents",
+                  "id": "events",
+                  "label": "Events",
+                  "x": 174,
+                  "y": 264
                 }
               ],
               "links": [
@@ -178,6 +185,22 @@
                 {
                   "from": "progression",
                   "to": "pets"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "events"
+                },
+                {
+                  "from": "events",
+                  "to": "core"
+                },
+                {
+                  "from": "events",
+                  "to": "commerce"
+                },
+                {
+                  "from": "events",
+                  "to": "customer"
                 }
               ]
             },

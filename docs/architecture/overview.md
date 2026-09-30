@@ -25,6 +25,7 @@ flowchart LR
     ui["UI<br/><small>GameUI/HUD, panels, UIFactory</small>"]
     dev["Dev<br/><small>screenshot/camera-tour/probe tools</small>"]
     progression["Progression<br/><small>ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants</small>"]
+    events["Events<br/><small>ShopEventDirector (PetShop.Events): seasonal events that tune supplier prices (ShopManager), customer spawning (CustomerSpawner) and pet care drain (GameManager); wired by GameBootstrapper.WireEvents</small>"]
     bootstrapper --> core
     bootstrapper --> shop
     bootstrapper --> player
@@ -42,6 +43,10 @@ flowchart LR
     progression --> shop
     progression --> commerce
     progression --> pets
+    bootstrapper --> events
+    events --> core
+    events --> commerce
+    events --> customer
 ```
 <!-- generated:end comp:pet-shop-simulator-game-client -->
 
