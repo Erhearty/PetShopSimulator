@@ -101,6 +101,13 @@
                   "label": "Dev",
                   "x": 324,
                   "y": 184
+                },
+                {
+                  "desc": "ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants",
+                  "id": "progression",
+                  "label": "Progression",
+                  "x": 24,
+                  "y": 264
                 }
               ],
               "links": [
@@ -151,6 +158,26 @@
                 {
                   "from": "dev",
                   "to": "core"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "progression"
+                },
+                {
+                  "from": "progression",
+                  "to": "core"
+                },
+                {
+                  "from": "progression",
+                  "to": "shop"
+                },
+                {
+                  "from": "progression",
+                  "to": "commerce"
+                },
+                {
+                  "from": "progression",
+                  "to": "pets"
                 }
               ]
             },
@@ -174,6 +201,16 @@
                   "desc": "Capture PNGs of the running game then quit",
                   "example": "Screenshots/",
                   "key": "-screenshot <path>"
+                },
+                {
+                  "desc": "Attaches DayTelemetry (via GameBootstrapper.AttachTelemetry) and appends per-day JSON records and a run summary to this JSONL file (Soak Telemetry Log).",
+                  "example": "-telemetry /tmp/soak.jsonl",
+                  "key": "-telemetry <path>"
+                },
+                {
+                  "desc": "Soak-run mode: also attaches DayTelemetry, and quits the game after n in-game days.",
+                  "example": "-quitafterdays 30",
+                  "key": "-quitafterdays <n>"
                 }
               ]
             },
@@ -401,6 +438,30 @@
                   "name": "AutoReorder",
                   "notes": "per category: category, enabled, threshold, units",
                   "type": "List<ReorderRule>"
+                },
+                {
+                  "flags": "",
+                  "name": "ProgressionTier",
+                  "notes": "Highest reputation tier reached; v2 saves migrate from Reputation",
+                  "type": "int"
+                },
+                {
+                  "flags": "",
+                  "name": "EventSeed",
+                  "notes": "Seed for deterministic daily event rolls",
+                  "type": "int"
+                },
+                {
+                  "flags": "",
+                  "name": "ActiveEventId",
+                  "notes": "None|SupplierSale|Heatwave|StreetFestival",
+                  "type": "string"
+                },
+                {
+                  "flags": "",
+                  "name": "EventDaysLeft",
+                  "notes": "Days remaining for the active event",
+                  "type": "int"
                 }
               ]
             },
@@ -452,6 +513,27 @@
       "id": "player-prefs-store",
       "name": "PlayerPrefs Settings Store",
       "type": "storage"
+    },
+    {
+      "canvas": {
+        "widgets": [
+          {
+            "data": {
+              "text": "Dev-only JSON-lines file written by DayTelemetry (Assets/Scripts/Dev/DayTelemetry.cs) during soak runs: one JSON record appended per in-game day plus a final run-summary record, via File.AppendAllText. Only produced when GameBootstrapper.AttachTelemetry attaches the component because -telemetry or -quitafterdays was passed on the command line; normal play never writes it. Separate from the Local Save File and never read back by the game."
+            },
+            "h": 180,
+            "id": "widget-1790328111624-0",
+            "title": "Intent & Scope Description",
+            "type": "text",
+            "w": 350,
+            "x": 30,
+            "y": 30
+          }
+        ]
+      },
+      "id": "soak-telemetry-log",
+      "name": "Soak Telemetry Log (JSONL)",
+      "type": "storage"
     }
   ],
   "connections": [
@@ -469,6 +551,11 @@
       "from": "pet-shop-simulator-game-client",
       "protocol": "Unity PlayerPrefs API (key bindings, autosave setting)",
       "to": "player-prefs-store"
+    },
+    {
+      "from": "pet-shop-simulator-game-client",
+      "protocol": "Local filesystem append (File.AppendAllText, JSON lines)",
+      "to": "soak-telemetry-log"
     }
   ],
   "forestreeFormatVersion": true,

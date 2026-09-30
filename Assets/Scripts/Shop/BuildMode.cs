@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -10,7 +11,7 @@ namespace PetShop.Shop
     /// <summary>
     /// 3D build mode — projects the mouse onto the floor plane, shows a translucent
     /// ghost of the item, and places real furniture on LMB.
-    /// LMB place | R rotate | RMB/Esc/B cancel | Delete-key or middle-click removes.
+    /// LMB place | R rotate | Q cycle pen species | RMB/Esc/B cancel | Delete-key or middle-click removes.
     /// </summary>
     public class BuildMode : MonoBehaviour
     {
@@ -34,6 +35,17 @@ namespace PetShop.Shop
         public UnityEvent<string>                       OnBuildMessage          = new();
         public UnityEvent<GameObject>                   OnFurnitureSpawned      = new();
         public UnityEvent<GameObject>                   OnFurnitureDespawning   = new();
+
+        /// <summary>
+        /// Pen species the player may pick with Q, as pen variant strings. Null or empty
+        /// leaves new pens on the factory default (Rabbit).
+        /// </summary>
+        public Func<IReadOnlyList<string>> PenVariantSource;
+
+        /// <summary>Catalog type of pens, the only item whose species can be picked.</summary>
+        private const string PenType = "pen";
+        /// <summary>Index into the current pen variant options; wrapped on use.</summary>
+        private int _penVariantIndex;
 
         public bool             IsActive    { get; private set; }
         public PlacedObjectData CurrentItem { get; private set; }
@@ -64,6 +76,7 @@ namespace PetShop.Shop
             _rotation   = 0f;
             CreateGhost();
             OnBuildModeEntered.Invoke(item);
+            if (item.Type == PenType) AnnouncePenVariant();
         }
 
         public void ExitBuildMode()
@@ -83,6 +96,7 @@ namespace PetShop.Shop
             { ExitBuildMode(); return; }
 
             if (InputBindings.GetKeyDown(GameAction.BuildRotate)) _rotation = (_rotation + 90f) % 360f;
+            if (Input.GetKeyDown(KeyCode.Q)) CyclePenVariant();
 
             UpdateGhost();
 
@@ -111,7 +125,34 @@ namespace PetShop.Shop
                 return;
             }
 
-            Place(cell, CurrentItem, null, _rotation, charge: true);
+            string variant = CurrentItem.Type == PenType ? CurrentPenVariant() : null;
+            Place(cell, CurrentItem, variant, _rotation, charge: true);
+        }
+
+        /// <summary>The species the next pen will hold, or null for the factory default.</summary>
+        private string CurrentPenVariant()
+        {
+            var options = PenVariantSource?.Invoke();
+            if (options == null || options.Count == 0) return null;
+            return options[_penVariantIndex % options.Count];
+        }
+
+        /// <summary>Q: step to the next unlocked pen species and announce it.</summary>
+        private void CyclePenVariant()
+        {
+            if (CurrentItem == null || CurrentItem.Type != PenType) return;
+            var options = PenVariantSource?.Invoke();
+            if (options == null || options.Count == 0) return;
+
+            _penVariantIndex = (_penVariantIndex % options.Count + 1) % options.Count;
+            AnnouncePenVariant();
+        }
+
+        /// <summary>Tells the player which species the next pen will hold.</summary>
+        private void AnnouncePenVariant()
+        {
+            string name = CurrentPenVariant();
+            if (name != null) OnBuildMessage.Invoke($"Pen species: {name} — Q to change");
         }
 
         /// <summary>

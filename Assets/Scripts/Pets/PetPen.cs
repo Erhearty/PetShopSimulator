@@ -117,9 +117,10 @@ namespace PetShop.Pets
 
         /// <summary>
         /// Ages every resident by one day, using however much feed and bedding was left.
-        /// Called by BreedingSystem at day end.
+        /// Called by BreedingSystem at day end. <paramref name="careDrainMultiplier"/> scales how
+        /// fast feed and bedding run down (1 = normal, higher during a heatwave).
         /// </summary>
-        public void AdvanceDay()
+        public void AdvanceDay(float careDrainMultiplier = 1f)
         {
             bool fed   = FoodLevel   > 0.2f;
             bool clean = Cleanliness > 0.2f;
@@ -127,7 +128,7 @@ namespace PetShop.Pets
             foreach (var pet in _residents) pet.AdvanceDay(fed, clean);
 
             // More animals eat more and make more mess.
-            float load = 0.18f + Count * 0.12f;
+            float load = (0.18f + Count * 0.12f) * careDrainMultiplier;
             FoodLevel   = Mathf.Clamp01(FoodLevel   - load);
             Cleanliness = Mathf.Clamp01(Cleanliness - load * 0.85f);
 

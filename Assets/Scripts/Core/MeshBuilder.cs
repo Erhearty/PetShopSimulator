@@ -192,9 +192,11 @@ namespace PetShop.Core
             foreach (float sx in new[] { -1f, 1f })
             foreach (float sz in new[] { -1f, 1f })
             {
-                var post = CreateBox(0.14f, wallH + 0.12f, 0.14f, MaterialFactory.PenFence, "Post");
+                const float postH = wallH + 0.12f;
+                var post = CreateBox(0.14f, postH, 0.14f, MaterialFactory.PenFence, "Post");
                 post.transform.SetParent(root.transform, false);
-                post.transform.localPosition = new Vector3(sx * size * 0.5f, 0f, sz * size * 0.5f);
+                // Overwriting localPosition drops CreateBox's base lift, so re-apply it (half height).
+                post.transform.localPosition = new Vector3(sx * size * 0.5f, postH * 0.5f, sz * size * 0.5f);
             }
             return root;
         }
@@ -204,7 +206,8 @@ namespace PetShop.Core
         {
             var wall = CreateBox(width, height, thickness, MaterialFactory.PenFence, name);
             wall.transform.SetParent(parent.transform, false);
-            wall.transform.localPosition   = pos;
+            // pos is the wall's footing; lift by half its height so its base stands on it.
+            wall.transform.localPosition   = pos + Vector3.up * (height * 0.5f);
             wall.transform.localEulerAngles = new Vector3(0f, yRot, 0f);
         }
 
@@ -344,11 +347,41 @@ namespace PetShop.Core
 
         // ── Utilities ───────────────────────────────────────────────────────────
 
-        /// <summary>Removes every collider in a hierarchy — characters use their own controller/agent.</summary>
+        /// <summary>Namespace every game script lives in; any other script in a model came with a pack.</summary>
+        private const string GameNamespace = "PetShop";
+
+        /// <summary>
+        /// Removes every collider in a hierarchy — characters use their own controller/agent.
+        /// Pack scripts (e.g. the animal pack's CreatureMover / MovePlayerInput) are disabled first
+        /// so they cannot drive the model. A CharacterController is disabled rather than destroyed:
+        /// those scripts [RequireComponent] it, and destroying it logs an error.
+        /// </summary>
         public static void StripColliders(GameObject root)
         {
+            DisablePackScripts(root);
             foreach (var col in root.GetComponentsInChildren<Collider>(true))
-                Object.Destroy(col);
+            {
+                if (col is CharacterController controller) controller.enabled = false;
+                else Object.Destroy(col);
+            }
+        }
+
+        /// <summary>Disables every MonoBehaviour in the hierarchy that is not one of the game's own.</summary>
+        private static void DisablePackScripts(GameObject root)
+        {
+            foreach (var script in root.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                // A missing-script slot comes back null.
+                if (script == null || IsGameScript(script)) continue;
+                script.enabled = false;
+            }
+        }
+
+        /// <summary>True when <paramref name="script"/>'s type lives in the game's own namespace or one below it.</summary>
+        private static bool IsGameScript(MonoBehaviour script)
+        {
+            string ns = script.GetType().Namespace;
+            return ns != null && (ns == GameNamespace || ns.StartsWith(GameNamespace + ".", System.StringComparison.Ordinal));
         }
 
         public static void SetLayerRecursive(GameObject root, int layer)

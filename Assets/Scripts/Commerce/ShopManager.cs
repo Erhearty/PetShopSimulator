@@ -149,6 +149,18 @@ namespace PetShop.Commerce
             OnBalanceChanged.Invoke(Balance);
         }
 
+        /// <summary>
+        /// Takes <paramref name="amount"/> even if it overdraws the account, counting it as
+        /// spent today. Used for fines the shop cannot refuse.
+        /// </summary>
+        public void ForceCharge(float amount, string reason)
+        {
+            Balance    -= amount;
+            SpentToday += amount;
+            Debug.Log($"[ShopManager] Charged {amount:F2} for '{reason}' — balance {Balance:F2}");
+            OnBalanceChanged.Invoke(Balance);
+        }
+
         public void SetReputation(float value)
         {
             Reputation = Mathf.Clamp(value, 0f, 100f);
@@ -185,7 +197,7 @@ namespace PetShop.Commerce
 
         public bool Restock(string itemId, int quantity, float unitCost)
         {
-            if (!ChangeBalance(-unitCost * quantity, $"Restock {quantity}x {itemId}")) return false;
+            if (!ChangeBalance(-unitCost * quantity * SupplierPriceMultiplier, $"Restock {quantity}x {itemId}")) return false;
             ChangeStock(itemId, quantity);
             return true;
         }
@@ -234,6 +246,9 @@ namespace PetShop.Commerce
         /// <summary>What a unit costs when ordered from the wholesaler, ahead of time.</summary>
         public const float WholesaleDiscount = 0.78f;
 
+        /// <summary>Event-driven multiplier on supplier costs (orders and restocks). 1 = normal.</summary>
+        public float SupplierPriceMultiplier { get; set; } = 1f;
+
         /// <summary>
         /// Buying off the shelf at the cash-and-carry when you have run out. Deliberately
         /// dearer than ordering: planning ahead is supposed to be worth something.
@@ -273,7 +288,7 @@ namespace PetShop.Commerce
         {
             if (units <= 0) return null;
 
-            float cost = unitCost * WholesaleDiscount * units;
+            float cost = unitCost * WholesaleDiscount * SupplierPriceMultiplier * units;
             if (!ChangeBalance(-cost, $"Order {units}x {category}")) return null;
 
             var order = new SupplierOrder
@@ -369,33 +384,5 @@ namespace PetShop.Commerce
         /// <summary>Point in the trading day (0–1) at which the van pulls up.</summary>
         public float           ArrivalProgress;
         public bool            Delivered;
-    }
-
-    [Serializable]
-    public class SaleRecord
-    {
-        public int    Day;
-        public string ItemId;
-        public string Label;
-        public int    Quantity;
-        public float  UnitPrice;
-        public float  Revenue;
-        public string BuyerName;
-    }
-
-    [Serializable]
-    public class DaySummary
-    {
-        public int              Day;
-        public float            TotalRevenue;
-        public int              TotalUnits;
-        public int              SaleCount;
-        public float            Rent;
-        public float            Wages;
-        public float            NetChange;
-        public float            Reputation;
-        public float            ClosingBalance;
-        public float            Spend;
-        public List<SaleRecord> Records = new();
     }
 }

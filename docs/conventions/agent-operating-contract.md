@@ -82,6 +82,7 @@ Use these exact names and ids when discussing the architecture.
 | Local Save File | `local-save-file` | storage |
 | Pet Shop Simulator (Game Client) | `pet-shop-simulator-game-client` | frontend |
 | PlayerPrefs Settings Store | `player-prefs-store` | storage |
+| Soak Telemetry Log (JSONL) | `soak-telemetry-log` | storage |
 <!-- generated:end cap:canonical-names -->
 
 <!-- generated:start cap:system-boundary -->

@@ -24,6 +24,7 @@ flowchart LR
     pets["Pets<br/><small>Pet, PetPen, BreedingSystem</small>"]
     ui["UI<br/><small>GameUI/HUD, panels, UIFactory</small>"]
     dev["Dev<br/><small>screenshot/camera-tour/probe tools</small>"]
+    progression["Progression<br/><small>ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants</small>"]
     bootstrapper --> core
     bootstrapper --> shop
     bootstrapper --> player
@@ -36,6 +37,11 @@ flowchart LR
     commerce --> ui
     pets --> ui
     dev --> core
+    bootstrapper --> progression
+    progression --> core
+    progression --> shop
+    progression --> commerce
+    progression --> pets
 ```
 <!-- generated:end comp:pet-shop-simulator-game-client -->
 
@@ -62,3 +68,8 @@ Unity PlayerPrefs store for per-machine player preferences: key bindings (InputB
 
 **Tech:** Unity PlayerPrefs
 <!-- generated:end comp:player-prefs-store -->
+<!-- generated:start comp:soak-telemetry-log -->
+## Soak Telemetry Log (JSONL) (`soak-telemetry-log`, STORAGE)
+
+Dev-only JSON-lines file written by DayTelemetry (Assets/Scripts/Dev/DayTelemetry.cs) during soak runs: one JSON record appended per in-game day plus a final run-summary record, via File.AppendAllText. Only produced when GameBootstrapper.AttachTelemetry attaches the component because -telemetry or -quitafterdays was passed on the command line; normal play never writes it. Separate from the Local Save File and never read back by the game.
+<!-- generated:end comp:soak-telemetry-log -->

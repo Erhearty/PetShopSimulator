@@ -46,6 +46,29 @@ namespace PetShop.Customer
 
         public CustomerState State { get; private set; } = CustomerState.Entering;
 
+        // ── Outcome events (read by playtest telemetry; gameplay does not listen) ──
+
+        /// <summary>Raised when a customer pays at the till.</summary>
+        public static event System.Action<CustomerAI> CheckedOut;
+
+        /// <summary>Raised when a customer leaves having picked up nothing.</summary>
+        public static event System.Action<CustomerAI> WalkedOutEmpty;
+
+        /// <summary>Raised when a queueing customer gives up waiting and abandons the basket.</summary>
+        public static event System.Action<CustomerAI> GaveUp;
+
+        /// <summary>Raised each time a walk ends because its timeout expired before arrival.</summary>
+        public static event System.Action<CustomerAI> NavigationTimedOut;
+
+        /// <summary>Raised when the customer's GameObject is destroyed.</summary>
+        public static event System.Action<CustomerAI> Despawned;
+
+        /// <summary>
+        /// Horizontal (XZ) distance in metres from the till at the moment of the last checkout;
+        /// 0 before any checkout or when there is no till.
+        /// </summary>
+        public float DistanceToTillAtCheckout { get; private set; }
+
         private readonly List<(string id, string label, float price)> _basket = new();
         private NavMeshAgent    _agent;
         private CharacterVisual _visual;
@@ -169,6 +192,7 @@ namespace PetShop.Customer
             {
                 // Walked out with nothing — mildly bad for the shop's standing
                 ShopManager?.ChangeReputation(-0.6f);
+                WalkedOutEmpty?.Invoke(this);
             }
 
             State = CustomerState.Leaving;
@@ -240,6 +264,7 @@ namespace PetShop.Customer
                 SetBubble("gave up!", UIFactory.Bad);
                 FloatingText.Spawn(transform.position + Vector3.up * 2.4f, "−3.5 rep", UIFactory.Bad, 0.26f);
                 _basket.Clear();
+                GaveUp?.Invoke(this);
             }
         }
 
@@ -267,10 +292,13 @@ namespace PetShop.Customer
             {
                 timeout -= Time.deltaTime;
                 if (_agent.pathPending) { yield return null; continue; }
-                if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) break;
-                if (_agent.remainingDistance <= _agent.stoppingDistance) break;
+                if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
+                if (_agent.remainingDistance <= _agent.stoppingDistance) yield break;
                 yield return null;
             }
+
+            Debug.LogWarning($"[CustomerAI] {name} ran out of time walking to {target}.");
+            NavigationTimedOut?.Invoke(this);
 
             // Deliberately not setting isStopped here: toggling it between legs makes the
             // agent lurch. autoBraking already eases it into each stop.
@@ -368,7 +396,24 @@ namespace PetShop.Customer
                                $"+€ {total:N2}", UIFactory.Good, 0.3f);
             GameManager.Instance?.Notify($"Sold {_basket.Count} item(s) for €{total:N2}");
             AudioManager.Instance?.PlaySfx("sale");
+
+            DistanceToTillAtCheckout = HorizontalDistanceToTill();
+            CheckedOut?.Invoke(this);
         }
+
+        /// <summary>XZ distance to the register (or the queue's till); 0 when neither exists.</summary>
+        private float HorizontalDistanceToTill()
+        {
+            Transform till = RegisterPoint != null ? RegisterPoint
+                           : Queue != null ? Queue.TillPoint : null;
+            if (till == null) return 0f;
+
+            Vector3 offset = till.position - transform.position;
+            offset.y = 0f;
+            return offset.magnitude;
+        }
+
+        private void OnDestroy() => Despawned?.Invoke(this);
 
     }
 }

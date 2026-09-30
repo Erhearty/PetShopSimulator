@@ -2,6 +2,8 @@ using UnityEngine;
 using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Customer;
+using PetShop.Progression;
+using PetShop.Events;
 using PetShop.UI;
 
 namespace PetShop.Core
@@ -38,10 +40,16 @@ namespace PetShop.Core
 
         private GameUI _ui;
 
+        /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
+        private const int MaxPackFallbacksReported = 10;
+
         private void Awake()
         {
+            PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
             BuildSystems();
             BuildWorld();
+            string packFallbacks = ModelLibrary.PackFallbackReport(MaxPackFallbacksReported);
+            if (packFallbacks != null) Debug.LogWarning(packFallbacks);
             BuildUI();
             WireEverything();
         }
@@ -194,8 +202,32 @@ namespace PetShop.Core
 
         // ── Wiring ──────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Adds the progression director to the game object and hands it the generator and
+        /// build mode, so tiers can open lot stages and pen species.
+        /// </summary>
+        private void WireProgression()
+        {
+            var progression = _game.gameObject.AddComponent<ProgressionDirector>();
+            progression.Init(_game, _generator, _build);
+            _game.Progression = progression;
+        }
+
+        /// <summary>
+        /// Adds the seasonal event director and hands it the shop and spawner it tunes.
+        /// </summary>
+        private void WireEvents()
+        {
+            var events = _game.gameObject.AddComponent<ShopEventDirector>();
+            events.Init(_game, _shop, _spawner);
+            _game.Events = events;
+        }
+
         private void WireEverything()
         {
+            WireProgression();
+            WireEvents();
+
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);
 
@@ -223,6 +255,18 @@ namespace PetShop.Core
                 var interaction = player.GetComponent<Player.InteractionSystem>();
                 if (interaction != null) interaction.PromptText = _ui.HUD.PromptLabel;
             }
+
+            AttachTelemetry();
+        }
+
+        /// <summary>Adds the soak-run recorder, but only when -telemetry or -quitafterdays asked for it.</summary>
+        private void AttachTelemetry()
+        {
+            string path = PlaytestOptions.TelemetryPath;
+            int?   days = PlaytestOptions.QuitAfterDays;
+            if (string.IsNullOrEmpty(path) && !days.HasValue) return;
+
+            gameObject.AddComponent<Dev.DayTelemetry>().Init(_game, _shop, path, days);
         }
     }
 }

@@ -29,4 +29,8 @@ Projected from `schema` widgets on the architecture canvas.
 | `PetSaveData.ribbons` | int |  | pet show placings won (0-3 count toward price) |
 | `ShowEntryPetId` | string |  | pet entered in the next show; empty if none |
 | `AutoReorder` | List<ReorderRule> |  | per category: category, enabled, threshold, units |
+| `ProgressionTier` | int |  | Highest reputation tier reached; v2 saves migrate from Reputation |
+| `EventSeed` | int |  | Seed for deterministic daily event rolls |
+| `ActiveEventId` | string |  | None\|SupplierSale\|Heatwave\|StreetFestival |
+| `EventDaysLeft` | int |  | Days remaining for the active event |
 <!-- generated:end comp:local-save-file -->

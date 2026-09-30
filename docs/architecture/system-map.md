@@ -10,6 +10,8 @@ graph TD
     build-editor-tooling -->|Unity Editor build pipeline (headless build.sh)| pet-shop-simulator-game-client
     pet-shop-simulator-game-client -->|Local filesystem I/O (JsonUtility JSON)| local-save-file
     pet-shop-simulator-game-client -->|Unity PlayerPrefs API (key bindings, autosave setting)| player-prefs-store
+    soak-telemetry-log["Soak Telemetry Log (JSONL) <br/> <small>(STORAGE)</small>"]
+    pet-shop-simulator-game-client -->|Local filesystem append (File.AppendAllText, JSON lines)| soak-telemetry-log
 ```
 
 ## Components
@@ -18,10 +20,12 @@ graph TD
 - [Local Save File](overview.md) (`local-save-file`, storage)
 - [Pet Shop Simulator (Game Client)](overview.md) (`pet-shop-simulator-game-client`, frontend)
 - [PlayerPrefs Settings Store](overview.md) (`player-prefs-store`, storage)
+- [Soak Telemetry Log (JSONL)](overview.md) (`soak-telemetry-log`, storage)
 
 ## Interactions
 
 - [build-editor-tooling → pet-shop-simulator-game-client](interactions/build-editor-tooling--pet-shop-simulator-game-client.md) via `Unity Editor build pipeline (headless build.sh)`
 - [pet-shop-simulator-game-client → local-save-file](interactions/pet-shop-simulator-game-client--local-save-file.md) via `Local filesystem I/O (JsonUtility JSON)`
 - [pet-shop-simulator-game-client → player-prefs-store](interactions/pet-shop-simulator-game-client--player-prefs-store.md) via `Unity PlayerPrefs API (key bindings, autosave setting)`
+- [pet-shop-simulator-game-client → soak-telemetry-log](interactions/pet-shop-simulator-game-client--soak-telemetry-log.md) via `Local filesystem append (File.AppendAllText, JSON lines)`
 <!-- generated:end file:system-map -->

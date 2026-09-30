@@ -41,6 +41,13 @@ namespace PetShop.Shop
         /// <summary>World Z of the yard's street-facing edge.</summary>
         public float YardFrontZ => YardDepth * 0.5f;
 
+        /// <summary>Lot stage 0: the shop room and the paddock, out to the street.</summary>
+        public const int StarterLotStage   = PetShop.Progression.ProgressionRules.StarterLotStage;
+        /// <summary>Lot stage 1: stage 0 plus the strip behind it, to the yard's back edge.</summary>
+        public const int BackStripLotStage = PetShop.Progression.ProgressionRules.BackStripLotStage;
+        /// <summary>Lot stage 2: the whole yard.</summary>
+        public const int FullYardLotStage  = PetShop.Progression.ProgressionRules.FullYardLotStage;
+
         public StreetGenerator Street  { get; private set; }
         public Transform ShopRoot      { get; private set; }
         public Transform FurnitureRoot { get; private set; }
@@ -107,6 +114,19 @@ namespace PetShop.Shop
         // than its pens reads as an empty sand pit with a few hutches in one corner.
         internal Rect PaddockArea => new(2f, -9f, 24f, 17f);      // x, z, width, depth
         internal float PathZ      => ShopCentre.z - RoomDepth * 0.5f - 2.2f;
+
+        // ── Lot stages ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Makes every cell of lot <paramref name="stage"/> buildable. Stages only grow, so
+        /// cells from an earlier stage stay buildable; the doorway never is. Does nothing
+        /// before <see cref="Generate"/> has run.
+        /// </summary>
+        public void ApplyLotStage(int stage)
+        {
+            if (_grid == null) return;
+            new ShopInteriorBuilder(new ShopBuildContext(this, _grid)).ApplyLotStage(stage);
+        }
 
         // ── NavMesh ─────────────────────────────────────────────────────────────
 

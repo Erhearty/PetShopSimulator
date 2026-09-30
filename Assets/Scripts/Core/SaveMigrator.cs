@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using PetShop.Progression;
 
 namespace PetShop.Core
 {
@@ -11,13 +12,16 @@ namespace PetShop.Core
     public static class SaveMigrator
     {
         /// <summary>The save format version written by this build.</summary>
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         /// <summary>Saves written before the Version field existed; they parse as 0.</summary>
         private const int LegacyVersion = 0;
 
         /// <summary>The first versioned save format.</summary>
         private const int FirstVersion = 1;
+
+        /// <summary>The last save format without a progression tier.</summary>
+        private const int PreProgressionVersion = 2;
 
         /// <summary>Default staff count applied when a save carries none.</summary>
         private const int DefaultStaff = 1;
@@ -40,6 +44,7 @@ namespace PetShop.Core
         {
             { LegacyVersion, NormaliseDefaults },
             { FirstVersion,  NormaliseDefaults },
+            { PreProgressionVersion, SeedProgressionTier },
         };
 
         /// <summary>
@@ -100,6 +105,10 @@ namespace PetShop.Core
             }
             return true;
         }
+
+        /// <summary>Seeds the progression tier, new in version 3, from the tier the save's reputation earns.</summary>
+        private static void SeedProgressionTier(SaveData data) =>
+            data.ProgressionTier = ProgressionRules.TierForReputation(data.Reputation);
 
         /// <summary>
         /// Fills in fields older saves may lack or hold invalid values for: staff, price multiplier,

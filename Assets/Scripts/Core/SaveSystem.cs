@@ -14,6 +14,8 @@ namespace PetShop.Core
     public class SaveData
     {
         public int    Version = SaveMigrator.CurrentVersion;
+        /// <summary>Permanent reputation tier reached (see ProgressionRules).</summary>
+        public int    ProgressionTier;
         public float  Balance;
         public float  Reputation;
         public int    Day;
@@ -22,6 +24,12 @@ namespace PetShop.Core
         public string SavedAt;
         /// <summary>Id of the pet entered in the pet show, or empty for none.</summary>
         public string ShowEntryPetId;
+        /// <summary>Seed for the seasonal event rolls; 0 in older saves (a fresh one is picked).</summary>
+        public int    EventSeed;
+        /// <summary>Name of the running ShopEventKind; "None" when no event is running.</summary>
+        public string ActiveEventId = "None";
+        /// <summary>Days the running seasonal event still has to go.</summary>
+        public int    EventDaysLeft;
 
         public List<StockEntry>   Stock         = new();
         /// <summary>Delivered units still in the stockroom, keyed by category name.</summary>
@@ -107,6 +115,13 @@ namespace PetShop.Core
 
         private static int _activeSlot = DefaultSlot;
 
+        /// <summary>
+        /// When non-empty (set by <c>-savepath</c>), replaces the default save slot so a
+        /// playtest never touches the player's real save.
+        /// </summary>
+        public static string PathOverride;
+
+
         /// <summary>Folder the saves live in. Tests point this at a temp directory; null means the real folder.</summary>
         internal static string RootOverride;
 
@@ -120,9 +135,13 @@ namespace PetShop.Core
             set => _activeSlot = Mathf.Clamp(value, DefaultSlot, SlotCount);
         }
 
-        /// <summary>Path of the main save file for <paramref name="slot"/> (clamped to a valid slot).</summary>
-        public static string SlotPath(int slot) =>
-            Path.Combine(Root, string.Format(SlotFileFormat, Mathf.Clamp(slot, DefaultSlot, SlotCount)));
+        /// <summary>Path of the main save file for <paramref name="slot"/> (clamped to a valid slot); the default slot honours <see cref="PathOverride"/>.</summary>
+        public static string SlotPath(int slot)
+        {
+            slot = Mathf.Clamp(slot, DefaultSlot, SlotCount);
+            if (slot == DefaultSlot && !string.IsNullOrEmpty(PathOverride)) return PathOverride;
+            return Path.Combine(Root, string.Format(SlotFileFormat, slot));
+        }
 
         /// <summary>Path of the active slot's main save file.</summary>
         public static string SavePath => SlotPath(ActiveSlot);

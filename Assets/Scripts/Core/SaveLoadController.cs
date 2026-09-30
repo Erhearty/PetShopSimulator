@@ -92,7 +92,9 @@ namespace PetShop.Core
                 Day             = shop.Day,
                 Staff           = _game.StaffCount,
                 PriceMultiplier = shop.PriceMultiplier,
+                ProgressionTier = _game.Progression?.Tier ?? 0,
             };
+            _game.Events?.Capture(data);
 
             foreach (var kvp in shop.Stock)
                 data.Stock.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
@@ -174,12 +176,22 @@ namespace PetShop.Core
                     shop.AddToWarehouse(category, entry.qty);
 
             var loadedPets = new System.Collections.Generic.List<Pet>();
+
+            // Unlocked lot stages must be buildable before saved furniture is placed on them.
+            _game.Progression?.Restore(data.ProgressionTier);
+            _game.Events?.Restore(data);
+
             foreach (var item in data.PlacedObjects)
             {
                 var def = BuildCatalog.Get(item.catalogId);
                 if (def == null) continue;
 
-                var go = _game.Build.Place(new Vector2Int(item.cellX, item.cellY), def,
+                // Saves from before lot stages could build anywhere in the yard; keep the
+                // ground under each saved piece so it is not silently dropped on load.
+                var cell = new Vector2Int(item.cellX, item.cellY);
+                _game.Build.GridManager.EnsureFloor(cell, def.Size);
+
+                var go = _game.Build.Place(cell, def,
                                            item.variant, item.rotation, charge: false);
                 if (go == null) continue;
 
