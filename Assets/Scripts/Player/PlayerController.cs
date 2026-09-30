@@ -14,16 +14,12 @@ namespace PetShop.Player
         public float Acceleration  = 0.09f;
 
         [Header("Jump")]
-        public KeyCode JumpKey     = KeyCode.Space;
         public float   JumpHeight  = 1.1f;
         [Tooltip("Grace period after walking off an edge during which a jump still counts.")]
         public float   CoyoteTime  = 0.12f;
         [Tooltip("A jump pressed this long before landing still fires on touchdown.")]
         public float   JumpBuffer  = 0.12f;
         [Range(0f, 1f)] public float AirControl = 0.7f;
-
-        [Header("Interaction")]
-        public KeyCode InteractKey = KeyCode.E;
 
         private CharacterController _cc;
         private Camera              _cam;
@@ -53,10 +49,10 @@ namespace PetShop.Player
 
         private void Update()
         {
-            if (Input.GetKeyDown(JumpKey) && !Blocked) _jumpPressedAt = Time.time;
+            if (InputBindings.GetKeyDown(GameAction.Jump) && !Blocked) _jumpPressedAt = Time.time;
 
             HandleMove();
-            if (Input.GetKeyDown(InteractKey) && !Blocked) _interact?.TryInteract();
+            if (InputBindings.GetKeyDown(GameAction.Interact) && !Blocked) _interact?.TryInteract();
         }
 
         private void HandleMove()
@@ -66,8 +62,9 @@ namespace PetShop.Player
             // Movement is frozen while placing furniture so LMB is unambiguous,
             // and while a blocking panel is up.
             bool frozen = Blocked || (GameManager.Instance != null && GameManager.Instance.IsBuildModeActive);
-            float h = frozen ? 0f : Input.GetAxisRaw("Horizontal");
-            float v = frozen ? 0f : Input.GetAxisRaw("Vertical");
+            Vector2 move = frozen ? Vector2.zero : InputBindings.MoveVector();
+            float h = move.x;
+            float v = move.y;
 
             Vector3 camForward = _cam != null
                 ? Vector3.ProjectOnPlane(_cam.transform.forward, Vector3.up).normalized
@@ -79,7 +76,7 @@ namespace PetShop.Player
             Vector3 wish = camForward * v + camRight * h;
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 
-            // GetAxisRaw is a hard 0/1, so stepping straight to full speed looks stuttery.
+            // Raw key input is a hard 0/1, so stepping straight to full speed looks stuttery.
             // Smoothing the horizontal velocity is what makes movement read as continuous.
             float responsiveness = IsGrounded ? Acceleration : Acceleration / Mathf.Max(0.05f, AirControl);
             _velocity = Vector3.SmoothDamp(_velocity, wish * MoveSpeed, ref _velocityRef, responsiveness);

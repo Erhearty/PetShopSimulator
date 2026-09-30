@@ -33,14 +33,21 @@ namespace PetShop.UI
         private int _penIndex;
         private Pet _pickA, _pickB;
 
+        private FamilyTreePanel _tree;
+        private ShowcasePanel _showcase;
+        private readonly BreedingTargetView _target = new BreedingTargetView();
+
         public bool IsOpen => _root != null && _root.activeSelf;
 
         private PetPen CurrentPen =>
             _penIndex >= 0 && _penIndex < _breedablePens.Count ? _breedablePens[_penIndex] : null;
 
-        public void Build(Transform canvas, GameManager game)
+        public void Build(Transform canvas, GameManager game, FamilyTreePanel tree = null,
+                          ShowcasePanel showcase = null)
         {
             _game = game;
+            _tree = tree;
+            _showcase = showcase;
 
             _root = UIFactory.Panel("BreedDim", canvas, Vector2.zero, Vector2.one,
                                     new Color(0.03f, 0.05f, 0.08f, 0.62f));
@@ -59,6 +66,10 @@ namespace PetShop.UI
             var close = UIFactory.Button("Close", panel.transform, "Close  (Esc)",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
             close.onClick.AddListener(Hide);
+
+            var show = UIFactory.Button("PetShow", panel.transform, "Pet show",
+                new Vector2(0.55f, 0.895f), new Vector2(0.75f, 0.965f), 15f);
+            show.onClick.AddListener(() => _showcase?.Show());
 
             // Pen selector: one pen at a time keeps the list short enough to read.
             var prev = UIFactory.Button("PrevPen", panel.transform, "<",
@@ -94,6 +105,8 @@ namespace PetShop.UI
             _clearButton = UIFactory.Button("ClearPair", panel.transform, "Clear pairing",
                 new Vector2(0.75f, 0.11f), new Vector2(0.97f, 0.19f), 15f);
             _clearButton.onClick.AddListener(ClearPair);
+
+            _target.Build(panel.transform, Refresh);
 
             _root.SetActive(false);
         }
@@ -218,33 +231,7 @@ namespace PetShop.UI
             float rowHeight = 1f / Mathf.Max(6, residents.Count);
 
             for (int i = 0; i < residents.Count; i++)
-            {
-                Pet pet = residents[i];
-                float top    = 1f - i * rowHeight;
-                float bottom = top - rowHeight * 0.88f;
-
-                if (!pet.IsAdult)
-                {
-                    var note = UIFactory.Label($"Young_{i}", _listRoot,
-                        $"     {pet.petName}   ·   {pet.growthStage.ToString().ToLowerInvariant()}, " +
-                        $"grown in {Mathf.Max(0, pet.daysToMature - pet.ageDays)} days",
-                        new Vector2(0f, bottom), new Vector2(1f, top), 14f, UIFactory.InkMuted);
-                    _petRows.Add(note.gameObject);
-                    continue;
-                }
-
-                bool picked = pet == _pickA || pet == _pickB;
-                string slot = pet == _pickA ? "A" : pet == _pickB ? "B" : "·";
-
-                var btn = UIFactory.Button($"Pet_{i}", _listRoot,
-                    $"{slot}   {pet.petName}   ·   {pet.rarity}   ·   {pet.Condition}",
-                    new Vector2(0f, bottom), new Vector2(1f, top), 14f,
-                    picked ? UIFactory.ButtonOn : UIFactory.ButtonBg);
-
-                Pet captured = pet;
-                btn.onClick.AddListener(() => Pick(captured));
-                _petRows.Add(btn.gameObject);
-            }
+                DrawRow(residents, i, rowHeight);
 
             bool canPair = BreedingSystem.CanPair(_pickA, _pickB);
             bool planned = pen.HasValidPlan;
@@ -259,10 +246,55 @@ namespace PetShop.UI
             if (!pen.HasSpace)
                 _statusLabel.text += "\n<color=#F0A07A>The pen is full — no room for a baby.</color>";
 
-            _expectedLabel.text = BreedingSystem.DescribeExpected(_pickA, _pickB);
+            _expectedLabel.text = _target.ExpectedWithChance(
+                BreedingSystem.DescribeExpected(_pickA, _pickB), _pickA, _pickB);
 
             SetInteractable(_pairButton, canPair && pen.HasSpace, UIFactory.ButtonOn);
             SetInteractable(_clearButton, planned, UIFactory.ButtonBg);
+        }
+
+        private void DrawRow(List<Pet> residents, int i, float rowHeight)
+        {
+            Pet pet = residents[i];
+            float top    = 1f - i * rowHeight;
+            float bottom = top - rowHeight * 0.88f;
+
+            AddTreeButton(pet, i, bottom, top);
+            if (pet.IsAdult) DrawAdultRow(pet, residents, i, bottom, top);
+            else             DrawYoungRow(pet, i, bottom, top);
+        }
+
+        private void DrawYoungRow(Pet pet, int i, float bottom, float top)
+        {
+            var note = UIFactory.Label($"Young_{i}", _listRoot,
+                $"     {pet.petName}   ·   {pet.growthStage.ToString().ToLowerInvariant()}, " +
+                $"grown in {Mathf.Max(0, pet.daysToMature - pet.ageDays)} days",
+                new Vector2(0f, bottom), new Vector2(0.82f, top), 14f, UIFactory.InkMuted);
+            _petRows.Add(note.gameObject);
+        }
+
+        private void DrawAdultRow(Pet pet, List<Pet> residents, int i, float bottom, float top)
+        {
+            bool picked = pet == _pickA || pet == _pickB;
+            string slot = pet == _pickA ? "A" : pet == _pickB ? "B" : "·";
+
+            var btn = UIFactory.Button($"Pet_{i}", _listRoot,
+                $"{slot}   {pet.petName}   ·   {pet.rarity}   ·   {pet.Condition}" +
+                _target.BestPartnerSuffix(pet, residents),
+                new Vector2(0f, bottom), new Vector2(0.82f, top), 13f,
+                picked ? UIFactory.ButtonOn : UIFactory.ButtonBg);
+
+            Pet captured = pet;
+            btn.onClick.AddListener(() => Pick(captured));
+            _petRows.Add(btn.gameObject);
+        }
+
+        private void AddTreeButton(Pet pet, int i, float bottom, float top)
+        {
+            var tree = UIFactory.Button($"Tree_{i}", _listRoot, "Tree",
+                new Vector2(0.84f, bottom), new Vector2(1f, top), 13f);
+            tree.onClick.AddListener(() => _tree?.Show(pet));
+            _petRows.Add(tree.gameObject);
         }
 
         private static void SetInteractable(Button button, bool on, Color enabledColour)

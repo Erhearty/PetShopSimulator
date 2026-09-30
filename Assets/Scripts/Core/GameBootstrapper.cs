@@ -58,6 +58,7 @@ namespace PetShop.Core
         {
             bool touring  = Dev.CameraTour.TryCreate(out _);
             bool headless = touring || Dev.ScreenshotCapture.TryCreate(out _) || Application.isBatchMode;
+            SaveSystem.MigrateLegacy();
 
             if (headless)
             {
@@ -68,12 +69,13 @@ namespace PetShop.Core
             else
             {
                 _game.SetModalOpen(true);
-                _ui.Title.Build(_ui.CanvasRoot, SaveSystem.HasSave(), continueSave =>
+                _ui.Title.Build(_ui.CanvasRoot, (slot, continueSave) =>
                 {
+                    SaveSystem.ActiveSlot = slot;
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin();
-                });
+                }, () => _ui.Settings.Show());
             }
 
             Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, 1-4 build, Tab ledger, Enter to close the day.");
@@ -89,7 +91,7 @@ namespace PetShop.Core
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                     ToggleBuild(ids[i]);
 
-            if (Input.GetKeyDown(KeyCode.B))
+            if (InputBindings.GetKeyDown(GameAction.BuildMode))
                 ToggleBuild(_build.CurrentItem != null ? _build.CurrentItem.Id : BuildCatalog.ShelfSmall);
         }
 
@@ -139,6 +141,7 @@ namespace PetShop.Core
             _game.Spawner = _spawner;
             _game.Audio   = _audio;
             _game.Queue   = _queue;
+            gmGO.AddComponent<AutoReorderRunner>().Attach(_game);
 
             _generator = gameObject.AddComponent<ShopGenerator>();
             _generator.RoomWidth  = RoomWidth;

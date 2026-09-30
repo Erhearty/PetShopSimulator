@@ -92,15 +92,15 @@ namespace PetShop.Shop
             if (!IsActive) return;
 
             // Escape is routed by GameUI so a single press cannot also close a panel.
-            if (Input.GetKeyDown(KeyCode.B) || Input.GetMouseButtonDown(1))
+            if (InputBindings.GetKeyDown(GameAction.BuildMode) || Input.GetMouseButtonDown(1))
             { ExitBuildMode(); return; }
 
-            if (Input.GetKeyDown(KeyCode.R)) _rotation = (_rotation + 90f) % 360f;
+            if (InputBindings.GetKeyDown(GameAction.BuildRotate)) _rotation = (_rotation + 90f) % 360f;
             if (Input.GetKeyDown(KeyCode.Q)) CyclePenVariant();
 
             UpdateGhost();
 
-            if (Input.GetKeyDown(KeyCode.Delete)) { TryRemoveUnderCursor(); return; }
+            if (InputBindings.GetKeyDown(GameAction.BuildRemove)) { TryRemoveUnderCursor(); return; }
 
             if (PointerOverUI) return;
             if (Input.GetMouseButtonDown(0)) TryPlace();

@@ -1,7 +1,7 @@
 <!-- generated:start cap:overview-intro -->
 # Architecture Overview
 
-4 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
+5 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
 <!-- generated:end cap:overview-intro -->
 
 <!-- generated:start comp:pet-shop-simulator-game-client -->
@@ -25,6 +25,7 @@ flowchart LR
     ui["UI<br/><small>GameUI/HUD, panels, UIFactory</small>"]
     dev["Dev<br/><small>screenshot/camera-tour/probe tools</small>"]
     progression["Progression<br/><small>ProgressionDirector, ProgressionRules: reputation tiers, lot-stage & pen-species unlocks, weekly inspection fines/grants</small>"]
+    events["Events<br/><small>ShopEventDirector (PetShop.Events): seasonal events that tune supplier prices (ShopManager), customer spawning (CustomerSpawner) and pet care drain (GameManager); wired by GameBootstrapper.WireEvents</small>"]
     bootstrapper --> core
     bootstrapper --> shop
     bootstrapper --> player
@@ -42,6 +43,10 @@ flowchart LR
     progression --> shop
     progression --> commerce
     progression --> pets
+    bootstrapper --> events
+    events --> core
+    events --> commerce
+    events --> customer
 ```
 <!-- generated:end comp:pet-shop-simulator-game-client -->
 
@@ -56,11 +61,18 @@ Editor-time / headless tooling (Assets/Editor, driven by root build.sh) that set
 <!-- generated:start comp:local-save-file -->
 ## Local Save File (`local-save-file`, STORAGE)
 
-Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them.
+Up to three JSON save slots (petshop_save_1..3.json under Application.persistentDataPath); a legacy petshop_save.json is migrated into slot 1 on first run.
 
 **Tech:** JsonUtility (Unity built-in JSON), Local filesystem (Application.persistentDataPath)
 <!-- generated:end comp:local-save-file -->
 
+<!-- generated:start comp:player-prefs-store -->
+## PlayerPrefs Settings Store (`player-prefs-store`, STORAGE)
+
+Unity PlayerPrefs store for per-machine player preferences: key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs). Separate from the Local Save File, which holds game-progress state.
+
+**Tech:** Unity PlayerPrefs
+<!-- generated:end comp:player-prefs-store -->
 <!-- generated:start comp:soak-telemetry-log -->
 ## Soak Telemetry Log (JSONL) (`soak-telemetry-log`, STORAGE)
 

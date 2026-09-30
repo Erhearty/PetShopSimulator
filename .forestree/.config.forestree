@@ -108,6 +108,13 @@
                   "label": "Progression",
                   "x": 24,
                   "y": 264
+                },
+                {
+                  "desc": "ShopEventDirector (PetShop.Events): seasonal events that tune supplier prices (ShopManager), customer spawning (CustomerSpawner) and pet care drain (GameManager); wired by GameBootstrapper.WireEvents",
+                  "id": "events",
+                  "label": "Events",
+                  "x": 174,
+                  "y": 264
                 }
               ],
               "links": [
@@ -178,6 +185,22 @@
                 {
                   "from": "progression",
                   "to": "pets"
+                },
+                {
+                  "from": "bootstrapper",
+                  "to": "events"
+                },
+                {
+                  "from": "events",
+                  "to": "core"
+                },
+                {
+                  "from": "events",
+                  "to": "commerce"
+                },
+                {
+                  "from": "events",
+                  "to": "customer"
                 }
               ]
             },
@@ -303,7 +326,7 @@
         "widgets": [
           {
             "data": {
-              "text": "Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them."
+              "text": "Up to three JSON save slots (petshop_save_1..3.json under Application.persistentDataPath); a legacy petshop_save.json is migrated into slot 1 on first run."
             },
             "h": 180,
             "id": "widget-1790266201279-0",
@@ -393,6 +416,54 @@
                 },
                 {
                   "flags": "",
+                  "name": "SlotFile",
+                  "notes": "petshop_save_{1..3}.json; one SaveData per slot",
+                  "type": "string"
+                },
+                {
+                  "flags": "",
+                  "name": "PetSaveData.id",
+                  "notes": "stable pet id (short GUID)",
+                  "type": "string"
+                },
+                {
+                  "flags": "",
+                  "name": "PetSaveData.parentAId / parentBId",
+                  "notes": "empty for founders",
+                  "type": "string"
+                },
+                {
+                  "flags": "",
+                  "name": "PetSaveData.generation",
+                  "notes": "0 for bought/starter pets",
+                  "type": "int"
+                },
+                {
+                  "flags": "",
+                  "name": "Lineage",
+                  "notes": "every pet ever owned (id, name, species, rarity, coat rgb, parents, generation, bornDay) so trees survive sales",
+                  "type": "List<LineageEntry>"
+                },
+                {
+                  "flags": "",
+                  "name": "PetSaveData.ribbons",
+                  "notes": "pet show placings won (0-3 count toward price)",
+                  "type": "int"
+                },
+                {
+                  "flags": "",
+                  "name": "ShowEntryPetId",
+                  "notes": "pet entered in the next show; empty if none",
+                  "type": "string"
+                },
+                {
+                  "flags": "",
+                  "name": "AutoReorder",
+                  "notes": "per category: category, enabled, threshold, units",
+                  "type": "List<ReorderRule>"
+                },
+                {
+                  "flags": "",
                   "name": "ProgressionTier",
                   "notes": "Highest reputation tier reached; v2 saves migrate from Reputation",
                   "type": "int"
@@ -436,6 +507,41 @@
         "widgets": [
           {
             "data": {
+              "text": "Unity PlayerPrefs store for per-machine player preferences: key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs). Separate from the Local Save File, which holds game-progress state."
+            },
+            "h": 180,
+            "id": "widget-1790782660813-0",
+            "title": "Intent & Scope Description",
+            "type": "text",
+            "w": 350,
+            "x": 30,
+            "y": 30
+          },
+          {
+            "data": {
+              "techs": [
+                "Unity PlayerPrefs"
+              ]
+            },
+            "h": 200,
+            "id": "widget-1790782660821-1",
+            "title": "Tech Stack Profiles",
+            "type": "techstack",
+            "w": 350,
+            "x": 60,
+            "y": 60
+          }
+        ]
+      },
+      "id": "player-prefs-store",
+      "name": "PlayerPrefs Settings Store",
+      "type": "storage"
+    },
+    {
+      "canvas": {
+        "widgets": [
+          {
+            "data": {
               "text": "Dev-only JSON-lines file written by DayTelemetry (Assets/Scripts/Dev/DayTelemetry.cs) during soak runs: one JSON record appended per in-game day plus a final run-summary record, via File.AppendAllText. Only produced when GameBootstrapper.AttachTelemetry attaches the component because -telemetry or -quitafterdays was passed on the command line; normal play never writes it. Separate from the Local Save File and never read back by the game."
             },
             "h": 180,
@@ -463,6 +569,11 @@
       "from": "pet-shop-simulator-game-client",
       "protocol": "Local filesystem I/O (JsonUtility JSON)",
       "to": "local-save-file"
+    },
+    {
+      "from": "pet-shop-simulator-game-client",
+      "protocol": "Unity PlayerPrefs API (key bindings, autosave setting)",
+      "to": "player-prefs-store"
     },
     {
       "from": "pet-shop-simulator-game-client",

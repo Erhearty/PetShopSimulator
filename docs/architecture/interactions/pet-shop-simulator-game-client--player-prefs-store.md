@@ -1,0 +1,22 @@
+<!-- generated:start edge:pet-shop-simulator-game-client→player-prefs-store -->
+# Interaction: Pet Shop Simulator (Game Client) → PlayerPrefs Settings Store
+
+- **Participants:** `pet-shop-simulator-game-client` → `player-prefs-store`
+- **Transport:** `Unity PlayerPrefs API (key bindings, autosave setting)`
+<!-- generated:end edge:pet-shop-simulator-game-client→player-prefs-store -->
+
+## Contract
+
+_TODO (agent-owned): request/response shapes and invariants._
+
+## Auth
+
+_TODO (agent-owned): how this interaction is authenticated._
+
+## Flow
+
+_TODO (agent-owned): the sequence of the interaction._
+
+## Code
+
+_TODO (agent-owned): entry points on both sides._

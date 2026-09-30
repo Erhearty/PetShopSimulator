@@ -11,15 +11,25 @@ namespace PetShop.UI
         private GameObject  _root;
         private GameManager _game;
         private AudioManager _audio;
+        private SettingsPanel _settings;
         private TMP_Text    _musicLabel;
         private TMP_Text    _status;
 
+        // Button column: row i spans [RowTop - i*RowStep - RowHeight, RowTop - i*RowStep].
+        private const float RowTop    = 0.74f;
+        private const float RowStep   = 0.10f;
+        private const float RowHeight = 0.085f;
+        private const float RowLeft   = 0.10f;
+        private const float RowRight  = 0.90f;
+
         public bool IsOpen => _root != null && _root.activeSelf;
 
-        public void Build(Transform canvas, GameManager game, AudioManager audio)
+        /// <summary>Builds the hidden menu; <paramref name="settings"/> is opened by its Settings button.</summary>
+        public void Build(Transform canvas, GameManager game, AudioManager audio, SettingsPanel settings = null)
         {
-            _game  = game;
-            _audio = audio;
+            _game     = game;
+            _audio    = audio;
+            _settings = settings;
 
             _root = UIFactory.Panel("PauseDim", canvas, Vector2.zero, Vector2.one,
                                     new Color(0.03f, 0.05f, 0.08f, 0.72f));
@@ -39,11 +49,11 @@ namespace PetShop.UI
                 new Vector2(0.08f, 0.76f), new Vector2(0.92f, 0.85f), 15f, UIFactory.InkMuted);
 
             var resume = UIFactory.Button("Resume", panel.transform, "Resume",
-                new Vector2(0.10f, 0.63f), new Vector2(0.90f, 0.72f), 19f, UIFactory.ButtonOn);
+                RowMin(0), RowMax(0), 19f, UIFactory.ButtonOn);
             resume.onClick.AddListener(Close);
 
             var save = UIFactory.Button("Save", panel.transform, "Save game",
-                new Vector2(0.10f, 0.52f), new Vector2(0.90f, 0.61f), 17f);
+                RowMin(1), RowMax(1), 17f);
             save.onClick.AddListener(() =>
             {
                 bool saved = _game.SaveGame();
@@ -51,16 +61,20 @@ namespace PetShop.UI
             });
 
             var music = UIFactory.Button("Music", panel.transform, "",
-                new Vector2(0.10f, 0.41f), new Vector2(0.90f, 0.50f), 17f);
+                RowMin(2), RowMax(2), 17f);
             _musicLabel = music.GetComponentInChildren<TMP_Text>();
             music.onClick.AddListener(() => { _audio?.ToggleMusic(); RefreshMusicLabel(); });
 
+            var settingsButton = UIFactory.Button("Settings", panel.transform, "Settings",
+                RowMin(3), RowMax(3), 17f);
+            settingsButton.onClick.AddListener(() => _settings?.Show());
+
             var restart = UIFactory.Button("Restart", panel.transform, "Abandon shop & restart",
-                new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.39f), 16f);
+                RowMin(4), RowMax(4), 16f);
             restart.onClick.AddListener(() => { Close(); _game.RestartGame(); });
 
             var quit = UIFactory.Button("Quit", panel.transform, "Save & quit",
-                new Vector2(0.10f, 0.13f), new Vector2(0.90f, 0.22f), 17f);
+                RowMin(5), RowMax(5), 17f);
             quit.onClick.AddListener(() =>
             {
                 if (_game.SaveGame()) { Application.Quit(); return; }
@@ -80,7 +94,7 @@ namespace PetShop.UI
             _root.SetActive(true);
             _game?.SetModalOpen(true);
             Time.timeScale = 0f;
-            if (_status != null) _status.text = $"Day {_game.Shop.Day} · € {_game.Shop.Balance:N0}";
+            if (_status != null) _status.text = $"Slot {SaveSystem.ActiveSlot} · Day {_game.Shop.Day} · € {_game.Shop.Balance:N0}";
             RefreshMusicLabel();
         }
 
@@ -96,6 +110,10 @@ namespace PetShop.UI
         {
             if (IsOpen) Close(); else Open();
         }
+
+        private static Vector2 RowMin(int row) => new(RowLeft, RowTop - row * RowStep - RowHeight);
+
+        private static Vector2 RowMax(int row) => new(RowRight, RowTop - row * RowStep);
 
         private void RefreshMusicLabel()
         {

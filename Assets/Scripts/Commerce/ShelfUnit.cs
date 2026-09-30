@@ -93,7 +93,7 @@ namespace PetShop.Commerce
 
             if (_lines.Count == 0)
             {
-                _priceTag.SetText($"{Category}\n<size=70%>empty — press E</size>");
+                _priceTag.SetText($"{Category}\n<size=70%>empty — press {InputBindings.Label(GameAction.Interact)}</size>");
                 _priceTag.SetColour(UIFactory.Bad);
                 return;
             }
