@@ -1,7 +1,7 @@
 <!-- generated:start cap:overview-intro -->
 # Architecture Overview
 
-4 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
+5 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
 <!-- generated:end cap:overview-intro -->
 
 <!-- generated:start comp:pet-shop-simulator-game-client -->

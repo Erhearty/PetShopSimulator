@@ -7,10 +7,10 @@ graph TD
     local-save-file["Local Save File <br/> <small>(STORAGE)</small>"]
     pet-shop-simulator-game-client["Pet Shop Simulator (Game Client) <br/> <small>(FRONTEND)</small>"]
     player-prefs-store["PlayerPrefs Settings Store <br/> <small>(STORAGE)</small>"]
+    soak-telemetry-log["Soak Telemetry Log (JSONL) <br/> <small>(STORAGE)</small>"]
     build-editor-tooling -->|Unity Editor build pipeline (headless build.sh)| pet-shop-simulator-game-client
     pet-shop-simulator-game-client -->|Local filesystem I/O (JsonUtility JSON)| local-save-file
     pet-shop-simulator-game-client -->|Unity PlayerPrefs API (key bindings, autosave setting)| player-prefs-store
-    soak-telemetry-log["Soak Telemetry Log (JSONL) <br/> <small>(STORAGE)</small>"]
     pet-shop-simulator-game-client -->|Local filesystem append (File.AppendAllText, JSON lines)| soak-telemetry-log
 ```
 
