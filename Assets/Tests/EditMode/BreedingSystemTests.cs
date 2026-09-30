@@ -77,7 +77,7 @@ namespace PetShop.Tests
         public void InheritRarity_RollAtThreshold_DoesNotUpgrade()
         {
             Assert.AreEqual(Pet.Rarity.Common, BreedingSystem.InheritRarity(
-                Pet.Rarity.Common, Pet.Rarity.Common, BreedingSystem.RarityUpgradeChance));
+                Pet.Rarity.Common, Pet.Rarity.Uncommon, BreedingSystem.RarityUpgradeChance));
         }
 
         [Test]

@@ -20,11 +20,17 @@ namespace PetShop.Core
         public int    Staff = 1;
         public float  PriceMultiplier = 1f;
         public string SavedAt;
+        /// <summary>Id of the pet entered in the pet show, or empty for none.</summary>
+        public string ShowEntryPetId;
 
         public List<StockEntry>   Stock         = new();
         /// <summary>Delivered units still in the stockroom, keyed by category name.</summary>
         public List<StockEntry>   Warehouse     = new();
         public List<PlacedItem>   PlacedObjects = new();
+        /// <summary>Every animal ever registered in the lineage registry.</summary>
+        public List<LineageEntrySave> Lineage   = new();
+        /// <summary>Auto-reorder rule per product category.</summary>
+        public List<ReorderRuleSave> AutoReorder = new();
 
         [Serializable]
         public class StockEntry { public string id; public int qty; }
@@ -41,35 +47,105 @@ namespace PetShop.Core
         }
 
         [Serializable]
+        public class LineageEntrySave
+        {
+            public string id, petName, species, rarity, parentAId, parentBId;
+            public float  coat_r, coat_g, coat_b;
+            public int    generation, bornDay;
+        }
+
+        [Serializable]
         public class PetSaveData
         {
+            public string id, parentAId, parentBId;
+            public int    generation;
             public string species, petName, growthStage, rarity;
             public float  coat_r, coat_g, coat_b;
             public float  temperament, energyLevel, friendliness;
             public int    ageDays, daysToMature;
             public float  basePrice;
+            public int    ribbons;
         }
     }
 
+    /// <summary>What the title screen shows about one save slot, read without loading the game.</summary>
+    public sealed class SlotSummary
+    {
+        /// <summary>The day the saved shop is on.</summary>
+        public int Day;
+
+        /// <summary>The saved shop's cash balance.</summary>
+        public float Balance;
+
+        /// <summary>When the save was written, as the ISO-8601 UTC string stored in the file.</summary>
+        public string SavedAt;
+    }
+
+    /// <summary>
+    /// Reads and writes saves as JSON under the persistent data folder. Saves live in
+    /// <see cref="SlotCount"/> numbered slots; the parameterless calls act on <see cref="ActiveSlot"/>.
+    /// </summary>
     public static class SaveSystem
     {
+        /// <summary>Number of save slots offered to the player.</summary>
+        public const int SlotCount = 3;
+
+        /// <summary>The slot used when none has been chosen.</summary>
+        private const int DefaultSlot = 1;
+
+        /// <summary>File name of the single save written before slots existed.</summary>
+        private const string LegacyFileName = "petshop_save.json";
+
+        /// <summary>Slot file name pattern; {0} is the slot number.</summary>
+        private const string SlotFileFormat = "petshop_save_{0}.json";
+
         /// <summary>Suffix of the scratch file a save is written to before being swapped in.</summary>
         private const string TempSuffix = ".tmp";
 
         /// <summary>Suffix of the copy of the previous save kept after a successful swap.</summary>
         private const string BackupSuffix = ".bak";
 
-        public static string SavePath =>
-            Path.Combine(Application.persistentDataPath, "petshop_save.json");
+        private static int _activeSlot = DefaultSlot;
 
-        /// <summary>True when the default slot has a main save or a backup to fall back on.</summary>
-        public static bool HasSave() => HasSave(SavePath);
+        /// <summary>Folder the saves live in. Tests point this at a temp directory; null means the real folder.</summary>
+        internal static string RootOverride;
+
+        /// <summary>Folder the saves live in: <see cref="RootOverride"/> or Application.persistentDataPath.</summary>
+        public static string Root => RootOverride ?? Application.persistentDataPath;
+
+        /// <summary>The slot the parameterless Save/Load/Delete act on, clamped to 1..<see cref="SlotCount"/>.</summary>
+        public static int ActiveSlot
+        {
+            get => _activeSlot;
+            set => _activeSlot = Mathf.Clamp(value, DefaultSlot, SlotCount);
+        }
+
+        /// <summary>Path of the main save file for <paramref name="slot"/> (clamped to a valid slot).</summary>
+        public static string SlotPath(int slot) =>
+            Path.Combine(Root, string.Format(SlotFileFormat, Mathf.Clamp(slot, DefaultSlot, SlotCount)));
+
+        /// <summary>Path of the active slot's main save file.</summary>
+        public static string SavePath => SlotPath(ActiveSlot);
+
+        /// <summary>Path of the pre-slots save file.</summary>
+        private static string LegacyPath => Path.Combine(Root, LegacyFileName);
+
+        /// <summary>True when any slot has a main save or a backup to fall back on.</summary>
+        public static bool HasSave()
+        {
+            for (int slot = DefaultSlot; slot <= SlotCount; slot++)
+                if (HasSave(slot)) return true;
+            return false;
+        }
+
+        /// <summary>True when <paramref name="slot"/> has a main save or a backup.</summary>
+        public static bool HasSave(int slot) => HasSave(SlotPath(slot));
 
         /// <summary>True when <paramref name="path"/> or its backup exists.</summary>
         public static bool HasSave(string path) =>
             File.Exists(path) || File.Exists(path + BackupSuffix);
 
-        /// <summary>Writes <paramref name="data"/> to the default save slot.</summary>
+        /// <summary>Writes <paramref name="data"/> to the active save slot.</summary>
         /// <returns>True when the file was written; false when the write failed (error is logged).</returns>
         public static bool Save(SaveData data) => Save(data, SavePath);
 
@@ -140,7 +216,7 @@ namespace PetShop.Core
             }
         }
 
-        /// <summary>Reads the default save slot; null when absent, unreadable or unmigratable.</summary>
+        /// <summary>Reads the active save slot; null when absent, unreadable or unmigratable.</summary>
         public static SaveData Load() => Load(SavePath);
 
         /// <summary>
@@ -177,7 +253,7 @@ namespace PetShop.Core
             }
         }
 
-        /// <summary>Removes the default save slot together with its backup and temp files.</summary>
+        /// <summary>Removes the active save slot together with its backup and temp files.</summary>
         public static void Delete() => Delete(SavePath);
 
         /// <summary>Removes <paramref name="path"/> and its backup and temp files, where present.</summary>
@@ -188,10 +264,50 @@ namespace PetShop.Core
             if (File.Exists(path + TempSuffix)) File.Delete(path + TempSuffix);
         }
 
+        // ── Slots ───────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Day, balance and save time of <paramref name="slot"/>, read (with backup fallback and
+        /// in-memory migration) without touching any file. Null when the slot is empty or unreadable.
+        /// </summary>
+        public static SlotSummary Peek(int slot)
+        {
+            if (!HasSave(slot)) return null;
+            var data = Load(SlotPath(slot));
+            if (data == null) return null;
+            return new SlotSummary { Day = data.Day, Balance = data.Balance, SavedAt = data.SavedAt };
+        }
+
+        /// <summary>
+        /// Moves a save written before slots existed (and its backup) into slot 1, unless slot 1
+        /// already holds a save. Safe to call repeatedly.
+        /// </summary>
+        /// <returns>True when a legacy file was moved.</returns>
+        public static bool MigrateLegacy()
+        {
+            string legacy = LegacyPath;
+            if (!HasSave(legacy) || HasSave(DefaultSlot)) return false;
+            string target = SlotPath(DefaultSlot);
+            MoveIfPresent(legacy, target);
+            MoveIfPresent(legacy + BackupSuffix, target + BackupSuffix);
+            Debug.Log($"[SaveSystem] Moved legacy save {legacy} into slot {DefaultSlot}.");
+            return true;
+        }
+
+        /// <summary>Moves <paramref name="from"/> to <paramref name="to"/> when the source exists.</summary>
+        private static void MoveIfPresent(string from, string to)
+        {
+            if (File.Exists(from)) File.Move(from, to);
+        }
+
         // ── Pet serialisation ───────────────────────────────────────────────────
 
         public static SaveData.PetSaveData PetToSaveData(Pet p) => new()
         {
+            id           = p.id,
+            parentAId    = p.parentAId,
+            parentBId    = p.parentBId,
+            generation   = p.generation,
             species      = p.species.ToString(),
             petName      = p.petName,
             growthStage  = p.growthStage.ToString(),
@@ -205,6 +321,7 @@ namespace PetShop.Core
             ageDays      = p.ageDays,
             daysToMature = p.daysToMature,
             basePrice    = p.basePrice,
+            ribbons      = p.ribbons,
         };
 
         public static Pet SaveDataToPet(SaveData.PetSaveData d)
@@ -213,6 +330,10 @@ namespace PetShop.Core
             Enum.TryParse(d.species,     out pet.species);
             Enum.TryParse(d.growthStage, out pet.growthStage);
             Enum.TryParse(d.rarity,      out pet.rarity);
+            pet.id           = string.IsNullOrEmpty(d.id) ? BreedingSystem.NewId() : d.id;
+            pet.parentAId    = d.parentAId;
+            pet.parentBId    = d.parentBId;
+            pet.generation   = d.generation;
             pet.petName      = d.petName;
             pet.name         = $"{pet.species}_{d.petName}";
             pet.coat         = new Color(d.coat_r, d.coat_g, d.coat_b);
@@ -222,6 +343,7 @@ namespace PetShop.Core
             pet.ageDays      = d.ageDays;
             pet.daysToMature = Mathf.Max(1, d.daysToMature);
             pet.basePrice    = d.basePrice > 0f ? d.basePrice : Pet.SpeciesBasePrice(pet.species);
+            pet.ribbons      = Mathf.Max(0, d.ribbons);
             return pet;
         }
     }

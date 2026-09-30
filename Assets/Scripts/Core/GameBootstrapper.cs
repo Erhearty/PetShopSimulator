@@ -50,6 +50,7 @@ namespace PetShop.Core
         {
             bool touring  = Dev.CameraTour.TryCreate(out _);
             bool headless = touring || Dev.ScreenshotCapture.TryCreate(out _) || Application.isBatchMode;
+            SaveSystem.MigrateLegacy();
 
             if (headless)
             {
@@ -60,8 +61,9 @@ namespace PetShop.Core
             else
             {
                 _game.SetModalOpen(true);
-                _ui.Title.Build(_ui.CanvasRoot, SaveSystem.HasSave(), continueSave =>
+                _ui.Title.Build(_ui.CanvasRoot, (slot, continueSave) =>
                 {
+                    SaveSystem.ActiveSlot = slot;
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin();
@@ -131,6 +133,7 @@ namespace PetShop.Core
             _game.Spawner = _spawner;
             _game.Audio   = _audio;
             _game.Queue   = _queue;
+            gmGO.AddComponent<AutoReorderRunner>().Attach(_game);
 
             _generator = gameObject.AddComponent<ShopGenerator>();
             _generator.RoomWidth  = RoomWidth;

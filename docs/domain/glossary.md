@@ -19,5 +19,9 @@ Canonical component names projected from the architecture canvas.
 <!-- generated:end comp:build-editor-tooling -->
 
 <!-- generated:start comp:local-save-file -->
-- **Local Save File** (`local-save-file`) - storage component. Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them.
+- **Local Save File** (`local-save-file`) - storage component. Up to three JSON save slots (petshop_save_1..3.json under Application.persistentDataPath); a legacy petshop_save.json is migrated into slot 1 on first run.
 <!-- generated:end comp:local-save-file -->
+
+<!-- generated:start comp:player-prefs-store -->
+- **PlayerPrefs Settings Store** (`player-prefs-store`) - storage component. Unity PlayerPrefs store for per-machine player preferences: key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs). Separate from the Local Save File, which holds game-progress state.
+<!-- generated:end comp:player-prefs-store -->

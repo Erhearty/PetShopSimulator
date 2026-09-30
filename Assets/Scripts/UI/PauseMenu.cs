@@ -94,7 +94,7 @@ namespace PetShop.UI
             _root.SetActive(true);
             _game?.SetModalOpen(true);
             Time.timeScale = 0f;
-            if (_status != null) _status.text = $"Day {_game.Shop.Day} · € {_game.Shop.Balance:N0}";
+            if (_status != null) _status.text = $"Slot {SaveSystem.ActiveSlot} · Day {_game.Shop.Day} · € {_game.Shop.Balance:N0}";
             RefreshMusicLabel();
         }
 

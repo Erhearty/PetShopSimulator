@@ -35,9 +35,12 @@ namespace PetShop.UI
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
-        public void Build(Transform canvas, GameManager game)
+        private ReorderPanel _reorder;
+
+        public void Build(Transform canvas, GameManager game, ReorderPanel reorder = null)
         {
             _game = game;
+            _reorder = reorder;
 
             _root = UIFactory.Panel("StatsDim", canvas, Vector2.zero, Vector2.one,
                                     new Color(0.03f, 0.05f, 0.08f, 0.62f));
@@ -144,7 +147,7 @@ namespace PetShop.UI
         private void BuildOrderControls(Transform panel)
         {
             var categories = (ProductCategory[])System.Enum.GetValues(typeof(ProductCategory));
-            float w = 0.9f / categories.Length;
+            float w = 0.9f / (categories.Length + 1);
 
             for (int i = 0; i < categories.Length; i++)
             {
@@ -161,6 +164,8 @@ namespace PetShop.UI
                 });
                 _orderControls.Add(btn.gameObject);
             }
+            _orderControls.Add(ReorderPanel.OpenButton(panel, 0.05f + categories.Length * w, w - 0.012f,
+                () => { Hide(); _reorder?.Show(); }));
         }
 
         /// <summary>Price and staffing controls — the two levers the player actually pulls.</summary>

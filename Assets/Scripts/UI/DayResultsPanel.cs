@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Pets;
 
 namespace PetShop.UI
 {
@@ -169,6 +170,7 @@ namespace PetShop.UI
         private string Advice(DaySummary s, float profit)
         {
             var notes = new List<string>();
+            AddShowNotes(notes, s.Day);
 
             int emptyShelves = 0;
             float refill = 0f;
@@ -209,6 +211,19 @@ namespace PetShop.UI
                 notes.Add("· The shop is in good shape. Consider another shelf or pen to grow.");
 
             return string.Join("\n", notes.GetRange(0, Mathf.Min(3, notes.Count)));
+        }
+
+        private void AddShowNotes(List<string> notes, int day)
+        {
+            var last = _game.Show.LastResult;
+            if (PetShow.IsShowDay(day) && last.HasValue && _game.Show.LastResultDay == day)
+            {
+                var r = last.Value;
+                notes.Add(r.disqualified ? "· Pet show: your entry was disqualified."
+                    : $"· Pet show: placed #{r.placement}, prize € {r.prize:N0}.");
+            }
+            if (PetShow.IsShowDay(day + 1) && _game.Show.EntryPetId == null)
+                notes.Add($"· Pet show tomorrow — enter a {ShowJudging.CurrentTheme(_game, day + 1).species} from the breeding panel.");
         }
 
         public void Hide()

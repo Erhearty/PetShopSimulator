@@ -1,7 +1,7 @@
 <!-- generated:start cap:overview-intro -->
 # Architecture Overview
 
-3 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
+4 component(s) declared on the architecture canvas. Topology: [system-map.md](system-map.md).
 <!-- generated:end cap:overview-intro -->
 
 <!-- generated:start comp:pet-shop-simulator-game-client -->
@@ -50,7 +50,15 @@ Editor-time / headless tooling (Assets/Editor, driven by root build.sh) that set
 <!-- generated:start comp:local-save-file -->
 ## Local Save File (`local-save-file`, STORAGE)
 
-Single JSON save file at Application.persistentDataPath/petshop_save.json, written/read by Core/SaveSystem.cs. Holds the entire persisted game state: balance, reputation, day, staff, price multiplier, shelf/warehouse stock, and every placed furniture item with its shelf stock or pen residents (pets). Versioned (SaveData.Version) - on load, SaveSystem.TryRead passes every save through Core/SaveMigrator.cs, which upgrades older saves (legacy v0 and v1) in memory to the current version instead of discarding them.
+Up to three JSON save slots (petshop_save_1..3.json under Application.persistentDataPath); a legacy petshop_save.json is migrated into slot 1 on first run.
 
 **Tech:** JsonUtility (Unity built-in JSON), Local filesystem (Application.persistentDataPath)
 <!-- generated:end comp:local-save-file -->
+
+<!-- generated:start comp:player-prefs-store -->
+## PlayerPrefs Settings Store (`player-prefs-store`, STORAGE)
+
+Unity PlayerPrefs store for per-machine player preferences: key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs). Separate from the Local Save File, which holds game-progress state.
+
+**Tech:** Unity PlayerPrefs
+<!-- generated:end comp:player-prefs-store -->

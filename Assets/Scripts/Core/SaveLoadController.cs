@@ -25,6 +25,8 @@ namespace PetShop.Core
 
         public void NewGame()
         {
+            _game.Show.Withdraw();
+            SaveReorder.ResetToDefaults(_game.AutoReorder);
             foreach (var p in _game.Generator.StarterLayout(_game.Grid))
             {
                 var def = BuildCatalog.Get(p.CatalogId);
@@ -66,12 +68,13 @@ namespace PetShop.Core
         /// <summary>
         /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
         /// </summary>
+        /// <param name="quiet">True for an automatic save: the success toast reads "Autosaved.".</param>
         /// <returns>True when the save was written; false when it failed.</returns>
-        public bool SaveGame()
+        public bool SaveGame(bool quiet = false)
         {
             if (SaveSystem.Save(BuildSaveData()))
             {
-                _game.Notify("Game saved.");
+                _game.Notify(quiet ? "Autosaved." : "Game saved.");
                 return true;
             }
             _game.Notify("Save FAILED — progress not written. Check disk space/permissions.");
@@ -105,6 +108,9 @@ namespace PetShop.Core
                 if (entry.Data != null)
                     data.PlacedObjects.Add(BuildPlacedItem(entry));
 
+            SaveLineage.Capture(data);
+            SaveReorder.Capture(data, _game.AutoReorder);
+            data.ShowEntryPetId = _game.Show.EntryPetId;
             return data;
         }
 
@@ -144,6 +150,15 @@ namespace PetShop.Core
             }
         }
 
+        /// <summary>Re-enters the saved show pet if it was loaded; otherwise clears the entry.</summary>
+        private void RestoreShowEntry(string petId, System.Collections.Generic.List<Pet> pets)
+        {
+            _game.Show.Withdraw();
+            if (string.IsNullOrEmpty(petId)) return;
+            var pet = pets.Find(p => p.id == petId);
+            if (pet != null) _game.Show.Restore(pet);
+        }
+
         public void LoadGame(SaveData data)
         {
             var shop = _game.Shop;
@@ -158,6 +173,7 @@ namespace PetShop.Core
                 if (System.Enum.TryParse(entry.id, out ProductCategory category))
                     shop.AddToWarehouse(category, entry.qty);
 
+            var loadedPets = new System.Collections.Generic.List<Pet>();
             foreach (var item in data.PlacedObjects)
             {
                 var def = BuildCatalog.Get(item.catalogId);
@@ -178,8 +194,15 @@ namespace PetShop.Core
                 var pen = go.GetComponent<PetPen>();
                 if (pen != null)
                     foreach (var petData in item.pets)
-                        pen.AddPet(SaveSystem.SaveDataToPet(petData));
+                    {
+                        var pet = SaveSystem.SaveDataToPet(petData);
+                        loadedPets.Add(pet);
+                        pen.AddPet(pet);
+                    }
             }
+            SaveLineage.Apply(data, loadedPets, data.Day);
+            SaveReorder.Apply(data, _game.AutoReorder);
+            RestoreShowEntry(data.ShowEntryPetId, loadedPets);
 
             for (int i = 0; i < Mathf.Max(1, data.Staff); i++) _game.HireAssistant();
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);

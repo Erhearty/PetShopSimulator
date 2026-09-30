@@ -22,6 +22,7 @@ namespace PetShop.UI
         private const float  RowFont       = 15f;
         private const float  StatusFont    = 15f;
         private const float  RowFill       = 0.88f;
+        private const float  GeneralRowHeight = 0.09f;
 
         private static readonly Vector2 Centre        = new(0.5f, 0.5f);
         private static readonly Vector2 PanelHalfSize = new(450f, 320f);
@@ -34,6 +35,8 @@ namespace PetShop.UI
         private TMP_Text    _status;
         private Button      _resetButton;
         private Button      _closeButton;
+        private Button      _autosaveButton;
+        private TMP_Text    _autosaveLabel;
 
         private readonly Dictionary<GameAction, TMP_Text> _keyLabels = new();
         private readonly List<Button> _rebindButtons = new();
@@ -88,6 +91,7 @@ namespace PetShop.UI
             _capturing   = null;
             _status.text = "";
             RefreshKeys();
+            RefreshAutosaveLabel();
             _root.SetActive(true);
             _root.transform.SetAsLastSibling();
             SelectFirstRow();
@@ -162,7 +166,7 @@ namespace PetShop.UI
             _rebindButtons.Add(rebind);
         }
 
-        /// <summary>The "General" section. Deliberately empty: later options parent to <see cref="GeneralSection"/>.</summary>
+        /// <summary>The "General" section: the autosave toggle; further options parent to <see cref="GeneralSection"/>.</summary>
         private void BuildGeneral(Transform panel)
         {
             UIFactory.Label("GeneralHeader", panel, "General",
@@ -170,12 +174,33 @@ namespace PetShop.UI
 
             GeneralSection = UIFactory.Node("General", panel,
                                             new Vector2(0.64f, 0.11f), new Vector2(0.97f, 0.83f)).transform;
+
+            _autosaveButton = UIFactory.Button("AutosaveMorning", GeneralSection, "",
+                new Vector2(0f, 1f - GeneralRowHeight), Vector2.one, RowFont);
+            _autosaveLabel = _autosaveButton.GetComponentInChildren<TMP_Text>();
+            _autosaveButton.onClick.AddListener(ToggleAutosave);
+            RefreshAutosaveLabel();
         }
 
-        /// <summary>Explicit up/down navigation: rebind rows top to bottom, then Reset, then Close.</summary>
+        /// <summary>Flips the morning autosave setting and reports it.</summary>
+        private void ToggleAutosave()
+        {
+            GameSettings.AutosaveEachMorning = !GameSettings.AutosaveEachMorning;
+            RefreshAutosaveLabel();
+            _status.text = GameSettings.AutosaveEachMorning ? "Autosave each morning on." : "Autosave each morning off.";
+        }
+
+        /// <summary>Shows the current morning autosave setting on its button.</summary>
+        private void RefreshAutosaveLabel()
+        {
+            if (_autosaveLabel == null) return;
+            _autosaveLabel.text = $"Autosave each morning: {(GameSettings.AutosaveEachMorning ? "on" : "off")}";
+        }
+
+        /// <summary>Explicit up/down navigation: rebind rows top to bottom, then the autosave toggle, Reset, Close.</summary>
         private void WireNavigation()
         {
-            var chain = new List<Selectable>(_rebindButtons) { _resetButton, _closeButton };
+            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _resetButton, _closeButton };
             for (int i = 0; i < chain.Count; i++)
             {
                 chain[i].navigation = new Navigation
@@ -278,6 +303,7 @@ namespace PetShop.UI
         private void SetRowsInteractable(bool interactable)
         {
             foreach (var button in _rebindButtons) button.interactable = interactable;
+            if (_autosaveButton != null) _autosaveButton.interactable = interactable;
             if (_resetButton != null) _resetButton.interactable = interactable;
         }
 

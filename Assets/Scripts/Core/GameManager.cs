@@ -42,6 +42,12 @@ namespace PetShop.Core
 
         public ItemDatabase Catalog { get; private set; }
 
+        /// <summary>The weekly pet show: current entry and last result.</summary>
+        public PetShow Show { get; } = new PetShow();
+
+        /// <summary>Per-category automatic supplier reorder rules.</summary>
+        public AutoReorder AutoReorder { get; } = new AutoReorder();
+
         /// <summary>0 at opening time, 1 at closing time.</summary>
         public float DayProgress => DayLengthSeconds <= 0f ? 0f
             : Mathf.Clamp01(_dayElapsed / DayLengthSeconds);
@@ -112,6 +118,7 @@ namespace PetShop.Core
         {
             Shop?.OnDeliveryArrived.AddListener(_floor.OnDeliveryArrived);
 
+            LineageRegistry.Reset(); // statics survive scene reloads
             var save = SaveSystem.Load();
             if (save != null) _saveLoad.LoadGame(save);
             else              _saveLoad.NewGame();
@@ -260,6 +267,8 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
+            ShowJudging.Run(this);
+
             DaySummary summary = Shop.CloseDay();
             SaveGame();
 
@@ -336,6 +345,7 @@ namespace PetShop.Core
         {
             if (IsGameOver) return;
             StartDay();
+            if (GameSettings.AutosaveEachMorning && !IsGameOver) SaveGame(quiet: true);
         }
 
         public void RestartGame()
@@ -350,8 +360,9 @@ namespace PetShop.Core
         /// <summary>
         /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
         /// </summary>
+        /// <param name="quiet">True for an automatic save: the success toast reads "Autosaved.".</param>
         /// <returns>True when the save was written; false when it failed.</returns>
-        public bool SaveGame() => _saveLoad.SaveGame();
+        public bool SaveGame(bool quiet = false) => _saveLoad.SaveGame(quiet);
 
         // ── Utility ───────────────────────────────────────────────────────────
 
