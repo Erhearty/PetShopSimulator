@@ -35,6 +35,13 @@ namespace PetShop.Customer
         [Tooltip("Chance per browsing stop that a customer falls for one of the animals.")]
         [Range(0f, 1f)] public float PetBuyChance = 0.12f;
 
+        /// <summary>What kind of shopper this is. Set by the spawner before Start runs.</summary>
+        [Header("Archetype")]
+        public CustomerArchetype Archetype = CustomerArchetype.Regular;
+
+        /// <summary>The resolved tuning for <see cref="Archetype"/>; valid from Start onwards.</summary>
+        public CustomerProfile Profile { get; private set; } = CustomerProfile.For(CustomerArchetype.Regular);
+
         /// <summary>Chance per browsing stop, at normal prices, of taking something off a shelf.</summary>
         private const float ShelfBuyChance = 0.7f;
 
@@ -84,7 +91,11 @@ namespace PetShop.Customer
 
         /// <summary>Above this, they will not buy however much they liked it.</summary>
         public float BudgetCap { get; private set; }
+
+        /// <summary>Most this shopper will pay for an animal; 0 if not after one.</summary>
+        public float PetBudget { get; private set; }
         private bool  _boughtPet;
+        private bool  _sawWantedPet;
         private bool  _served;
         private bool  _gaveUp;
 
@@ -123,8 +134,10 @@ namespace PetShop.Customer
             // thought bubble something true to show.
             var categories = (ProductCategory[])System.Enum.GetValues(typeof(ProductCategory));
             PreferredCategory = categories[Random.Range(0, categories.Length)];
-            WantsPet          = Random.value < 0.30f;
-            BudgetCap         = WantsPet ? Random.Range(120f, 900f) : Random.Range(14f, 60f);
+            Profile           = CustomerProfile.For(Archetype);
+            WantsPet          = Random.value < Profile.WantsPetChance;
+            PetBudget         = WantsPet ? Profile.RollPetBudget() : 0f;
+            BudgetCap         = WantsPet ? PetBudget : Profile.RollItemBudget();
 
             BuildBubble();
             StartCoroutine(RunBehaviour());
@@ -140,7 +153,7 @@ namespace PetShop.Customer
             Color colour = WantsPet ? new Color(0.98f, 0.78f, 0.38f) : UIFactory.Ink;
 
             _bubble = WorldLabel.Create(transform, new Vector3(0f, 2.15f, 0f),
-                                        $"<size=80%>{want}</size>", 0.085f, colour, width: 1.4f);
+                                        $"<size=80%><b>{Profile.Label}</b>: {want}</size>", 0.085f, colour, width: 1.4f);
             _bubble.MaxVisibleDistance = 22f;
         }
 
@@ -184,16 +197,10 @@ namespace PetShop.Customer
                 if (_basket.Count >= MaxPurchases) break;
             }
 
-            if (_basket.Count > 0)
-            {
-                yield return WaitToBeServed();
-            }
-            else
-            {
-                // Walked out with nothing — mildly bad for the shop's standing
-                ShopManager?.ChangeReputation(-0.6f);
-                WalkedOutEmpty?.Invoke(this);
-            }
+            // Rep hit for an empty basket is scaled by the customer's profile.
+            ApplyBrowsePenalties();
+            if (_basket.Count > 0) yield return WaitToBeServed();
+            else WalkedOutEmpty?.Invoke(this);
 
             State = CustomerState.Leaving;
             if (EntryPoint != null) yield return NavigateTo(EntryPoint.position);
@@ -222,7 +229,7 @@ namespace PetShop.Customer
                 yield break;
             }
 
-            Queue.Join(this);
+            Queue.Join(this, Profile.PatienceMultiplier);
             SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
             int lastPlace = -1;
 
@@ -328,54 +335,70 @@ namespace PetShop.Customer
 
         private void TryPickUp()
         {
-            float demand = ShopManager != null ? ShopManager.DemandFactor : 1f;
+            float demand = ShopManager != null
+                ? ShopManager.DemandFor(Profile.PriceSensitivity, Profile.MaxDemand) : 1f;
+            TryPickUpItem(demand);
+            TryPickUpPet(demand);
+        }
 
+        private void TryPickUpItem(float demand)
+        {
             var stocked = Shelves.FindAll(s => s != null && !s.IsEmpty);
 
             // Favour the aisle they came for; fall back to anything stocked.
             var preferred = stocked.FindAll(s => s.Category == PreferredCategory);
             if (preferred.Count > 0) stocked = preferred;
+            if (stocked.Count == 0 || !WillBuy(Random.value, ShelfBuyChance, demand)) return;
 
-            if (stocked.Count > 0 && WillBuy(Random.value, ShelfBuyChance, demand))
+            var shelf   = stocked[Random.Range(0, stocked.Count)];
+            var product = shelf.TakeOne();
+            if (product == null) return;
+
+            float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice) : product.basePrice;
+            if (price <= BudgetCap)
             {
-                var shelf   = stocked[Random.Range(0, stocked.Count)];
-                var product = shelf.TakeOne();
-                if (product != null)
-                {
-                    float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice)
-                                                      : product.basePrice;
-
-                    if (price <= BudgetCap)
-                    {
-                        _basket.Add((product.id, product.displayName, price));
-                        SetBubble($"got {product.displayName}", UIFactory.Good);
-                    }
-                    else
-                    {
-                        // Too dear: put it back, and let the player see why.
-                        shelf.AddStock(product, 1);
-                        SetBubble("too expensive", UIFactory.Bad);
-                    }
-                }
+                _basket.Add((product.id, product.displayName, price));
+                SetBubble($"got {product.displayName}", UIFactory.Good);
+                return;
             }
+            // Too dear: put it back, and let the player see why.
+            shelf.AddStock(product, 1);
+            SetBubble("too expensive", UIFactory.Bad);
+        }
 
-            if (!_boughtPet && WantsPet && WillBuy(Random.value, PetBuyChance * 3f, demand))
+        /// <summary>Adults only, filtered by the profile's rarity; price checked against PetBudget first.</summary>
+        private void TryPickUpPet(float demand)
+        {
+            if (_boughtPet || !WantsPet) return;
+            var pens = PetPens.FindAll(p => p != null && Profile.FirstWantedPet(p) != null);
+            if (pens.Count > 0) _sawWantedPet = true;
+            if (!WillBuy(Random.value, PetBuyChance * 3f, demand) || pens.Count == 0) return;
+
+            var pen = pens[Random.Range(0, pens.Count)];
+            Pet pet = Profile.FirstWantedPet(pen);
+            float price = ShopManager != null ? ShopManager.PriceOf(pet.SellPrice()) : pet.SellPrice();
+            if (price > PetBudget)
             {
-                var pens = PetPens.FindAll(p => p != null && p.HasAdults);
-                if (pens.Count > 0)
-                {
-                    var pen = pens[Random.Range(0, pens.Count)];
-                    Pet pet = pen.TakeAdult();
-                    if (pet != null)
-                    {
-                        float price = ShopManager != null ? ShopManager.PriceOf(pet.SellPrice())
-                                                          : pet.SellPrice();
-                        _basket.Add(($"pet_{pet.species}", pet.DisplayName(), price));
-                        _boughtPet = true;
-                        SetBubble($"buying a {pet.species}", UIFactory.Good);
-                    }
-                }
+                // Skip this pet but keep browsing: shelf items may still sell (as before archetypes).
+                SetBubble($"{pet.species}? too pricey", UIFactory.Bad);
+                return;
             }
+            if (!pen.RemovePet(pet)) return;
+            _basket.Add(($"pet_{pet.species}", pet.DisplayName(), price));
+            _boughtPet = true;
+            SetBubble($"buying a {pet.species}", UIFactory.Good);
+        }
+
+        /// <summary>Rep hits for an empty basket, or for never seeing an acceptable animal.</summary>
+        private void ApplyBrowsePenalties()
+        {
+            if (ShopManager == null) return;
+            // Walked out with nothing — bad for the shop's standing, how bad depends on who
+            if (_basket.Count == 0) ShopManager.ChangeReputation(-Profile.EmptyShelfRepPenalty);
+
+            bool missedPet = WantsPet && !_boughtPet && !_sawWantedPet;
+            if (missedPet && Profile.NoMatchingPetRepPenalty > 0f)
+                ShopManager.ChangeReputation(-Profile.NoMatchingPetRepPenalty);
         }
 
         private void Checkout()
@@ -414,6 +437,5 @@ namespace PetShop.Customer
         }
 
         private void OnDestroy() => Despawned?.Invoke(this);
-
     }
 }

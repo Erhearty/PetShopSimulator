@@ -21,6 +21,7 @@ Projected from `schema` widgets on the architecture canvas.
 | `Stock` | StockEntry[] | - | id + qty pairs, shelf stock |
 | `Warehouse` | StockEntry[] | - | delivered units still in the stockroom, keyed by category |
 | `PlacedObjects` | PlacedItem[] | - | catalogId, cellX/cellY, variant, rotation, shelfStock[], pets[] (PetSaveData) |
+| `StaffList` | StaffSaveData[] | - | Save v4+: one record per assistant - name, role, skill (int), wage (float), serviceSeconds (float). Empty in pre-v4 saves; SaveMigrator (v3→v4 step) normalises it. Staff int head count is kept alongside it. |
 | `SlotFile` | string |  | petshop_save_{1..3}.json; one SaveData per slot |
 | `PetSaveData.id` | string |  | stable pet id (short GUID) |
 | `PetSaveData.parentAId / parentBId` | string |  | empty for founders |

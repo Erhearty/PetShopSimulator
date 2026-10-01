@@ -38,6 +38,10 @@ namespace PetShop.Commerce
 
         private readonly List<IShopper>      _queue = new();
         private readonly Dictionary<IShopper, float> _joinedAt = new();
+        private readonly Dictionary<IShopper, float> _patience = new();
+
+        /// <summary>Smallest per-shopper patience scale honoured, so nobody walks out instantly.</summary>
+        private const float MinPatienceMultiplier = 0.1f;
 
         public int  Length      => _queue.Count;
         public bool AnyWaiting  => _queue.Count > 0;
@@ -54,11 +58,16 @@ namespace PetShop.Commerce
             }
         }
 
-        public void Join(IShopper shopper)
+        /// <summary>
+        /// Adds <paramref name="shopper"/> to the back of the line. <paramref name="patienceMultiplier"/>
+        /// scales how long they will wait (1 = the queue's normal patience).
+        /// </summary>
+        public void Join(IShopper shopper, float patienceMultiplier = 1f)
         {
             if (shopper == null || _queue.Contains(shopper)) return;
             _queue.Add(shopper);
             _joinedAt[shopper] = Time.time;
+            _patience[shopper] = Mathf.Max(MinPatienceMultiplier, patienceMultiplier);
             OnQueueChanged.Invoke(_queue.Count);
         }
 
@@ -66,6 +75,7 @@ namespace PetShop.Commerce
         {
             if (shopper == null || !_queue.Remove(shopper)) return;
             _joinedAt.Remove(shopper);
+            _patience.Remove(shopper);
             OnQueueChanged.Invoke(_queue.Count);
         }
 
@@ -84,7 +94,8 @@ namespace PetShop.Commerce
             int place = _queue.IndexOf(shopper);
             if (place < 0 || !_joinedAt.TryGetValue(shopper, out float joined)) return 0f;
 
-            float allowance = PatienceSeconds + place * PatiencePerPlace;
+            float scale     = _patience.TryGetValue(shopper, out float m) ? m : 1f;
+            float allowance = (PatienceSeconds + place * PatiencePerPlace) * scale;
             return Mathf.Clamp01((Time.time - joined) / allowance);
         }
 

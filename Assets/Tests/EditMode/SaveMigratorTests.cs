@@ -31,7 +31,7 @@ namespace PetShop.Tests
         /// <summary>The tier reputation 72 earns: Trusted Name (70 ≤ 72 &lt; 85).</summary>
         private const int Reputation72Tier = 2;
 
-        /// <summary>The save format version this build writes.</summary>
+        /// <summary>The save format that introduced ProgressionTier (before the staff list).</summary>
         private const int Version3 = 3;
 
         /// <summary>A version 1 save with invalid staff/multiplier and a placed item lacking lists.</summary>
@@ -53,14 +53,46 @@ namespace PetShop.Tests
 
         private const string MalformedJson = "{ this is not json";
 
+        /// <summary>A version 4 save carrying a named staff list.</summary>
+        private const string V4StaffJson =
+            "{\"Version\":4,\"ProgressionTier\":1,\"Balance\":10.0,\"Day\":2,\"Staff\":1,\"PriceMultiplier\":1.0," +
+            "\"StaffList\":[{\"name\":\"Ada\",\"role\":\"Feeder\",\"skill\":4,\"wage\":72.5,\"serviceSeconds\":3.25}]}";
+
         [Test]
-        public void Migrate_CurrentVersion_RoundTripsUnchanged()
+        public void Migrate_V4_KeepsStaffListExactly()
+        {
+            var data = SaveMigrator.Migrate(V4StaffJson);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
+            Assert.AreEqual(1, data.ProgressionTier);
+            Assert.AreEqual(1, data.StaffList.Count);
+            var s = data.StaffList[0];
+            Assert.AreEqual("Ada", s.name);
+            Assert.AreEqual("Feeder", s.role);
+            Assert.AreEqual(4, s.skill);
+            Assert.AreEqual(72.5f, s.wage, Tolerance);
+            Assert.AreEqual(3.25f, s.serviceSeconds, Tolerance);
+        }
+
+        [Test]
+        public void Migrate_V2_LeavesStaffListEmptyAndHeadCountIntact()
+        {
+            var data = SaveMigrator.Migrate(V2Json);
+
+            Assert.AreEqual(0, data.StaffList.Count);
+            Assert.AreEqual(2, data.Staff);
+        }
+
+        [Test]
+        public void Migrate_Version3_UpgradesToCurrentWithFieldsIntact()
         {
             var data = SaveMigrator.Migrate(V3Json);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
             Assert.AreEqual(2, data.ProgressionTier);
+            Assert.IsNotNull(data.StaffList);
             Assert.AreEqual(1234.5f, data.Balance, Tolerance);
             Assert.AreEqual(67.25f, data.Reputation, Tolerance);
             Assert.AreEqual(9, data.Day);
@@ -104,7 +136,7 @@ namespace PetShop.Tests
             var data = SaveMigrator.Migrate(V2Json);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
             Assert.AreEqual(Reputation72Tier, data.ProgressionTier);
             Assert.AreEqual(ProgressionRules.TierForReputation(72f), data.ProgressionTier);
             Assert.AreEqual(72f, data.Reputation, Tolerance);
@@ -117,18 +149,19 @@ namespace PetShop.Tests
             var data = SaveMigrator.Migrate(V1HighReputationJson);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
             Assert.AreEqual(ProgressionRules.TierForReputation(HighReputation), data.ProgressionTier);
             Assert.Greater(data.ProgressionTier, 0);
         }
 
         [Test]
-        public void Migrate_MissingVersion_ReachesVersion3()
+        public void Migrate_MissingVersion_ReachesCurrentVersion()
         {
             var data = SaveMigrator.Migrate(LegacyJson);
 
             Assert.IsNotNull(data);
-            Assert.AreEqual(Version3, data.Version);
+            Assert.AreEqual(SaveMigrator.CurrentVersion, data.Version);
+            Assert.Greater(SaveMigrator.CurrentVersion, Version3);
         }
 
         [Test]

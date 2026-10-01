@@ -12,7 +12,7 @@ namespace PetShop.Core
     public static class SaveMigrator
     {
         /// <summary>The save format version written by this build.</summary>
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
 
         /// <summary>Saves written before the Version field existed; they parse as 0.</summary>
         private const int LegacyVersion = 0;
@@ -45,7 +45,20 @@ namespace PetShop.Core
             { LegacyVersion, NormaliseDefaults },
             { FirstVersion,  NormaliseDefaults },
             { PreProgressionVersion, SeedProgressionTier },
+            { StaffCountVersion, NormaliseStaffList },
         };
+
+        /// <summary>Saves that kept only a staff head count, not who the staff were.</summary>
+        private const int StaffCountVersion = 3;
+
+        /// <summary>
+        /// Version 3 → 4: a staff list did not exist yet. Leaves it empty so the roster falls back
+        /// to the head count in <see cref="SaveData.Staff"/> (zero staying zero).
+        /// </summary>
+        private static void NormaliseStaffList(SaveData data)
+        {
+            data.StaffList ??= new List<SaveData.StaffSaveData>();
+        }
 
         /// <summary>
         /// Parses <paramref name="json"/> and migrates it step by step to <see cref="CurrentVersion"/>.

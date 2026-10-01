@@ -101,11 +101,37 @@ namespace PetShop.UI
 
             var shop = _game.Shop;
             _summaryLabel.text =
-                $"{_game.StaffCount} on the till  ·  wages € {_game.Payroll:N0} tonight  ·  " +
-                $"balance € {(shop != null ? shop.Balance : 0f):N0}  ·  room for {3 - _game.StaffCount} more";
+                $"{RoleCounts()}  ·  wages € {_game.Payroll:N0} tonight  ·  " +
+                $"balance € {(shop != null ? shop.Balance : 0f):N0}  ·  " +
+                $"room for {Mathf.Max(0, StaffRoster.MaxStaff - _game.StaffCount)} more";
 
             BuildCards();
             BuildPayroll();
+        }
+
+        /// <summary>How many staff work each job, e.g. "1 cashier · 1 restocker · 0 feeders".</summary>
+        private string RoleCounts()
+        {
+            var parts = new List<string>();
+            foreach (StaffRole role in System.Enum.GetValues(typeof(StaffRole)))
+            {
+                int n = 0;
+                foreach (var member in _game.Staff) if (member != null && member.Role == role) n++;
+                string word = role.ToString().ToLowerInvariant();
+                parts.Add($"{n} {word}{(n == 1 ? "" : "s")}");
+            }
+            return string.Join("  ·  ", parts);
+        }
+
+        /// <summary>Role, stars and skill word, e.g. "Cashier  ★★★☆☆ capable".</summary>
+        private static string RoleAndSkill(StaffRole role, int skill) =>
+            $"{role}  {StaffCandidate.Stars(skill)} {StaffCandidate.SkillWordFor(skill)}";
+
+        /// <summary>The job after <paramref name="role"/>, wrapping round.</summary>
+        private static StaffRole NextRole(StaffRole role)
+        {
+            int count = System.Enum.GetValues(typeof(StaffRole)).Length;
+            return (StaffRole)(((int)role + 1) % count);
         }
 
         /// <summary>One card per applicant, side by side.</summary>
@@ -122,38 +148,45 @@ namespace PetShop.UI
             }
 
             float w = 1f / candidates.Count;
+            for (int i = 0; i < candidates.Count; i++) BuildCard(i, i * w, w, candidates[i]);
+        }
 
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                StaffCandidate candidate = candidates[i];
-                float x = i * w;
+        /// <summary>One applicant: name, job and skill, speed, terms and a hire button.</summary>
+        private void BuildCard(int i, float x, float w, StaffCandidate candidate)
+        {
+            var card = UIFactory.Panel($"Card_{i}", _cardRoot,
+                new Vector2(x + 0.006f, 0f), new Vector2(x + w - 0.006f, 1f),
+                new Color(0.11f, 0.14f, 0.19f, 0.95f));
+            _spawned.Add(card);
 
-                var card = UIFactory.Panel($"Card_{i}", _cardRoot,
-                    new Vector2(x + 0.006f, 0f), new Vector2(x + w - 0.006f, 1f),
-                    new Color(0.11f, 0.14f, 0.19f, 0.95f));
-                _spawned.Add(card);
+            UIFactory.Label("Name", card.transform, candidate.Name,
+                new Vector2(0.06f, 0.80f), new Vector2(0.94f, 0.96f), 17f, UIFactory.Ink);
 
-                UIFactory.Label("Name", card.transform, candidate.Name,
-                    new Vector2(0.06f, 0.74f), new Vector2(0.94f, 0.95f), 17f, UIFactory.Ink);
+            UIFactory.Label("Role", card.transform, RoleAndSkill(candidate.Role, candidate.Skill),
+                new Vector2(0.06f, 0.64f), new Vector2(0.94f, 0.80f), 14f, UIFactory.Ink);
 
-                UIFactory.Label("Speed", card.transform,
-                    $"{candidate.SpeedWord}  —  one customer every {candidate.ServiceSeconds:0.#} s",
-                    new Vector2(0.06f, 0.54f), new Vector2(0.94f, 0.72f), 13f, UIFactory.Accent);
+            UIFactory.Label("Speed", card.transform,
+                $"{candidate.SpeedWord}  —  one customer every {candidate.ServiceSeconds:0.#} s",
+                new Vector2(0.06f, 0.48f), new Vector2(0.94f, 0.64f), 13f, UIFactory.Accent);
 
-                UIFactory.Label("Terms", card.transform,
-                    $"€ {candidate.DailyWage:N0} a day\n€ {candidate.SignOnFee:N0} to sign",
-                    new Vector2(0.06f, 0.26f), new Vector2(0.94f, 0.52f), 14f, UIFactory.InkMuted);
+            UIFactory.Label("Terms", card.transform,
+                $"€ {candidate.DailyWage:N0} a day\n€ {candidate.SignOnFee:N0} to sign",
+                new Vector2(0.06f, 0.24f), new Vector2(0.94f, 0.48f), 14f, UIFactory.InkMuted);
 
-                bool room = _game.StaffCount < 3;
-                var hire = UIFactory.Button($"Hire_{i}", card.transform,
-                    room ? "Hire" : "No room",
-                    new Vector2(0.12f, 0.06f), new Vector2(0.88f, 0.22f), 15f,
-                    room ? UIFactory.ButtonOn : UIFactory.ButtonBg);
+            BuildHireButton(i, card.transform, candidate);
+        }
 
-                hire.interactable = room;
-                StaffCandidate captured = candidate;
-                hire.onClick.AddListener(() => { _game.HireCandidate(captured); Refresh(); });
-            }
+        /// <summary>Hire button for a card, disabled when the shop is full.</summary>
+        private void BuildHireButton(int i, Transform card, StaffCandidate candidate)
+        {
+            bool room = _game.StaffCount < StaffRoster.MaxStaff;
+            var hire = UIFactory.Button($"Hire_{i}", card,
+                room ? "Hire" : "No room",
+                new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f), 15f,
+                room ? UIFactory.ButtonOn : UIFactory.ButtonBg);
+
+            hire.interactable = room;
+            hire.onClick.AddListener(() => { _game.HireCandidate(candidate); Refresh(); });
         }
 
         /// <summary>Who is on shift, with a button to let each of them go.</summary>
@@ -163,33 +196,40 @@ namespace PetShop.UI
             if (staff.Count == 0)
             {
                 var none = UIFactory.Label("NoStaff", _payrollRoot,
-                    "Nobody on the till — you will have to serve every customer yourself.",
+                    "Nobody on the payroll — you will have to serve every customer yourself.",
                     Vector2.zero, Vector2.one, 14f, UIFactory.Bad);
                 _spawned.Add(none.gameObject);
                 return;
             }
 
-            float rowHeight = 1f / Mathf.Max(3, staff.Count);
+            float rowHeight = 1f / Mathf.Max(StaffRoster.MaxStaff, staff.Count);
 
             for (int i = 0; i < staff.Count; i++)
             {
-                var member = staff[i];
-                if (member == null) continue;
-
-                float top    = 1f - i * rowHeight;
-                float bottom = top - rowHeight * 0.9f;
-
-                var row = UIFactory.Label($"Staff_{i}", _payrollRoot,
-                    $"{member.StaffName}   ·   € {member.DailyWage:N0} a day   ·   " +
-                    $"one customer every {member.ServiceSeconds:0.#} s",
-                    new Vector2(0f, bottom), new Vector2(0.78f, top), 14f, UIFactory.Ink);
-                _spawned.Add(row.gameObject);
-
-                var fire = UIFactory.Button($"Fire_{i}", _payrollRoot, "Let go",
-                    new Vector2(0.80f, bottom), new Vector2(1f, top), 13f);
-                fire.onClick.AddListener(() => { _game.FireAssistant(); Refresh(); });
-                _spawned.Add(fire.gameObject);
+                if (staff[i] == null) continue;
+                float top = 1f - i * rowHeight;
+                BuildPayrollRow(i, staff[i], top, top - rowHeight * 0.9f);
             }
+        }
+
+        /// <summary>One member of staff: terms, a button to change job, and one to let them go.</summary>
+        private void BuildPayrollRow(int i, Assistant member, float top, float bottom)
+        {
+            var row = UIFactory.Label($"Staff_{i}", _payrollRoot,
+                $"{member.StaffName}   ·   {RoleAndSkill(member.Role, member.Skill)}   ·   " +
+                $"€ {member.DailyWage:N0} a day   ·   one customer every {member.ServiceSeconds:0.#} s",
+                new Vector2(0f, bottom), new Vector2(0.62f, top), 13f, UIFactory.Ink);
+            _spawned.Add(row.gameObject);
+
+            var role = UIFactory.Button($"Role_{i}", _payrollRoot, $"Make {NextRole(member.Role)}",
+                new Vector2(0.63f, bottom), new Vector2(0.80f, top), 12f);
+            role.onClick.AddListener(() => { member.SetRole(NextRole(member.Role)); Refresh(); });
+            _spawned.Add(role.gameObject);
+
+            var fire = UIFactory.Button($"Fire_{i}", _payrollRoot, "Let go",
+                new Vector2(0.81f, bottom), new Vector2(1f, top), 13f);
+            fire.onClick.AddListener(() => { _game.FireAssistant(member); Refresh(); });
+            _spawned.Add(fire.gameObject);
         }
     }
 }

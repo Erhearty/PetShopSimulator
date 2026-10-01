@@ -415,6 +415,12 @@
                   "type": "PlacedItem[]"
                 },
                 {
+                  "flags": "-",
+                  "name": "StaffList",
+                  "notes": "Save v4+: one record per assistant - name, role, skill (int), wage (float), serviceSeconds (float). Empty in pre-v4 saves; SaveMigrator (v3→v4 step) normalises it. Staff int head count is kept alongside it.",
+                  "type": "StaffSaveData[]"
+                },
+                {
                   "flags": "",
                   "name": "SlotFile",
                   "notes": "petshop_save_{1..3}.json; one SaveData per slot",
