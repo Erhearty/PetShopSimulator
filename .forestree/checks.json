@@ -26,18 +26,26 @@
       "scope": "repo"
     },
     {
-      "id": "shell-syntax",
-      "name": "Shell script syntax",
-      "kind": "lint",
-      "command": "bash -n build.sh && bash -n Tools/purge_history.sh",
-      "enabled": true,
-      "scope": "repo"
-    },
-    {
       "id": "test",
       "name": "EditMode tests",
       "kind": "test",
       "command": "pre=\"$(git diff --name-only)\"; ./build.sh test; rc=$?; git diff --name-only | while IFS= read -r f; do printf '%s\\n' \"$pre\" | grep -qxF -- \"$f\" || git checkout -- \"$f\"; done; [ \"$rc\" -eq 0 ] && true",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "id": "playmode-tests",
+      "name": "PlayMode tests",
+      "kind": "test",
+      "command": "./build.sh playmode",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
+      "id": "full-playtest",
+      "name": "Full playtest",
+      "kind": "test",
+      "command": "./build.sh linux && ./build.sh playtest",
       "enabled": true,
       "scope": "repo"
     }

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "setup": [],
+  "run": [
+    {
+      "id": "play",
+      "name": "Play",
+      "command": "./build.sh run",
+      "enabled": true
+    }
+  ]
+}
