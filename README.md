@@ -11,8 +11,8 @@ startup; there are no sound files.
 > The Asset Store packs are licensed to the project owner's Unity account and are **not**
 > in this repository — they are gitignored and purged from history. The CC0 Kenney kits are kept
 > out too, to keep the repo small. A fresh clone runs on procedural geometry only;
-> `./build.sh assets` restores the packs once downloaded, and the Kenney kits are copied in by
-> hand. See [`THIRD-PARTY.md`](THIRD-PARTY.md).
+> `./build.sh assets` restores the packs once downloaded, and `build.sh` restores the Kenney kits
+> automatically. See [`THIRD-PARTY.md`](THIRD-PARTY.md).
 
 ![Unity 6000.6.2f1](https://img.shields.io/badge/Unity-6000.6.2f1-black) ![Built-in RP](https://img.shields.io/badge/pipeline-Built--in-blue)
 
@@ -23,20 +23,45 @@ startup; there are no sound files.
 ./build.sh run        # play it
 ./build.sh look       # render screenshots of the running game into Screenshots/
 ./build.sh test       # run the EditMode unit tests headless
+./build.sh playtest   # spawnverify + PlayMode tests + smoke + economy soak, one PASS/FAIL/SKIP line each
 ```
 
 Tests live in `Assets/Tests/EditMode` (assembly `PetShop.Tests.EditMode`) and results go to `Logs/build/editmode-results.xml`.
+
+### Automated playtest
+
+| Target | What it does |
+|--------|--------------|
+| `./build.sh playmode` | PlayMode tests (`Assets/Tests/PlayMode`, assembly `PetShop.Tests.PlayMode`). Tests tagged `[Category("KnownIssue")]` run separately afterwards and are reported as `⚠ known issue` without failing the run. |
+| `./build.sh spawnverify` | Spawns key pack models and checks their size and grounding. With no asset pack installed it reports SKIP; a partial install fails. |
+| `./build.sh soak` | Seeded headless run of the Linux player (`SEED`, default 1; `SOAK_DAYS`, default 15) that writes `Logs/build/soak.jsonl` and fails when any day leaves the soak bands. |
+| `./build.sh playtest` | All of the above plus `smoke`. Every stage runs even if an earlier one fails; exits 1 if any stage failed. Needs a Linux build (`./build.sh linux`). |
+| `./build.sh look-diff` | `look`, then compares `Screenshots/` against the approved `Tests/Baselines/Screenshots/` and prints each image's difference; diff images go to `Logs/screenshot-diff/`. Never fails. |
+| `./build.sh look-approve` | Copies the current `Screenshots/` over the baselines. |
+
+The soak band values in `Assets/Scripts/Dev/SoakBands.cs` are calibrated from the seed-1 15-day
+run of 2026-09-25 (an idle shop with no player input, measured with the Kenney kits absent).
 
 Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Play.
 
 A fresh clone needs one setup pass (`./build.sh setup`) before the first editor Play session,
 because TextMesh Pro's essential resources are not checked in.
 
-A fresh clone works without the Asset Store packs and the Kenney kits — neither is in the
-repository, and the game falls back to procedural geometry. To restore the full art, download
+Neither the Asset Store packs nor the Kenney kits are in the repository. The game itself still
+runs without them (it falls back to procedural geometry), but `build.sh` treats the Kenney kits as
+a prerequisite: every target that builds, runs or tests the game stops with exit 1 if they cannot
+be installed. To restore the full art, download
 the packs listed in [`THIRD-PARTY.md`](THIRD-PARTY.md) through Package Manager → My Assets, then
-run `./build.sh assets` (`./build.sh assets?` shows which are present). Copy the Kenney kits
-into `Assets/Resources/Kenney/<Kit>/` as `THIRD-PARTY.md` describes.
+run `./build.sh assets` (`./build.sh assets?` shows which are present). The Kenney kits are
+restored automatically: every `build.sh` target that needs the art first runs
+`Tools/fetch_kenney.sh` (or run it alone with `./build.sh kenney`), which copies each missing kit
+into `Assets/Resources/Kenney/<Kit>/` from another checkout — `KENNEY_SRC=/path/to/checkout`, else
+the main checkout when you are in a git worktree — else from a zip cached in
+`Library/kenney-cache/`, else downloads it from kenney.nl into that cache (so later runs work
+offline). If all three fail it lists each missing kit's URL and the target aborts;
+`THIRD-PARTY.md` describes copying them in by hand. `build.sh` looks for a Unity editor before any
+target runs, so on a machine without Unity run `bash Tools/fetch_kenney.sh .` directly instead of
+`./build.sh kenney`.
 
 ## Controls
 
@@ -163,6 +188,11 @@ imports them. `THIRD-PARTY.md` lists every pack, its folder and licence status.
 |------|--------|
 | `-daylength <seconds>` | Length of a trading day (default 210) |
 | `-screenshot <path>` | Capture PNGs of the running game, then quit |
+| `-seed <N>` | Seed gameplay randomness so a run is repeatable |
+| `-nopacks` | Ignore installed asset packs and use the fallbacks |
+| `-savepath <file>` | Use this save file instead of the default slot |
+| `-telemetry <file.jsonl>` | Append one JSON line per closed day, then a summary line |
+| `-quitafterdays <N>` | Quit after N days: exit code 0 when every soak band held, 3 otherwise |
 
 ## Licence
 

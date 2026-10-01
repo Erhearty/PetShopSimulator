@@ -25,6 +25,8 @@ namespace PetShop.Core
 
         public void NewGame()
         {
+            _game.Show.Withdraw();
+            SaveReorder.ResetToDefaults(_game.AutoReorder);
             foreach (var p in _game.Generator.StarterLayout(_game.Grid))
             {
                 var def = BuildCatalog.Get(p.CatalogId);
@@ -47,7 +49,9 @@ namespace PetShop.Core
             inherited.SignOnFee = 0f;
             inherited.Role      = StaffRole.Cashier;
             _game.HireCandidate(inherited);
-            _game.Notify("Welcome to your pet shop! B to build, E to interact, Enter to close up.");
+            _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
+                         $"{InputBindings.Label(GameAction.Interact)} to interact, " +
+                         $"{InputBindings.Label(GameAction.EndDay)} to close up.");
         }
 
         /// <summary>Stocks a fresh shelf for free — the starter inventory.</summary>
@@ -65,12 +69,13 @@ namespace PetShop.Core
         /// <summary>
         /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
         /// </summary>
+        /// <param name="quiet">True for an automatic save: the success toast reads "Autosaved.".</param>
         /// <returns>True when the save was written; false when it failed.</returns>
-        public bool SaveGame()
+        public bool SaveGame(bool quiet = false)
         {
             if (SaveSystem.Save(BuildSaveData()))
             {
-                _game.Notify("Game saved.");
+                _game.Notify(quiet ? "Autosaved." : "Game saved.");
                 return true;
             }
             _game.Notify("Save FAILED — progress not written. Check disk space/permissions.");
@@ -89,7 +94,9 @@ namespace PetShop.Core
                 Staff           = _game.StaffCount,
                 StaffList       = _game.StaffToSave(),
                 PriceMultiplier = shop.PriceMultiplier,
+                ProgressionTier = _game.Progression?.Tier ?? 0,
             };
+            _game.Events?.Capture(data);
 
             foreach (var kvp in shop.Stock)
                 data.Stock.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
@@ -105,6 +112,9 @@ namespace PetShop.Core
                 if (entry.Data != null)
                     data.PlacedObjects.Add(BuildPlacedItem(entry));
 
+            SaveLineage.Capture(data);
+            SaveReorder.Capture(data, _game.AutoReorder);
+            data.ShowEntryPetId = _game.Show.EntryPetId;
             return data;
         }
 
@@ -144,6 +154,15 @@ namespace PetShop.Core
             }
         }
 
+        /// <summary>Re-enters the saved show pet if it was loaded; otherwise clears the entry.</summary>
+        private void RestoreShowEntry(string petId, System.Collections.Generic.List<Pet> pets)
+        {
+            _game.Show.Withdraw();
+            if (string.IsNullOrEmpty(petId)) return;
+            var pet = pets.Find(p => p.id == petId);
+            if (pet != null) _game.Show.Restore(pet);
+        }
+
         public void LoadGame(SaveData data)
         {
             var shop = _game.Shop;
@@ -158,12 +177,23 @@ namespace PetShop.Core
                 if (System.Enum.TryParse(entry.id, out ProductCategory category))
                     shop.AddToWarehouse(category, entry.qty);
 
+            var loadedPets = new System.Collections.Generic.List<Pet>();
+
+            // Unlocked lot stages must be buildable before saved furniture is placed on them.
+            _game.Progression?.Restore(data.ProgressionTier);
+            _game.Events?.Restore(data);
+
             foreach (var item in data.PlacedObjects)
             {
                 var def = BuildCatalog.Get(item.catalogId);
                 if (def == null) continue;
 
-                var go = _game.Build.Place(new Vector2Int(item.cellX, item.cellY), def,
+                // Saves from before lot stages could build anywhere in the yard; keep the
+                // ground under each saved piece so it is not silently dropped on load.
+                var cell = new Vector2Int(item.cellX, item.cellY);
+                _game.Build.GridManager.EnsureFloor(cell, def.Size);
+
+                var go = _game.Build.Place(cell, def,
                                            item.variant, item.rotation, charge: false);
                 if (go == null) continue;
 
@@ -178,8 +208,15 @@ namespace PetShop.Core
                 var pen = go.GetComponent<PetPen>();
                 if (pen != null)
                     foreach (var petData in item.pets)
-                        pen.AddPet(SaveSystem.SaveDataToPet(petData));
+                    {
+                        var pet = SaveSystem.SaveDataToPet(petData);
+                        loadedPets.Add(pet);
+                        pen.AddPet(pet);
+                    }
             }
+            SaveLineage.Apply(data, loadedPets, data.Day);
+            SaveReorder.Apply(data, _game.AutoReorder);
+            RestoreShowEntry(data.ShowEntryPetId, loadedPets);
 
             _game.RestoreStaff(data);
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);

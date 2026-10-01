@@ -2,6 +2,8 @@ using UnityEngine;
 using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Customer;
+using PetShop.Progression;
+using PetShop.Events;
 using PetShop.UI;
 
 namespace PetShop.Core
@@ -38,10 +40,16 @@ namespace PetShop.Core
 
         private GameUI _ui;
 
+        /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
+        private const int MaxPackFallbacksReported = 10;
+
         private void Awake()
         {
+            PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
             BuildSystems();
             BuildWorld();
+            string packFallbacks = ModelLibrary.PackFallbackReport(MaxPackFallbacksReported);
+            if (packFallbacks != null) Debug.LogWarning(packFallbacks);
             BuildUI();
             WireEverything();
         }
@@ -50,6 +58,7 @@ namespace PetShop.Core
         {
             bool touring  = Dev.CameraTour.TryCreate(out _);
             bool headless = touring || Dev.ScreenshotCapture.TryCreate(out _) || Application.isBatchMode;
+            SaveSystem.MigrateLegacy();
 
             if (headless)
             {
@@ -60,12 +69,13 @@ namespace PetShop.Core
             else
             {
                 _game.SetModalOpen(true);
-                _ui.Title.Build(_ui.CanvasRoot, SaveSystem.HasSave(), continueSave =>
+                _ui.Title.Build(_ui.CanvasRoot, (slot, continueSave) =>
                 {
+                    SaveSystem.ActiveSlot = slot;
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin();
-                });
+                }, () => _ui.Settings.Show());
             }
 
             Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, 1-4 build, Tab ledger, Enter to close the day.");
@@ -81,7 +91,7 @@ namespace PetShop.Core
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                     ToggleBuild(ids[i]);
 
-            if (Input.GetKeyDown(KeyCode.B))
+            if (InputBindings.GetKeyDown(GameAction.BuildMode))
                 ToggleBuild(_build.CurrentItem != null ? _build.CurrentItem.Id : BuildCatalog.ShelfSmall);
         }
 
@@ -131,6 +141,7 @@ namespace PetShop.Core
             _game.Spawner = _spawner;
             _game.Audio   = _audio;
             _game.Queue   = _queue;
+            gmGO.AddComponent<AutoReorderRunner>().Attach(_game);
 
             _generator = gameObject.AddComponent<ShopGenerator>();
             _generator.RoomWidth  = RoomWidth;
@@ -191,8 +202,32 @@ namespace PetShop.Core
 
         // ── Wiring ──────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Adds the progression director to the game object and hands it the generator and
+        /// build mode, so tiers can open lot stages and pen species.
+        /// </summary>
+        private void WireProgression()
+        {
+            var progression = _game.gameObject.AddComponent<ProgressionDirector>();
+            progression.Init(_game, _generator, _build);
+            _game.Progression = progression;
+        }
+
+        /// <summary>
+        /// Adds the seasonal event director and hands it the shop and spawner it tunes.
+        /// </summary>
+        private void WireEvents()
+        {
+            var events = _game.gameObject.AddComponent<ShopEventDirector>();
+            events.Init(_game, _shop, _spawner);
+            _game.Events = events;
+        }
+
         private void WireEverything()
         {
+            WireProgression();
+            WireEvents();
+
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);
 
@@ -220,6 +255,18 @@ namespace PetShop.Core
                 var interaction = player.GetComponent<Player.InteractionSystem>();
                 if (interaction != null) interaction.PromptText = _ui.HUD.PromptLabel;
             }
+
+            AttachTelemetry();
+        }
+
+        /// <summary>Adds the soak-run recorder, but only when -telemetry or -quitafterdays asked for it.</summary>
+        private void AttachTelemetry()
+        {
+            string path = PlaytestOptions.TelemetryPath;
+            int?   days = PlaytestOptions.QuitAfterDays;
+            if (string.IsNullOrEmpty(path) && !days.HasValue) return;
+
+            gameObject.AddComponent<Dev.DayTelemetry>().Init(_game, _shop, path, days);
         }
     }
 }

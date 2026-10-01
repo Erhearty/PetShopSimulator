@@ -3,6 +3,13 @@ using UnityEngine;
 
 namespace PetShop.Pets
 {
+    /// <summary>Probability tables for one pairing: coat name → chance, rarity → chance.</summary>
+    public class PairingOdds
+    {
+        public readonly Dictionary<string, float> Coats = new Dictionary<string, float>();
+        public readonly Dictionary<Pet.Rarity, float> Rarities = new Dictionary<Pet.Rarity, float>();
+    }
+
     /// <summary>
     /// Static utility for breeding two adult same-species pets.
     /// Trait inheritance uses blended lerp + mutation, with a small
@@ -13,12 +20,14 @@ namespace PetShop.Pets
         private const float MutationChance       = 0.10f;
         private const float MutationStrength     = 0.15f;
         internal const float RarityUpgradeChance = 0.05f;
+        internal const float MatchedTierUpgradeChance = 0.12f;
+        private const int   CoatSamples          = 21;
         private const float BreedChancePerNight  = 0.45f;
 
         // ── Public API ───────────────────────────────────────────────
 
         /// <summary>Breed two pets. Returns null if prerequisites fail.</summary>
-        public static Pet Breed(Pet a, Pet b)
+        public static Pet Breed(Pet a, Pet b, int day = 0)
         {
             if (!a.CanBreed || !b.CanBreed)
             {
@@ -46,14 +55,20 @@ namespace PetShop.Pets
             offspring.rarity       = InheritRarity(a.rarity, b.rarity);
             offspring.petName      = RandomName();
             offspring.name         = $"{offspring.species}_{offspring.petName}";
+            offspring.id           = NewId();
+            offspring.parentAId    = a.id;
+            offspring.parentBId    = b.id;
+            offspring.generation   = Mathf.Max(a.generation, b.generation) + 1;
+            LineageRegistry.Register(offspring, day);
             return offspring;
         }
 
         /// <summary>
         /// End-of-day tick for every pen: age each resident, then let any pen with two
         /// adults and free space produce one baby. Returns the babies born tonight.
+        /// <paramref name="careDrainMultiplier"/> scales each pen's feed and bedding drain.
         /// </summary>
-        public static List<Pet> AdvanceDay(IEnumerable<PetPen> pens)
+        public static List<Pet> AdvanceDay(IEnumerable<PetPen> pens, float careDrainMultiplier = 1f)
         {
             var born = new List<Pet>();
             if (pens == null) return born;
@@ -61,7 +76,7 @@ namespace PetShop.Pets
             foreach (var pen in pens)
             {
                 if (pen == null) continue;
-                pen.AdvanceDay();
+                pen.AdvanceDay(careDrainMultiplier);
 
                 if (!pen.HasSpace || pen.AdultCount < 2) continue;
 
@@ -100,7 +115,8 @@ namespace PetShop.Pets
 
             var rarity = (Pet.Rarity)Mathf.Min((int)a.rarity, (int)b.rarity);
             return $"Expected: a baby {a.species}, {rarity} or better " +
-                   $"({RarityUpgradeChance * 100f:0}% chance of a step up)\n" +
+                   $"({UpgradeChance(a.rarity, b.rarity) * 100f:0}% chance of a step up; " +
+                   $"{MatchedTierUpgradeChance * 100f:0}% when both share a tier)\n" +
                    $"temperament {(a.temperament + b.temperament) * 0.5f:0.00}   ·   " +
                    $"energy {(a.energyLevel + b.energyLevel) * 0.5f:0.00}   ·   " +
                    $"friendliness {(a.friendliness + b.friendliness) * 0.5f:0.00}\n" +
@@ -112,7 +128,7 @@ namespace PetShop.Pets
             a != null && b != null && a != b && a.species == b.species && a.CanBreed && b.CanBreed;
 
         /// <summary>Generate a random adult pet for starter stock.</summary>
-        public static Pet GenerateRandom(Pet.Species species)
+        public static Pet GenerateRandom(Pet.Species species, int day = 0)
         {
             var p = ScriptableObject.CreateInstance<Pet>();
             p.species      = species;
@@ -126,7 +142,33 @@ namespace PetShop.Pets
             p.basePrice    = Pet.SpeciesBasePrice(species);
             p.petName      = RandomName();
             p.name         = $"{species}_{p.petName}";
+            p.id           = NewId();
+            p.generation   = 0;
+            LineageRegistry.Register(p, day);
             return p;
+        }
+
+        /// <summary>A fresh unique pet id.</summary>
+        public static string NewId() => System.Guid.NewGuid().ToString("N");
+
+        /// <summary>
+        /// Exact rarity odds and sampled coat odds (Color.Lerp at evenly spaced t, mutation ignored).
+        /// </summary>
+        public static PairingOdds EstimateOdds(Pet a, Pet b)
+        {
+            var odds = new PairingOdds();
+            for (int i = 0; i < CoatSamples; i++)
+            {
+                string name = CoatColours.Classify(Color.Lerp(a.coat, b.coat, i / (float)(CoatSamples - 1)));
+                odds.Coats.TryGetValue(name, out float p);
+                odds.Coats[name] = p + 1f / CoatSamples;
+            }
+
+            int baseTier = Mathf.Min((int)a.rarity, (int)b.rarity);
+            float up = baseTier < (int)Pet.Rarity.Legendary ? UpgradeChance(a.rarity, b.rarity) : 0f;
+            odds.Rarities[(Pet.Rarity)baseTier] = 1f - up;
+            if (up > 0f) odds.Rarities[(Pet.Rarity)(baseTier + 1)] = up;
+            return odds;
         }
 
         private static readonly string[] Names =
@@ -219,14 +261,18 @@ namespace PetShop.Pets
         private static Pet.Rarity InheritRarity(Pet.Rarity a, Pet.Rarity b) =>
             InheritRarity(a, b, Random.value);
 
+        /// <summary>Step-up chance: higher when both parents share a tier.</summary>
+        internal static float UpgradeChance(Pet.Rarity a, Pet.Rarity b) =>
+            a == b ? MatchedTierUpgradeChance : RarityUpgradeChance;
+
         /// <summary>
         /// Pure rarity inheritance: the lower parent tier, stepped up one tier when
-        /// <paramref name="upgradeRoll"/> is below RarityUpgradeChance (never past Legendary).
+        /// <paramref name="upgradeRoll"/> is below UpgradeChance (never past Legendary).
         /// </summary>
         internal static Pet.Rarity InheritRarity(Pet.Rarity a, Pet.Rarity b, float upgradeRoll)
         {
             int baseTier = Mathf.Min((int)a, (int)b);
-            if (upgradeRoll < RarityUpgradeChance && baseTier < (int)Pet.Rarity.Legendary)
+            if (upgradeRoll < UpgradeChance(a, b) && baseTier < (int)Pet.Rarity.Legendary)
                 baseTier++;
             return (Pet.Rarity)baseTier;
         }

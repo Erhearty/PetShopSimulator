@@ -59,6 +59,12 @@ namespace PetShop.Customer
         /// <summary>Customers currently in the world.</summary>
         public int LiveCustomers { get; private set; }
 
+        /// <summary>Event-driven multiplier on the spawn interval. Below 1 means busier; 1 = normal.</summary>
+        public float IntervalMultiplier { get; set; } = 1f;
+
+        /// <summary>Event-driven multiplier on today's customer target, applied at StartDay. 1 = normal.</summary>
+        public float TargetMultiplier { get; set; } = 1f;
+
         private bool  _dayActive;
         private float _timer;
         private float _censusTimer;
@@ -70,7 +76,7 @@ namespace PetShop.Customer
             _dayActive   = true;
             _timer       = BaseIntervalSeconds - FirstCustomerDelay;
             TargetToday  = ShopManager == null ? MinCustomersPerDay : Mathf.RoundToInt(
-                Mathf.Lerp(MinCustomersPerDay, MaxCustomersPerDay, ShopManager.Reputation / 100f));
+                Mathf.Lerp(MinCustomersPerDay, MaxCustomersPerDay, ShopManager.Reputation / 100f) * TargetMultiplier);
         }
 
         /// <summary>Stop letting new customers in, but let those inside finish shopping.</summary>
@@ -93,7 +99,7 @@ namespace PetShop.Customer
             if (LiveCustomers >= MaxConcurrent) return;
 
             float interval = Mathf.Max(MinIntervalSeconds,
-                                       BaseIntervalSeconds * (1f - ShopManager.Reputation / 160f));
+                                       BaseIntervalSeconds * (1f - ShopManager.Reputation / 160f) * IntervalMultiplier);
 
             _timer += Time.deltaTime;
             if (_timer < interval) return;

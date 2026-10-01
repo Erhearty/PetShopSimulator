@@ -84,9 +84,11 @@ namespace PetShop.Shop
                     Vector3 at = Vector3.Lerp(from, to, i / (float)posts);
                     if (!float.IsNaN(gapAt) && Mathf.Abs(at.x - gapAt) < gapWidth * 0.5f) continue;
 
-                    var post = MeshBuilder.CreateBox(0.12f, 1.1f, 0.12f, wood, "PaddockPost");
+                    const float postHeight = 1.1f;
+                    var post = MeshBuilder.CreateBox(0.12f, postHeight, 0.12f, wood, "PaddockPost");
                     post.transform.SetParent(parent, false);
-                    post.transform.position = at;
+                    // Setting position drops CreateBox's base lift; stand the post on the ground.
+                    post.transform.position = at + Vector3.up * (postHeight * 0.5f);
                 }
                 foreach (float y in new[] { 0.55f, 0.95f })
                 {
@@ -130,7 +132,8 @@ namespace PetShop.Shop
             {
                 var leg = MeshBuilder.CreateBox(0.18f, height, 0.18f, post, "PergolaPost");
                 leg.transform.SetParent(parent, false);
-                leg.transform.position = new Vector3(x, 0f, z);
+                // Setting position drops CreateBox's base lift; centre the leg so it runs ground to beam.
+                leg.transform.position = new Vector3(x, height * 0.5f, z);
             }
 
             // Beams along X over each row of posts

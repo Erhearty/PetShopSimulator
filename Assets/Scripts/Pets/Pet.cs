@@ -20,6 +20,12 @@ namespace PetShop.Pets
         public GrowthStage  growthStage  = GrowthStage.Baby;
         public Rarity       rarity       = Rarity.Common;
 
+        [Header("Lineage")]
+        public string id;
+        public string parentAId;
+        public string parentBId;
+        public int    generation = 0;
+
         [Header("Age")]
         public int ageDays      = 0;
         public int daysToMature = 7;
@@ -37,6 +43,7 @@ namespace PetShop.Pets
 
         [Header("Commerce")]
         public float basePrice = 50f;
+        public int   ribbons   = 0;   // pet show first-place ribbons; each adds to SellPrice
 
         // ── Queries ──────────────────────────────────────────────────
 
@@ -59,6 +66,8 @@ namespace PetShop.Pets
             m *= Mathf.Lerp(0.35f, 1.1f, health);
             m *= Mathf.Lerp(0.75f, 1.05f, happiness);
 
+            m *= 1f + PetShow.RibbonBonus * Mathf.Min(ribbons, PetShow.MaxRibbons);
+
             return Mathf.Round(basePrice * m * 100f) / 100f;
         }
 
@@ -68,6 +77,9 @@ namespace PetShop.Pets
           : health > 0.6f                      ? "well"
           : health > 0.35f                     ? "poorly"
           :                                      "suffering";
+
+        /// <summary>Human-readable name of the coat colour.</summary>
+        public string CoatName => CoatColours.Classify(coat);
 
         public bool NeedsAttention => hunger > 0.55f || health < 0.6f;
 

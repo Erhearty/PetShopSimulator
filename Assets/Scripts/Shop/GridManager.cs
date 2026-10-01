@@ -107,6 +107,20 @@ namespace PetShop.Shop
             OnFloorChanged.Invoke(cell, value);
         }
 
+        /// <summary>
+        /// Makes every cell of the footprint at <paramref name="cell"/> buildable floor.
+        /// Used on load so pieces saved before lot stages existed keep their ground.
+        /// </summary>
+        public void EnsureFloor(Vector2Int cell, Vector2Int size)
+        {
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            {
+                var check = cell + new Vector2Int(x, y);
+                if (!_floorCells.Contains(check)) SetFloor(check, true);
+            }
+        }
+
         public void FillFloorRect(Vector2Int origin, Vector2Int size)
         {
             for (int x = 0; x < size.x; x++)

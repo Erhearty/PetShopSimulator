@@ -6,6 +6,8 @@ using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Customer;
+using PetShop.Progression;
+using PetShop.Events;
 
 namespace PetShop.Core
 {
@@ -28,6 +30,8 @@ namespace PetShop.Core
         [HideInInspector] public AudioManager    Audio;
         [HideInInspector] public ShopGenerator   Generator;
         [HideInInspector] public CheckoutQueue    Queue;
+        [HideInInspector] public ProgressionDirector Progression;
+        [HideInInspector] public ShopEventDirector   Events;
 
         // ── Events for UI ─────────────────────────────────────────────────────
         public UnityEvent<DaySummary> OnDayEnded     = new();
@@ -41,6 +45,12 @@ namespace PetShop.Core
         public float DayLengthSeconds = 210f;
 
         public ItemDatabase Catalog { get; private set; }
+
+        /// <summary>The weekly pet show: current entry and last result.</summary>
+        public PetShow Show { get; } = new PetShow();
+
+        /// <summary>Per-category automatic supplier reorder rules.</summary>
+        public AutoReorder AutoReorder { get; } = new AutoReorder();
 
         /// <summary>0 at opening time, 1 at closing time.</summary>
         public float DayProgress => DayLengthSeconds <= 0f ? 0f
@@ -112,6 +122,7 @@ namespace PetShop.Core
         {
             Shop?.OnDeliveryArrived.AddListener(_floor.OnDeliveryArrived);
 
+            LineageRegistry.Reset(); // statics survive scene reloads
             var save = SaveSystem.Load();
             if (save != null) _saveLoad.LoadGame(save);
             else              _saveLoad.NewGame();
@@ -124,10 +135,10 @@ namespace PetShop.Core
         {
             if (IsGameOver || IsModalOpen) return;
 
-            if (Input.GetKeyDown(KeyCode.F5)) SaveGame();
+            if (InputBindings.GetKeyDown(GameAction.QuickSave)) SaveGame();
 
             if (!IsBuildModeActive &&
-                (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
+                (InputBindings.GetKeyDown(GameAction.EndDay) || Input.GetKeyDown(KeyCode.KeypadEnter)))
             {
                 EndDay();
                 return;
@@ -234,6 +245,7 @@ namespace PetShop.Core
             // A fresh set of applicants each morning gives the staff board a reason to be
             // checked more than once.
             RefreshCandidates();
+            Events?.BeginDay(Shop.Day);
             Spawner?.StartDay();
             OnDayStarted.Invoke(Shop.Day);
             Notify($"Day {Shop.Day} — open. Tonight: rent €{Shop.DailyRent:N0}" +
@@ -256,11 +268,14 @@ namespace PetShop.Core
             Spawner?.EndDay();
             yield return new WaitForSeconds(0.6f);
 
-            var born = BreedingSystem.AdvanceDay(_pens);
+            var born = BreedingSystem.AdvanceDay(_pens, Events?.CareDrainMultiplier ?? 1f);
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
-            DaySummary summary = Shop.CloseDay();
+            ShowJudging.Run(this);
+
+            DaySummary summary = CloseDayWithProgression();
+            Events?.EndDay(summary);
             SaveGame();
 
             Audio?.PlaySfx("day_end");
@@ -285,6 +300,30 @@ namespace PetShop.Core
                 yield return new WaitForSeconds(0.5f);
                 StartNewDay();
             }
+        }
+
+        /// <summary>
+        /// Closes the day's books, running any due inspection first, then adds the inspection
+        /// result and any tier-ups to the summary's headlines.
+        /// </summary>
+        private DaySummary CloseDayWithProgression()
+        {
+            // The inspector grades the day being closed, so the result lands in its books.
+            var inspection = Progression?.RunInspectionIfDue(Shop.Day);
+            DaySummary summary = Shop.CloseDay();
+            CollectProgressionHeadlines(summary, inspection);
+            return summary;
+        }
+
+        /// <summary>Adds the inspection result and any tier-ups to the day's summary.</summary>
+        private void CollectProgressionHeadlines(DaySummary summary, List<string> inspection)
+        {
+            if (inspection != null)
+                foreach (var line in inspection) { summary.Headlines.Add(line); Notify(line); }
+            if (Progression == null) return;
+            // The director notifies milestones itself; only the summary needs them here.
+            Progression.CheckMilestones();
+            summary.Headlines.AddRange(Progression.LatestMilestones);
         }
 
         // ── Staff (delegated to StaffRoster) ─────────────────────────────────
@@ -342,6 +381,7 @@ namespace PetShop.Core
         {
             if (IsGameOver) return;
             StartDay();
+            if (GameSettings.AutosaveEachMorning && !IsGameOver) SaveGame(quiet: true);
         }
 
         public void RestartGame()
@@ -356,8 +396,9 @@ namespace PetShop.Core
         /// <summary>
         /// Snapshots the shop and writes it to the save slot, notifying the player of the outcome.
         /// </summary>
+        /// <param name="quiet">True for an automatic save: the success toast reads "Autosaved.".</param>
         /// <returns>True when the save was written; false when it failed.</returns>
-        public bool SaveGame() => _saveLoad.SaveGame();
+        public bool SaveGame(bool quiet = false) => _saveLoad.SaveGame(quiet);
 
         // ── Utility ───────────────────────────────────────────────────────────
 

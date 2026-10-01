@@ -22,7 +22,13 @@ namespace PetShop.UI
         public StatsPanel      Stats     { get; private set; }
         public BreedingPanel   Breeding  { get; private set; }
         public StaffPanel      StaffBoard{ get; private set; }
+        public FamilyTreePanel FamilyTree{ get; private set; }
         public TitleScreen     Title     { get; private set; }
+        public ShowcasePanel   Showcase  { get; private set; }
+        public ReorderPanel    Reorder   { get; private set; }
+
+        /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
+        public SettingsPanel   Settings  { get; private set; }
 
         /// <summary>The canvas every panel lives under. Panels must parent here, not to GameUI:
         /// a plain Transform in the middle of a UI hierarchy breaks RectTransform anchoring.</summary>
@@ -37,8 +43,12 @@ namespace PetShop.UI
             (Results  != null && Results.IsOpen)  ||
             (Pause    != null && Pause.IsOpen)    ||
             (Stats    != null && Stats.IsOpen)    ||
+            (FamilyTree != null && FamilyTree.IsOpen) ||
+            (Showcase != null && Showcase.IsOpen) ||
             (Breeding != null && Breeding.IsOpen) ||
             (StaffBoard != null && StaffBoard.IsOpen) ||
+            (Reorder != null && Reorder.IsOpen) ||
+            (Settings != null && Settings.IsOpen) ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -79,17 +89,25 @@ namespace PetShop.UI
             Stats    = canvasGO.AddComponent<StatsPanel>();
             Breeding   = canvasGO.AddComponent<BreedingPanel>();
             StaffBoard = canvasGO.AddComponent<StaffPanel>();
+            FamilyTree = canvasGO.AddComponent<FamilyTreePanel>();
+            Showcase   = canvasGO.AddComponent<ShowcasePanel>();
+            Reorder    = canvasGO.AddComponent<ReorderPanel>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
+            Settings = canvasGO.AddComponent<SettingsPanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
             Info.Build(canvasGO.transform);
             Results.Build(canvasGO.transform, game);
             GameOver.Build(canvasGO.transform, game);
-            Stats.Build(canvasGO.transform, game);
-            Breeding.Build(canvasGO.transform, game);
+            Stats.Build(canvasGO.transform, game, Reorder);
+            Reorder.Build(canvasGO.transform, game);
+            Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
+            FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
+            Showcase.Build(canvasGO.transform, game);
             StaffBoard.Build(canvasGO.transform, game);
-            Pause.Build(canvasGO.transform, game, audio);
+            Settings.Build(canvasGO.transform, game);
+            Pause.Build(canvasGO.transform, game, audio, Settings);
 
             return canvas;
         }
@@ -100,7 +118,8 @@ namespace PetShop.UI
 
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
-            if (Input.GetKeyDown(KeyCode.Tab) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen)
+            if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
+                && !Reorder.IsOpen)
                 Stats.Toggle();
         }
 
@@ -110,8 +129,13 @@ namespace PetShop.UI
         /// </summary>
         private void HandleEscape()
         {
+            if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
+            if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
+            if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
             if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
+            if (Showcase != null && Showcase.IsOpen) { Showcase.Hide();        return; }
+            if (FamilyTree != null && FamilyTree.IsOpen) { FamilyTree.Hide();  return; }
             if (Breeding != null && Breeding.IsOpen) { Breeding.Hide();        return; }
             if (StaffBoard != null && StaffBoard.IsOpen) { StaffBoard.Hide();   return; }
             if (Stats != null && Stats.IsOpen)     { Stats.Hide();           return; }

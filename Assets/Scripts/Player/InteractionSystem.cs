@@ -22,6 +22,9 @@ namespace PetShop.Player
 
         private GameManager _game;
 
+        /// <summary>The interact key's label, as shown in prompts ("E" by default).</summary>
+        private static string Key => InputBindings.Label(GameAction.Interact);
+
         private void Start()
         {
             _game = GameManager.Instance;
@@ -82,27 +85,27 @@ namespace PetShop.Player
                 string source = ready > 0 ? $"  ·  {ready} in the stockroom" : "  ·  stockroom empty, cash-and-carry prices";
 
                 return shelf.IsEmpty
-                    ? $"[E]  Restock shelf{source}"
-                    : $"[E]  Restock {shelf.Category} shelf  ({shelf.TotalUnits} units left){source}";
+                    ? $"[{Key}]  Restock shelf{source}"
+                    : $"[{Key}]  Restock {shelf.Category} shelf  ({shelf.TotalUnits} units left){source}";
             }
 
             var pen = col.GetComponentInParent<PetPen>();
             if (pen != null)
             {
                 if (pen.NeedsService)
-                    return $"[E]  Feed & clean the {pen.PenSpecies} pen  (€{pen.ServiceCost:N0})";
+                    return $"[{Key}]  Feed & clean the {pen.PenSpecies} pen  (€{pen.ServiceCost:N0})";
                 return pen.HasSpace
-                    ? $"[E]  Buy a {pen.PenSpecies}  (€{Pet.WholesalePrice(pen.PenSpecies):N0})   ·  {pen.Count}/{pen.Capacity} in the pen"
-                    : $"[E]  {pen.PenSpecies} pen — full ({pen.Count}/{pen.Capacity})";
+                    ? $"[{Key}]  Buy a {pen.PenSpecies}  (€{Pet.WholesalePrice(pen.PenSpecies):N0})   ·  {pen.Count}/{pen.Capacity} in the pen"
+                    : $"[{Key}]  {pen.PenSpecies} pen — full ({pen.Count}/{pen.Capacity})";
             }
 
             if (col.GetComponentInParent<CounterInteractable>() != null)
             {
                 var queue = _game != null ? _game.Queue : null;
                 if (queue != null && queue.AnyWaiting)
-                    return $"[E]  Serve {queue.Front.ShopperName}  —  {queue.Front.BasketCount} item(s), " +
+                    return $"[{Key}]  Serve {queue.Front.ShopperName}  —  {queue.Front.BasketCount} item(s), " +
                            $"€{queue.Front.BasketValue:N2}   ({queue.Length} waiting)";
-                return "[E]  Check the books";
+                return $"[{Key}]  Check the books";
             }
 
             return null;

@@ -208,9 +208,11 @@ namespace PetShop.Shop
                 _ctx.Attach(course, new Vector3(c.x + side * hw, top, c.z));
                 Object.Destroy(course.GetComponent<Collider>());
 
-                var pipe = MeshBuilder.CreateCylinder(0.08f, top + storeys * storeyH,
+                // Runs from the ground up to the gutter; centred once positioned, so sit it at mid-height.
+                float pipeHeight = top + storeys * storeyH;
+                var pipe = MeshBuilder.CreateCylinder(0.08f, pipeHeight,
                     MaterialFactory.Get("downpipe", new Color(0.36f, 0.37f, 0.38f), 0.2f, 0.3f), "Downpipe");
-                pipe.transform.position = new Vector3(c.x + side * (hw + 0.2f), 0f, c.z + _ctx.RoomDepth * 0.45f);
+                pipe.transform.position = new Vector3(c.x + side * (hw + 0.2f), pipeHeight * 0.5f, c.z + _ctx.RoomDepth * 0.45f);
                 pipe.transform.SetParent(_ctx.ShopRoot, true);
                 Object.Destroy(pipe.GetComponent<Collider>());
             }

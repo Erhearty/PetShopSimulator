@@ -48,7 +48,8 @@ namespace PetShop.Core
             spot += new Vector3(UnityEngine.Random.Range(-2.4f, 2.4f), 0f, UnityEngine.Random.Range(-1f, 1.4f));
 
             DeliveryCrate.Spawn(spot, order.Category, order.Units);
-            _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. Press E to collect.");
+            _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. " +
+                         $"Press {InputBindings.Label(GameAction.Interact)} to collect.");
             _game.Audio?.PlaySfx("restock");
         }
 
