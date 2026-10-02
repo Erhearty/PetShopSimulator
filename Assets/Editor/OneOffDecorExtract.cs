@@ -125,8 +125,7 @@ public static class OneOffDecorExtract
         var parent = FindPath(SceneManager.GetActiveScene(), parentPath)
                      ?? throw new InvalidOperationException($"{id}: missing {parentPath}");
         var sources = ResolveParts(parent, parts, id);
-        GameObject copy = sources.Count == 1 ? CopySingle(sources[0]) : CopyGroup(id, sources);
-        copy.name = id;
+        GameObject copy = PivotAtBottomCentre(id, sources.Count == 1 ? CopySingle(sources[0]) : CopyGroup(id, sources));
         MeshBuilder.SetLayerRecursive(copy, FurnitureFactory.DecorationLayer);
         AssertAssetReferences(copy, id);
 
@@ -176,6 +175,23 @@ public static class OneOffDecorExtract
             part.transform.SetParent(root.transform, true);
         }
         root.transform.position = Vector3.zero;
+        return root;
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="copy"/> (already at the origin) in a new root whose pivot is the
+    /// bottom-centre of its renderer bounds, so FurnitureFactory.Spawn puts it on the floor in
+    /// the middle of its footprint whatever the source's own mesh offset was.
+    /// </summary>
+    private static GameObject PivotAtBottomCentre(string id, GameObject copy)
+    {
+        var renderers = copy.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) throw new InvalidOperationException($"{id}: no renderers");
+        Bounds b = renderers[0].bounds;
+        foreach (var r in renderers) b.Encapsulate(r.bounds);
+        var root = new GameObject(id);
+        copy.transform.SetParent(root.transform, true);
+        copy.transform.position -= new Vector3(b.center.x, b.min.y, b.center.z);
         return root;
     }
 

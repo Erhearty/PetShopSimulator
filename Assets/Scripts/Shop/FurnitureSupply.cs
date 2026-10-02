@@ -151,20 +151,29 @@ namespace PetShop.Shop
 
         /// <summary>
         /// Replaces the inventory and pending orders with those in <paramref name="data"/>, skipping
-        /// unknown catalogue ids. Raises no arrival events; call <see cref="RespawnArrived"/> after.
+        /// unknown catalogue ids (each skipped entry is logged as a warning, since its cost was
+        /// already paid). Raises no arrival events; call <see cref="RespawnArrived"/> after.
         /// </summary>
         public void Restore(SaveData data)
         {
             _owned.Clear();
             _pending.Clear();
             foreach (var e in data.FurnitureInventory ?? new List<SaveData.StockEntry>())
-                if (e != null && BuildCatalog.Get(e.id) != null && e.qty > 0) _owned[e.id] = OwnedCount(e.id) + e.qty;
+                if (e != null && IsKnown(e.id) && e.qty > 0) _owned[e.id] = OwnedCount(e.id) + e.qty;
 
             foreach (var o in data.PendingFurnitureOrders ?? new List<SaveData.FurnitureOrderSave>())
-                if (o != null && BuildCatalog.Get(o.catalogId) != null)
+                if (o != null && IsKnown(o.catalogId))
                     _pending.Add(new FurnitureOrder
                         { CatalogId = o.catalogId, ArrivalProgress = o.arrivalProgress, Arrived = o.arrived });
             OnChanged?.Invoke();
+        }
+
+        /// <summary>True when <paramref name="id"/> is in the catalogue; warns about a dropped save entry otherwise.</summary>
+        private static bool IsKnown(string id)
+        {
+            if (BuildCatalog.Get(id) != null) return true;
+            UnityEngine.Debug.LogWarning($"[FurnitureSupply] dropping saved furniture with unknown id '{id}'");
+            return false;
         }
     }
 }
