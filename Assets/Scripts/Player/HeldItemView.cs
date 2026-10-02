@@ -56,7 +56,7 @@ namespace PetShop.Player
         private void LateUpdate()
         {
             if (_model == null) return;
-            if (_main != Camera.main) EnsureRig();
+            if (_main != Camera.main || _anchor == null) EnsureRig();
             if (_overlay != null && _main != null) _overlay.fieldOfView = _main.fieldOfView;
             UpdateVisibility();
         }
@@ -80,6 +80,8 @@ namespace PetShop.Player
         private void EnsureRig()
         {
             if (_main == Camera.main && _anchor != null) return;
+            // Keep the model alive while the old anchor is torn down; it is re-parented below.
+            if (_model != null) _model.transform.SetParent(transform, false);
             TearDownRig();
             _main = Camera.main;
             if (_main == null) return;
@@ -112,6 +114,8 @@ namespace PetShop.Player
         {
             if (_anchor  != null) PrefabPreview.DestroySafe(_anchor.gameObject);
             if (_overlay != null) PrefabPreview.DestroySafe(_overlay.gameObject);
+            // Give the main camera its HeldItem layer back once it no longer hosts the rig.
+            if (_main != null && GameLayers.HeldItem >= 0) _main.cullingMask |= 1 << GameLayers.HeldItem;
             _anchor = null; _overlay = null; _main = null;
         }
 

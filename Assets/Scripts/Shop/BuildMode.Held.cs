@@ -62,7 +62,9 @@ namespace PetShop.Shop
         public bool EnterPlacement(string catalogId, string variant = null)
         {
             var def = BuildCatalog.Get(catalogId);
-            if (def == null || Supply == null || Supply.OwnedCount(catalogId) <= 0) return false;
+            if (def == null || Supply == null) return false;
+            int heldSame = IsHolding && CurrentItem != null && CurrentItem.Id == catalogId ? 1 : 0;
+            if (Supply.OwnedCount(catalogId) + heldSame <= 0) return false;
 
             ReturnHeld();
             if (!Supply.TakeOwned(catalogId)) return false;

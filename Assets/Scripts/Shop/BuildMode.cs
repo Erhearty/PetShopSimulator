@@ -105,6 +105,9 @@ namespace PetShop.Shop
             OnBuildModeExited.Invoke();
         }
 
+        /// <summary>A disabled or destroyed BuildMode hands a held item back so it is never lost.</summary>
+        private void OnDisable() => ExitBuildMode();
+
         private void Update()
         {
             if (!IsActive) return;

@@ -14,10 +14,12 @@ namespace PetShop.Shop
         private const float PenGhostHeight   = 0.7f;
         private const float ItemGhostHeight  = 1.5f;
         private const float BoxGhostInset    = 0.9f;
+        /// <summary>Half of a box's height: lifts its centre so the bottom sits on the floor.</summary>
+        private const float HalfExtent       = 0.5f;
 
         private GameObject _ghost;
         private Material   _ghostMat;
-        private float      _ghostHeight = 1.5f;
+        private float      _ghostHeight = ItemGhostHeight;
         private float      _ghostLift;
 
         /// <summary>The live placement preview, or null when build mode is closed.</summary>
@@ -50,7 +52,7 @@ namespace PetShop.Shop
             var box = MeshBuilder.CreateBox(footprint.x, _ghostHeight, footprint.y, null, "Ghost");
             box.transform.SetParent(transform, false);
             foreach (var col in box.GetComponentsInChildren<Collider>(true)) PrefabPreview.DestroySafe(col);
-            _ghostLift = _ghostHeight * 0.5f + GhostFloorClearance;
+            _ghostLift = _ghostHeight * HalfExtent + GhostFloorClearance;
             return box;
         }
 
