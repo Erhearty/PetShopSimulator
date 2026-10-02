@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using PetShop.Shop;
@@ -61,38 +60,6 @@ namespace PetShop.Tests
             _layout.ApplyLotStage(ShopLayout.FullYardLotStage);
             Assert.IsTrue(_grid.HasFloor(new Vector2Int(-16, -8)));
             Assert.IsFalse(_grid.HasFloor(new Vector2Int(-12, 4)));
-        }
-
-        [Test]
-        public void StarterLayout_ReadsMarkersAtTheirCells()
-        {
-            Mark(BuildCatalog.Counter, new Vector2Int(-12, -1), null, 0f);
-            Mark(BuildCatalog.ShelfLarge, new Vector2Int(-15, 1), "Food", 90f);
-            Mark(BuildCatalog.PetPen, new Vector2Int(2, 1), "Dog", 0f);
-
-            var list = _layout.StarterLayout(_grid);
-            Assert.AreEqual(3, list.Count);
-            var byId = new Dictionary<string, ShopLayout.FurniturePlacement>();
-            foreach (var p in list) byId[p.CatalogId] = p;
-
-            Assert.AreEqual(new Vector2Int(-12, -1), byId[BuildCatalog.Counter].Cell);
-            Assert.IsNull(byId[BuildCatalog.Counter].Variant);
-            Assert.AreEqual(new Vector2Int(-15, 1), byId[BuildCatalog.ShelfLarge].Cell);
-            Assert.AreEqual("Food", byId[BuildCatalog.ShelfLarge].Variant);
-            Assert.AreEqual(90f, byId[BuildCatalog.ShelfLarge].Rotation);
-            Assert.AreEqual(new Vector2Int(2, 1), byId[BuildCatalog.PetPen].Cell);
-            Assert.AreEqual("Dog", byId[BuildCatalog.PetPen].Variant);
-        }
-
-        private void Mark(string id, Vector2Int cell, string variant, float rot)
-        {
-            var go = new GameObject("Starter_" + id);
-            go.transform.SetParent(_go.transform, false);
-            go.transform.position = _grid.GridToWorld(cell);
-            var piece = go.AddComponent<StarterPiece>();
-            piece.CatalogId = id;
-            piece.Variant   = variant;
-            piece.Rotation  = rot;
         }
     }
 }

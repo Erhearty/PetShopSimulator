@@ -117,9 +117,14 @@ The shop is a small building in the corner of a large open lot. Supplies are sol
 the animals live in pens **outside** in the yard. Both are placed through the same build
 system, so you can rearrange either.
 
-The starting shop is set by `StarterPiece` markers in the scene; a `ShopLayout` component holds
-the yard and room dimensions, the door, forecourt and pavement anchors, the paddock and the lot
-stages that open up as the shop grows.
+A new game starts with an **empty** shop. Order every shelf, pen, counter and decoration from the
+furniture catalogue (the build key); it arrives as a crate on the forecourt, **E** collects it into
+your inventory, and you place it from your hand with a ghost preview — **R** / **Shift+R** / the
+mouse wheel rotate it, 45° for decor and 90° for everything else. Removing a piece returns it to
+the inventory. Customers only start coming once there is a counter plus at least one shelf or pen.
+
+A `ShopLayout` component holds the yard and room dimensions, the door, forecourt and pavement
+anchors, the paddock and the lot stages that open up as the shop grows.
 
 ## What's outside
 
@@ -142,10 +147,10 @@ baked meshes and materials live in `Assets/Environment/Baked/`. `GameBootstrappe
 `Bootstrap` object, builds the systems, assembles the UI and hands control to `GameManager`.
 
 ```
-MainScene  ─▶ world objects, ShopLayout (anchors, lot stages, NavMesh), StarterPiece markers
+MainScene  ─▶ world objects, ShopLayout (anchors, lot stages, NavMesh); no placed furniture
 Bootstrap  ─▶ systems (grid · shop · build · spawner · audio · manager)
            ─▶ UI             status bar, build palette, panels
-           ─▶ GameManager    starter layout or save, then the day loop
+           ─▶ GameManager    empty new shop or save, then the day loop
 ```
 
 **Standing rule: never add runtime generators or build-time scene generators.** New world
@@ -155,8 +160,8 @@ world in code; they have been removed.)
 
 Three things are worth knowing before you change anything:
 
-1. **All furniture goes through one path** — `BuildMode.Place()` → `FurnitureFactory.Spawn()`. The
-   starter shop, player placements and save loading share it, so they can never drift apart.
+1. **All furniture goes through one path** — `BuildMode.Place()` → `FurnitureFactory.Spawn()`.
+   Player placements and save loading share it, so they can never drift apart.
 2. **Shaders are resolved at runtime**, so they must be listed in Always Included Shaders or the
    build stripper removes them. `./build.sh setup` handles this.
 3. **`MeshBuilder` geometry sits on Y = 0** — primitives are positioned by their base, not their
@@ -182,7 +187,7 @@ Assets/
 │   └── Kenney/     CC0 model kits, not in the repo — see THIRD-PARTY.md
 └── Scripts/
     ├── Core/       bootstrap, game manager, mesh/material/model factories, audio, save
-    ├── Shop/       grid, build mode, furniture catalog, ShopLayout + StarterPiece
+    ├── Shop/       grid, build mode, furniture catalog and supply, ShopLayout
     ├── Player/     controller, third-person camera, interaction
     ├── Customer/   shopper AI and spawner
     ├── Commerce/   shop manager, shelves, products, catalog

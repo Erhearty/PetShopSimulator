@@ -52,6 +52,12 @@ namespace PetShop.Customer
         [HideInInspector] public List<ShelfUnit> Shelves = new();
         [HideInInspector] public List<PetPen>    PetPens = new();
 
+        /// <summary>True once at least one counter is placed. Pushed by the GameManager furniture registry.</summary>
+        [HideInInspector] public bool HasCounter;
+
+        /// <summary>Shown once per day when the doors stay shut for lack of furniture.</summary>
+        public const string NotTradingMessage = "Place a counter and a shelf or pen to open for customers.";
+
         public int  SpawnedToday { get; private set; }
         public int  TargetToday  { get; private set; }
         public bool DoorsClosed  { get; private set; }
@@ -68,12 +74,24 @@ namespace PetShop.Customer
         private bool  _dayActive;
         private float _timer;
         private float _censusTimer;
+        private bool  _warnedNotTrading;
+
+        /// <summary>
+        /// The shop can trade once it has somewhere to pay (a counter) and something to sell
+        /// (at least one shelf or pen). Until then no customers are let in.
+        /// </summary>
+        public static bool CanTrade(bool hasCounter, int shelfCount, int penCount) =>
+            hasCounter && (shelfCount > 0 || penCount > 0);
+
+        /// <summary>Whether the furniture currently placed lets the shop trade.</summary>
+        public bool CanTradeNow => CanTrade(HasCounter, Shelves.Count, PetPens.Count);
 
         public void StartDay()
         {
             SpawnedToday = 0;
             DoorsClosed  = false;
             _dayActive   = true;
+            _warnedNotTrading = false;
             _timer       = BaseIntervalSeconds - FirstCustomerDelay;
             TargetToday  = ShopManager == null ? MinCustomersPerDay : Mathf.RoundToInt(
                 Mathf.Lerp(MinCustomersPerDay, MaxCustomersPerDay, ShopManager.Reputation / 100f) * TargetMultiplier);
@@ -94,6 +112,7 @@ namespace PetShop.Customer
             if (_censusTimer <= 0f) { _censusTimer = 0.5f; LiveCustomers = CountLive(); }
 
             if (!_dayActive || DoorsClosed || ShopManager == null) return;
+            if (!CanTradeNow) { WarnNotTradingOnce(); return; }
             if (SpawnedToday >= TargetToday) return;
 
             if (LiveCustomers >= MaxConcurrent) return;
@@ -106,6 +125,14 @@ namespace PetShop.Customer
 
             _timer = 0f;
             SpawnCustomer();
+        }
+
+        /// <summary>Tells the player, once per day, why no customers are coming.</summary>
+        private void WarnNotTradingOnce()
+        {
+            if (_warnedNotTrading) return;
+            _warnedNotTrading = true;
+            GameManager.Instance?.Notify(NotTradingMessage);
         }
 
         private int CountLive()

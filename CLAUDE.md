@@ -26,9 +26,8 @@ The shop, the yard, the street and every prop are ordinary GameObjects saved in
 prefab per `BuildCatalog` id in `Assets/Prefabs/Furniture/`. The meshes, materials and textures the
 scene and those prefabs use are assets under `Assets/Environment/Baked/`. A `ShopLayout` component in
 the scene holds the yard and room dimensions, the anchors (shop centre, door, forecourt, player
-start, pavement), the paddock rect, the lot stages and the NavMesh bake. `StarterPiece` markers
-define the starter furniture of a new game: catalog id, variant and rotation, with the cell taken
-from the marker's position.
+start, pavement), the paddock rect, the lot stages and the NavMesh bake. The scene holds **no**
+placeable furniture: a new game starts with an empty shop (see "New game — an empty shop" below).
 
 **Standing rule: never add runtime generators or build-time scene generators.** New world content
 is added in the editor: make or edit a prefab, place it in MainScene, save the scene and commit it.
@@ -96,12 +95,12 @@ first, props on top:
 |---|---|
 | Forecourt | paving in front of the shop, `ShopFrontMargin` deep (7 m) |
 | Spine | paved path: gate → shop door → across to the paddock |
-| Paddock | `PaddockArea`, sanded and post-and-rail fenced; the starter pens go inside it |
+| Paddock | `PaddockArea`, sanded and post-and-rail fenced; the pens the player places go inside it |
 | Garden | planted bed with kerb, tree and benches, filling the gap between shop and paddock |
 | Beds | hedging along the back and west walls |
 
-`ShopLayout.PaddockRect` must stay sized to the pens, and the pens' `StarterPiece` markers
-must sit inside it. If you change one, check the other.
+`ShopLayout.PaddockRect` must stay sized for a sensible number of pens, inside lot stage 0.
+If you change one, check the other.
 
 **Asset traps found the hard way, both invisible in code review:**
 
@@ -124,11 +123,27 @@ street  beyond the yard's front edge at z = +17
 ```
 
 Shelves and the till go **indoors**; pet pens go **outdoors in the yard**. Both use the same
-placement path, so the only difference is which cells the starter layout picks.
+placement path, so the only difference is which cells the player picks.
 
-`ShopLayout.StarterLayout(grid)` turns each `StarterPiece` marker into a placement, taking the
-cell from the marker's world position. To change the starter shop, move, add or remove markers
-in the scene.
+## New game — an empty shop
+
+A new game starts with an **empty** shop: no shelves, pens, counter or decorations. The player
+furnishes it through the supply chain:
+
+1. **Order** a piece in the furniture catalogue (`FurnitureCatalogPanel`, opened with the build
+   key). It is paid at catalogue cost and tracked by `FurnitureSupply`.
+2. A **crate** is delivered to the forecourt later that day (overnight if the day ends first).
+3. Press **E** at the crate to collect it into the furniture inventory.
+4. **Place** it from the hand (`BuildMode.EnterPlacement`, `HeldItemView`): a ghost shows the
+   footprint; **R** / **Shift+R** / the mouse wheel rotate it — 45° steps for decor, 90° for
+   everything else.
+5. **Removing** a placed piece returns it to the inventory.
+
+`CustomerSpawner` lets **no customers** in until the shop can trade: at least one counter **and**
+at least one shelf or pen (`CustomerSpawner.CanTrade`). Until then the player is told once a day
+to place them. The counter count comes from the `GameManager` furniture registry.
+
+You still inherit one member of staff (a cashier) on a new game.
 
 **The street starts at `YardFrontZ`.** It is scene geometry, so if you resize the yard in
 `ShopLayout`, move the street objects to match. The old generator got this wrong once and left
@@ -372,7 +387,7 @@ Assets/
     ├── Core/
     │   ├── GameBootstrapper.cs     ← entry point; builds systems → world → UI → wiring
     │   ├── GameManager.cs          ← singleton; day loop, furniture registry, public facade
-    │   ├── SaveLoadController.cs   ← new game, starter shelves, save snapshot and load
+    │   ├── SaveLoadController.cs   ← new game (empty shop), save snapshot and load
     │   ├── ShopFloorActions.cs     ← orders, deliveries, restocking, pens, counter, shop summary
     │   ├── StaffRoster.cs          ← payroll, daily applicants, hire and fire
     │   ├── GameLayers.cs           ← named layer lookups + masks
@@ -385,20 +400,24 @@ Assets/
     │   └── SaveSystem.cs           ← JSON save incl. full furniture layout
     │
     ├── Shop/
-    │   ├── ShopLayout.cs           ← scene component: dimensions, anchors, lot stages, NavMesh, starter layout
-    │   ├── StarterPiece.cs         ← scene marker for one piece of starter furniture
+    │   ├── ShopLayout.cs           ← scene component: dimensions, anchors, lot stages, NavMesh
     │   ├── GridManager.cs          ← CellSize 2 m, XZ plane, footprint helpers
     │   ├── FurnitureFactory.cs     ← BuildCatalog (ids/costs/sizes) + Spawn() from Assets/Prefabs/Furniture
-    │   └── BuildMode.cs            ← floor-plane cursor, ghost, placement, refunds
+    │   ├── FurnitureSupply.cs      ← furniture inventory + catalogue orders in transit or on the forecourt
+    │   ├── PrefabPreview.cs        ← behaviour-free visual copies of prefabs for the ghost and held item
+    │   ├── BuildMode.cs            ← floor-plane cursor, placement, removal
+    │   ├── BuildMode.Ghost.cs      ← placement ghost
+    │   └── BuildMode.Held.cs       ← placing from the hand; rotation (45° decor, 90° otherwise)
     │
     ├── Player/
     │   ├── PlayerController.cs     ← CharacterController, camera-relative WASD
     │   ├── ThirdPersonCamera.cs    ← RMB orbit, scroll zoom, Linecast collision
+    │   ├── HeldItemView.cs         ← the furniture item in the player's hand
     │   └── InteractionSystem.cs    ← SphereCast on the Furniture layer; CounterInteractable
     │
     ├── Customer/
     │   ├── CustomerAI.cs           ← NavMeshAgent shopper: browse → basket → till → leave
-    │   └── CustomerSpawner.cs      ← footfall scales with reputation; closes doors near closing
+    │   └── CustomerSpawner.cs      ← footfall scales with reputation; none until counter + shelf/pen
     │
     ├── Commerce/
     │   ├── ShopManager.cs          ← balance, reputation, sales log, rent, orders, CloseDay()
@@ -421,6 +440,7 @@ Assets/
     │   ├── TitleScreen.cs          ← boot screen; Continue / New shop / Quit
     │   ├── PauseMenu.cs            ← Esc menu; sets Time.timeScale = 0
     │   ├── StatsPanel.cs           ← the ledger (Tab): shelves, animals, catalogue, manage
+    │   ├── FurnitureCatalogPanel.cs ← furniture catalogue: order pieces delivered as crates
     │   ├── BreedingPanel.cs        ← choose tonight's pairing; previews the offspring
     │   ├── StaffPanel.cs           ← three applicant cards vs. the current payroll
     │   ├── DayResultsPanel.cs      ← end-of-day books, revenue breakdown, advice
@@ -436,7 +456,7 @@ Assets/
 
 ## Key architecture rules
 
-**One path for all furniture.** The starter shop, player placement and save loading *all* go through
+**One path for all furniture.** Player placement and save loading *both* go through
 `BuildMode.Place()` → `FurnitureFactory.Spawn()`. Never spawn furniture any other way — the grid
 registration, layer assignment and `GameManager` bookkeeping all hang off that path.
 

@@ -132,8 +132,7 @@ namespace PetShop.Shop
 
     /// <summary>
     /// Turns a catalogue entry into a live GameObject with the right behaviour component.
-    /// Used by the starter shop, build mode and save loading alike, so all three
-    /// produce identical objects.
+    /// Used by build mode and save loading alike, so both produce identical objects.
     /// </summary>
     public static class FurnitureFactory
     {

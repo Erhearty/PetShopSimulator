@@ -23,27 +23,15 @@ namespace PetShop.Core
 
         // ── New game / layout ─────────────────────────────────────────────────
 
+        /// <summary>
+        /// Starts a fresh game with an empty shop: the player orders, collects and places every
+        /// shelf, pen, counter and decoration from the furniture catalogue.
+        /// </summary>
         public void NewGame()
         {
             _game.Show.Withdraw();
             _game.Furniture.Clear();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
-            foreach (var p in _game.Layout.StarterLayout(_game.Grid))
-            {
-                var def = BuildCatalog.Get(p.CatalogId);
-                var go  = _game.Build.Place(p.Cell, def, p.Variant, p.Rotation, charge: false);
-                if (go == null) continue;
-
-                var shelf = go.GetComponent<ShelfUnit>();
-                if (shelf != null) SeedShelf(shelf);
-
-                var pen = go.GetComponent<PetPen>();
-                if (pen != null)
-                {
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                }
-            }
             // You inherit one member of staff — without anyone on the till a new shop cannot
             // trade at all while you are out in the yard. Inherited, so no sign-on fee.
             var inherited = StaffCandidate.Generate();
@@ -53,16 +41,6 @@ namespace PetShop.Core
             _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
                          $"{InputBindings.Label(GameAction.Interact)} to interact, " +
                          $"{InputBindings.Label(GameAction.EndDay)} to close up.");
-        }
-
-        /// <summary>Stocks a fresh shelf for free — the starter inventory.</summary>
-        public void SeedShelf(ShelfUnit shelf)
-        {
-            var catalog = _game.Catalog;
-            if (catalog == null) return;
-            var products = catalog.GetByCategory(shelf.Category);
-            for (int i = 0; i < products.Count && i < shelf.MaxLines; i++)
-                shelf.AddStock(products[i], shelf.MaxPerLine);
         }
 
         // ── Save / load ───────────────────────────────────────────────────────

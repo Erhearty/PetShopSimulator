@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
@@ -9,8 +8,8 @@ namespace PetShop.Shop
 {
     /// <summary>
     /// Scene-authored description of the shop world: yard and room dimensions, the anchors
-    /// customers and the player use, the lot stages, the NavMesh and the starter furniture.
-    /// Everything here is edited by hand in the scene; anchors left empty fall back to the
+    /// customers and the player use, the lot stages and the NavMesh. A new game starts
+    /// with an empty shop; the player orders and places every piece of furniture. Everything here is edited by hand in the scene; anchors left empty fall back to the
     /// positions derived from the dimensions, which reproduces the generated layout exactly.
     /// </summary>
     public class ShopLayout : MonoBehaviour
@@ -109,7 +108,6 @@ namespace PetShop.Shop
         {
             _grid = grid;
             ApplyLotStage(StarterLotStage);
-            WarnIfStarterOutsideStage0();
         }
 
         /// <summary>
@@ -166,18 +164,6 @@ namespace PetShop.Shop
                     _grid.SetFloor(new Vector2Int(door.x + dx, door.y + dz), false);
         }
 
-        private void WarnIfStarterOutsideStage0()
-        {
-            RectInt area = LotStageCells(StarterLotStage);
-            foreach (var p in StarterLayout(_grid))
-            {
-                var size = BuildCatalog.Get(p.CatalogId)?.Size ?? Vector2Int.one;
-                bool inside = area.Contains(p.Cell) && area.Contains(p.Cell + size - Vector2Int.one);
-                if (!inside)
-                    Debug.LogWarning($"[ShopLayout] Starter {p.CatalogId} at {p.Cell} is outside lot stage 0.");
-            }
-        }
-
         // ── NavMesh ─────────────────────────────────────────────────────────────
 
         /// <summary>
@@ -200,42 +186,6 @@ namespace PetShop.Shop
             }
             _surface.BuildNavMesh();
             Debug.Log("[ShopLayout] NavMesh baked.");
-        }
-
-        // ── Starter layout ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// The shop you start a brand-new game with: one placement per <see cref="StarterPiece"/>
-        /// marker, cell taken from the marker's world position. Markers under this object are
-        /// preferred; if there are none, every marker in the scene is used.
-        /// </summary>
-        public List<FurniturePlacement> StarterLayout(GridManager grid)
-        {
-            var list = new List<FurniturePlacement>();
-            StarterPiece[] pieces = GetComponentsInChildren<StarterPiece>(true);
-            if (pieces.Length == 0)
-                pieces = FindObjectsByType<StarterPiece>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
-
-            foreach (var piece in pieces)
-            {
-                if (string.IsNullOrEmpty(piece.CatalogId)) continue;
-                list.Add(new FurniturePlacement(piece.CatalogId,
-                    grid.WorldToGrid(piece.transform.position),
-                    string.IsNullOrEmpty(piece.Variant) ? null : piece.Variant,
-                    piece.Rotation));
-            }
-            return list;
-        }
-
-        public readonly struct FurniturePlacement
-        {
-            public readonly string     CatalogId;
-            public readonly Vector2Int Cell;
-            public readonly string     Variant;
-            public readonly float      Rotation;
-
-            public FurniturePlacement(string catalogId, Vector2Int cell, string variant, float rotation)
-            { CatalogId = catalogId; Cell = cell; Variant = variant; Rotation = rotation; }
         }
 
 #if UNITY_EDITOR

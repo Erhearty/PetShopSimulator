@@ -178,8 +178,8 @@ namespace PetShop.Shop
         }
 
         /// <summary>
-        /// Place furniture and register it on the grid. Shared by the player, the starter
-        /// layout and save loading. <paramref name="footprintRotated"/> swaps the catalogue
+        /// Place furniture and register it on the grid. Shared by the player and save
+        /// loading. <paramref name="footprintRotated"/> swaps the catalogue
         /// footprint's x/y (hand-placed items turned 90/270°); false keeps <c>def.Size</c>.
         /// </summary>
         public GameObject Place(Vector2Int cell, PlacedObjectData def, string variant,
