@@ -126,10 +126,17 @@ namespace PetShop.Core
             LineageRegistry.Reset(); // statics survive scene reloads
             var save = SaveSystem.Load();
             if (save != null) _saveLoad.LoadGame(save);
-            else              _saveLoad.NewGame();
+            else              StartNewGame();
 
             Layout?.BakeNavMesh();
             StartDay();
+        }
+
+        /// <summary>A fresh, empty shop; -furnish (dev/test runs only) places the starter furniture.</summary>
+        private void StartNewGame()
+        {
+            _saveLoad.NewGame();
+            if (PlaytestOptions.Furnish) Dev.DevFurnisher.Furnish(this, PlaytestOptions.Seed ?? Dev.DevFurnisher.DefaultSeed);
         }
 
         private void Update()

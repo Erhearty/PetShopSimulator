@@ -40,6 +40,7 @@ namespace PetShop.Dev
             public float   OrthoSize;
             public Action  Setup;      // opens a panel / sets a state before the frame
             public Action  Teardown;
+            public bool    FromMainCamera;  // render through the player's camera (held item + aim ghost)
         }
 
         public static bool TryCreate(out CameraTour tour)
@@ -62,6 +63,9 @@ namespace PetShop.Dev
 
         private IEnumerator Start()
         {
+            // A new game starts with an empty shop; the shots need furniture, pets and customers.
+            DevFurnisher.Furnish(GameManager.Instance);
+
             float waited = 0f;
             while (waited < WarmupSeconds)
             {
@@ -101,6 +105,8 @@ namespace PetShop.Dev
 
                 yield return null;
                 yield return null;
+
+                if (shot.FromMainCamera) MatchMainCamera(cam);
 
                 cam.targetTexture = rt;
                 cam.Render();
@@ -243,12 +249,17 @@ namespace PetShop.Dev
                              () => ui.Pause.Open(),
                              () => { ui.Pause.Close(); Time.timeScale = 1f; }));
 
+            // The real flow: a pen from the furniture inventory in hand, its ghost where the player aims.
             if (game != null && game.Build != null)
-                shots.Add(Ui("build_mode",
-                             new Vector3(shop.x + 9f, 3.4f, shop.z - 6f),
-                             new Vector3(shop.x + 13f, 0f, shop.z - 11f),
-                             () => game.Build.EnterBuildMode(BuildCatalog.Get(BuildCatalog.PetPen)),
-                             () => game.Build.ExitBuildMode()));
+            {
+                var build = Ui("build_mode",
+                               new Vector3(shop.x + 9f, 3.4f, shop.z - 6f),
+                               new Vector3(shop.x + 13f, 0f, shop.z - 11f),
+                               () => HoldFromInventory(game, BuildCatalog.PetPen),
+                               () => PutBackInInventory(game, BuildCatalog.PetPen));
+                build.FromMainCamera = true;
+                shots.Add(build);
+            }
 
             // Plan views last: orthographic, so distances read true for design review.
             Vector3 plot = Vector3.zero;
@@ -301,6 +312,30 @@ namespace PetShop.Dev
         private static Shot Ui(string name, Vector3 from, Vector3 to, Action setup, Action teardown) =>
             new() { Name = name, Kind = Kind.Ui, Position = from, LookAt = to, Fov = 60f,
                     Setup = setup, Teardown = teardown };
+
+        /// <summary>Gives the inventory one <paramref name="id"/> and takes it into the hand.</summary>
+        private static void HoldFromInventory(GameManager game, string id)
+        {
+            game.Furniture.AddOwned(id);
+            if (!game.Build.EnterPlacement(id)) Debug.LogWarning($"[Tour] could not hold {id} for build_mode");
+        }
+
+        /// <summary>Closes build mode and removes the item <see cref="HoldFromInventory"/> handed out.</summary>
+        private static void PutBackInInventory(GameManager game, string id)
+        {
+            game.Build.ExitBuildMode();   // the held item goes back into the inventory
+            game.Furniture.TakeOwned(id);
+        }
+
+        /// <summary>Copies the player's camera pose so viewmodel and ghost frame as in play.</summary>
+        private static void MatchMainCamera(Camera cam)
+        {
+            var main = Camera.main;
+            if (main == null || main == cam) return;
+            cam.transform.SetPositionAndRotation(main.transform.position, main.transform.rotation);
+            cam.orthographic = false;
+            cam.fieldOfView  = main.fieldOfView;
+        }
 
         private Vector3 PenCentre(out Vector3 firstPen)
         {

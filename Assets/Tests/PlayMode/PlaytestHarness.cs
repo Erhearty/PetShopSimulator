@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using PetShop.Core;
+using PetShop.Dev;
 using PetShop.UI;
 
 namespace PetShop.Tests
@@ -78,12 +79,17 @@ namespace PetShop.Tests
         /// <param name="seed">Seed for UnityEngine.Random, applied before anything spawns.</param>
         /// <param name="timeScale">Time.timeScale once the day has started.</param>
         /// <param name="dayLength">Game seconds per trading day (GameManager.DayLengthSeconds).</param>
-        public static IEnumerator Boot(bool packs, int seed, float timeScale, float dayLength)
+        /// <param name="furnish">
+        /// True (default) to place the dev starter furniture once the day runs: a new game starts
+        /// with an empty shop, and customers only come once it has a counter and a shelf or pen.
+        /// </param>
+        public static IEnumerator Boot(bool packs, int seed, float timeScale, float dayLength, bool furnish = true)
         {
             StartCapturingBootLogs();
             try
             {
                 yield return BuildWorld(packs, seed, dayLength);
+                if (furnish) DevFurnisher.Furnish(GameManager.Instance, seed);
             }
             finally
             {
@@ -91,6 +97,21 @@ namespace PetShop.Tests
             }
             AssertNoBootErrors();
             Time.timeScale = timeScale;
+        }
+
+        /// <summary>
+        /// Runs <see cref="DevFurnisher.Furnish"/> on the live game under the same log capture as
+        /// <see cref="Boot"/>: its NavMesh rebake may raise the tolerated editor-only error, any
+        /// other error fails the test. Returns the number of pieces placed.
+        /// </summary>
+        public static int Furnish(int seed)
+        {
+            StartCapturingBootLogs();
+            int placed;
+            try { placed = DevFurnisher.Furnish(Game, seed); }
+            finally { StopCapturingBootLogs(); }
+            AssertNoBootErrors();
+            return placed;
         }
 
         /// <summary>Loads MainScene and waits until the first trading day is running.</summary>

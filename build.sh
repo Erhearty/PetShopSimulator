@@ -98,7 +98,7 @@ do_smoke() {
     # must neither pick up nor overwrite the player's real save.
     local save_dir; save_dir=$(mktemp -d)
     echo "▶ headless smoke run (6 short days)"
-    timeout 90 "$PLAYER" -batchmode -nographics -seed 1 -daylength 12 \
+    timeout 90 "$PLAYER" -batchmode -nographics -seed 1 -daylength 12 -furnish \
         -savepath "$save_dir/save.json" -logFile "$log" >/dev/null 2>&1 || true
     rm -rf "$save_dir"
 
@@ -216,7 +216,7 @@ do_soak() {
 
     echo "▶ headless economy soak (${SOAK_DAYS:-15} days, seed ${SEED:-1})"
     local rc=0
-    timeout 400 "$PLAYER" -batchmode -nographics -seed "${SEED:-1}" -daylength 12 \
+    timeout 400 "$PLAYER" -batchmode -nographics -seed "${SEED:-1}" -daylength 12 -furnish \
         -quitafterdays "${SOAK_DAYS:-15}" -savepath "$save" -telemetry "$jsonl" \
         -logFile "$log" >/dev/null 2>&1 || rc=$?
 
