@@ -12,17 +12,20 @@ using PetShop.UI;
 namespace PetShop.Tests
 {
     /// <summary>
-    /// Boots the real game world inside a PlayMode test, the same way SceneBuilder does it
-    /// (a new GameObject with <see cref="GameBootstrapper"/>), and tears it down again.
+    /// Boots the real game world inside a PlayMode test by loading MainScene (whose
+    /// <see cref="GameBootstrapper"/> builds everything), and tears it down again.
     ///
     /// Statics that <see cref="PlaytestOptions.Apply"/> only ever switches ON
     /// (<see cref="ModelLibrary.ForceProcedural"/>, <see cref="SaveSystem.PathOverride"/>) are
-    /// set here before the bootstrapper is added and reset here in <see cref="Teardown"/>.
+    /// set here before the scene loads and reset here in <see cref="Teardown"/>.
     /// </summary>
     public static class PlaytestHarness
     {
         /// <summary>A model that exists only when the Asset Store street pack is installed.</summary>
         public const string KnownPackPath = "Packs/Street/Roads/Streets/Road_Streight";
+
+        /// <summary>The baked scene holding the world and its bootstrapper (in the build settings).</summary>
+        private const string MainSceneName = "MainScene";
 
         /// <summary>Frames to let GameBootstrapper.Start run before calling Begin ourselves.</summary>
         private const int FramesBeforeManualBegin = 2;
@@ -90,16 +93,32 @@ namespace PetShop.Tests
             Time.timeScale = timeScale;
         }
 
-        /// <summary>Adds the bootstrapper and waits until the first trading day is running.</summary>
+        /// <summary>Loads MainScene and waits until the first trading day is running.</summary>
         private static IEnumerator BuildWorld(bool packs, int seed, float dayLength)
         {
             RememberPreexistingRoots();
             PrepareStatics(packs, seed);
 
-            Bootstrapper = new GameObject("PlaytestBootstrapper").AddComponent<GameBootstrapper>();
+            // sceneLoaded fires after the bootstrapper's Awake but before its Start (which may
+            // Begin the day), so the day-length override is in place before the day starts.
+            void OnLoaded(Scene scene, LoadSceneMode mode)
+            {
+                if (GameManager.Instance != null) GameManager.Instance.DayLengthSeconds = dayLength;
+            }
+            SceneManager.sceneLoaded += OnLoaded;
+            try
+            {
+                yield return SceneManager.LoadSceneAsync(MainSceneName, LoadSceneMode.Single);
+            }
+            finally
+            {
+                SceneManager.sceneLoaded -= OnLoaded;
+            }
+
+            Bootstrapper = Object.FindAnyObjectByType<GameBootstrapper>();
+            Assert.IsNotNull(Bootstrapper, $"{MainSceneName} has no GameBootstrapper.");
             GameManager game = GameManager.Instance;
             Assert.IsNotNull(game, "GameBootstrapper.Awake did not create a GameManager.");
-            // Awake has already run (and applied any -daylength), so this override sticks.
             game.DayLengthSeconds = dayLength;
 
             for (int i = 0; i < FramesBeforeManualBegin; i++) yield return null;

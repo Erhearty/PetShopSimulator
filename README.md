@@ -3,15 +3,18 @@
 A cozy first-person 3D management sim: lay out your shop, keep the shelves stocked, breed animals, and make
 rent — in a pet shop on a proper street corner, with traffic going past the window.
 
-The shop, the street and the whole city block are assembled at runtime from Unity Asset Store
-low-poly packs, the CC0 [Kenney](https://kenney.nl) kits, and procedural geometry — in that
-order of preference, with each tier falling back to the next. All audio is synthesised at
+The shop, the yard, the street and the whole city block are authored in the editor: they are
+objects in `Assets/Scenes/MainScene.unity`, built from Unity Asset Store low-poly packs, the CC0
+[Kenney](https://kenney.nl) kits and procedural geometry, with their meshes and materials saved
+as assets under `Assets/Environment/Baked/`. All audio is synthesised at
 startup; there are no sound files.
 
 > The Asset Store packs are licensed to the project owner's Unity account and are **not**
 > in this repository — they are gitignored and purged from history. The CC0 Kenney kits are kept
-> out too, to keep the repo small. A fresh clone runs on procedural geometry only;
-> `./build.sh assets` restores the packs once downloaded, and `build.sh` restores the Kenney kits
+> out too, to keep the repo small. The world itself is baked into `Assets/Scenes/MainScene.unity`
+> with the meshes, materials and textures it uses copied into `Assets/Environment/Baked/`, so a
+> fresh clone shows the full shop, yard and street; the packs and kits are only needed for
+> characters, pets and props spawned at runtime. `./build.sh assets` restores the packs once downloaded, and `build.sh` restores the Kenney kits
 > automatically. See [`THIRD-PARTY.md`](THIRD-PARTY.md).
 
 ![Unity 6000.6.2f1](https://img.shields.io/badge/Unity-6000.6.2f1-black) ![Built-in RP](https://img.shields.io/badge/pipeline-Built--in-blue)
@@ -19,7 +22,7 @@ startup; there are no sound files.
 ## Quick start
 
 ```bash
-./build.sh            # sets up, builds the scene and a Linux player, then smoke-tests it
+./build.sh            # sets up, builds a Linux player, then smoke-tests it
 ./build.sh run        # play it
 ./build.sh look       # render screenshots of the running game into Screenshots/
 ./build.sh test       # run the EditMode unit tests headless
@@ -48,7 +51,8 @@ A fresh clone needs one setup pass (`./build.sh setup`) before the first editor 
 because TextMesh Pro's essential resources are not checked in.
 
 Neither the Asset Store packs nor the Kenney kits are in the repository. The game itself still
-runs without them (it falls back to procedural geometry), but `build.sh` treats the Kenney kits as
+runs without them (the world is baked into the scene and runtime models degrade to plainer
+fallbacks), but `build.sh` treats the Kenney kits as
 a prerequisite: every target that builds, runs or tests the game stops with exit 1 if they cannot
 be installed. To restore the full art, download
 the packs listed in [`THIRD-PARTY.md`](THIRD-PARTY.md) through Package Manager → My Assets, then
@@ -113,10 +117,14 @@ The shop is a small building in the corner of a large open lot. Supplies are sol
 the animals live in pens **outside** in the yard. Both are placed through the same build
 system, so you can rearrange either.
 
+The starting shop is set by `StarterPiece` markers in the scene; a `ShopLayout` component holds
+the yard and room dimensions, the door, forecourt and pavement anchors, the paddock and the lot
+stages that open up as the shop grows.
+
 ## What's outside
 
 The shopfront is glazed, so the street is part of the game whether or not you step out onto it.
-`StreetGenerator` lays down the pavement, a two-lane road with a crossing at the door, the
+The scene holds the pavement, a two-lane road with a crossing at the door, the
 terrace of shops the pet shop belongs to, a block of buildings opposite, parked cars, street
 lights, trees and a skyline behind it all — about 140 objects.
 
@@ -128,15 +136,22 @@ their walk cycles are driven from actual travel speed, so nobody skates.
 
 ## Architecture
 
-`GameBootstrapper` is the whole entry point. Dropped on an empty GameObject, it builds the systems,
-generates the room and the player, assembles the UI, and hands control to `GameManager`.
+The world is not generated: the shop, yard, street and props are objects in
+`Assets/Scenes/MainScene.unity`, furniture is prefabs in `Assets/Prefabs/Furniture/`, and their
+baked meshes and materials live in `Assets/Environment/Baked/`. `GameBootstrapper`, on the scene's
+`Bootstrap` object, builds the systems, assembles the UI and hands control to `GameManager`.
 
 ```
-Bootstrap ─▶ systems (grid · shop · build · spawner · audio · manager)
-          ─▶ ShopGenerator  room shell, lighting, player, camera, NavMesh
-          ─▶ UI             status bar, build palette, panels
-          ─▶ GameManager    starter layout or save, then the day loop
+MainScene  ─▶ world objects, ShopLayout (anchors, lot stages, NavMesh), StarterPiece markers
+Bootstrap  ─▶ systems (grid · shop · build · spawner · audio · manager)
+           ─▶ UI             status bar, build palette, panels
+           ─▶ GameManager    starter layout or save, then the day loop
 ```
+
+**Standing rule: never add runtime generators or build-time scene generators.** New world
+content is added in the editor, as prefabs and scene objects, and the scene is committed.
+(`ShopGenerator`, `StreetGenerator` and the `SceneBuilder` editor script used to build the
+world in code; they have been removed.)
 
 Three things are worth knowing before you change anything:
 
@@ -149,8 +164,8 @@ Three things are worth knowing before you change anything:
 4. **Model kits are sized by measured bounds, never by a hard-coded scale.** The Kenney kits
    are authored at wildly different scales, so `KenneyLibrary.Spawn` takes a target size in
    metres and works out the factor itself.
-5. **The Kenney kits are optional.** Delete `Assets/Resources/Kenney/` and the game still runs
-   on its procedural fallbacks.
+5. **The Kenney kits are optional.** Delete `Assets/Resources/Kenney/` and the game still runs:
+   the world and furniture are baked assets, and runtime-spawned models fall back to plainer ones.
 
 `CLAUDE.md` has the full file map and the rest of the rules.
 
@@ -158,12 +173,16 @@ Three things are worth knowing before you change anything:
 
 ```
 Assets/
-├── Editor/     headless setup, scene generation and player builds
+├── Editor/     headless setup, checks and player builds
+├── Scenes/     MainScene.unity — the whole world, authored in the editor
+├── Prefabs/    Furniture/ — one prefab per placeable catalog item
+├── Environment/
+│   └── Baked/      meshes, materials and textures the scene and prefabs use
 ├── Resources/
 │   └── Kenney/     CC0 model kits, not in the repo — see THIRD-PARTY.md
 └── Scripts/
     ├── Core/       bootstrap, game manager, mesh/material/model factories, audio, save
-    ├── Shop/       grid, build mode, furniture catalog, shop and street generators
+    ├── Shop/       grid, build mode, furniture catalog, ShopLayout + StarterPiece
     ├── Player/     controller, third-person camera, interaction
     ├── Customer/   shopper AI and spawner
     ├── Commerce/   shop manager, shelves, products, catalog

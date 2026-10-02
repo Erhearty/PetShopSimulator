@@ -7,7 +7,7 @@
 <!-- generated:start comp:pet-shop-simulator-game-client -->
 ## Pet Shop Simulator (Game Client) (`pet-shop-simulator-game-client`, FRONTEND)
 
-Single-player, first-person 3D shop-management sim. GameBootstrapper is the whole entry point: it builds the grid/shop/build/spawner/audio/manager systems, generates the shop room and street via procedural + Kenney-kit geometry, assembles the player and UI, then hands control to GameManager for the day loop (customers, stocking, breeding, rent). No backend/server - everything runs client-side in one Unity process; all furniture placement funnels through BuildMode.Place() -> FurnitureFactory.Spawn() and audio is synthesised at startup (no sound files).
+Single-player, first-person 3D shop-management sim. The world (shop room and street) is authored in the editor in MainScene.unity - nothing generates it at runtime. GameBootstrapper is the whole entry point: it builds the grid/shop/build/spawner/audio/manager systems on top of the authored scene, assembles the player and UI, then hands control to GameManager for the day loop (customers, stocking, breeding, rent). No backend/server - everything runs client-side in one Unity process; all furniture placement funnels through BuildMode.Place() -> FurnitureFactory.Spawn() and audio is synthesised at startup (no sound files).
 
 **Tech:** Unity 6000.6.2f1, C#, Built-in Render Pipeline, UGUI (com.unity.ugui), AI Navigation / NavMesh (com.unity.ai.navigation), Unity Timeline, Unity Purchasing, Unity Test Framework
 
@@ -17,7 +17,7 @@ Single-player, first-person 3D shop-management sim. GameBootstrapper is the whol
 flowchart LR
     bootstrapper["GameBootstrapper<br/><small>entry point</small>"]
     core["Core<br/><small>GameManager, MeshBuilder, ModelLibrary, MaterialFactory, CharacterFactory, AudioManager, SaveSystem</small>"]
-    shop["Shop<br/><small>GridManager, BuildMode, FurnitureFactory, ShopGenerator, StreetGenerator</small>"]
+    shop["Shop<br/><small>GridManager, BuildMode, FurnitureFactory (shop room & street pre-authored in MainScene.unity)</small>"]
     player["Player<br/><small>PlayerController, cameras, InteractionSystem</small>"]
     customer["Customer<br/><small>CustomerAI, CustomerSpawner</small>"]
     commerce["Commerce<br/><small>ShopManager, ShelfUnit, ItemDatabase, CheckoutQueue, ProductItem, DeliveryCrate, StaffCandidate, Assistant</small>"]
@@ -53,7 +53,7 @@ flowchart LR
 <!-- generated:start comp:build-editor-tooling -->
 ## Build & Editor Tooling (`build-editor-tooling`, CUSTOM)
 
-Editor-time / headless tooling (Assets/Editor, driven by root build.sh) that sets up the project (TextMesh Pro essentials, Always-Included Shaders), generates the scene (SceneBuilder, GameBuilder), imports/reports on Kenney and Asset Store art, verifies spawns/materials/shaders, and produces the Linux player build plus smoke-test screenshots. Runs only at build/dev time - never shipped in the game itself.
+Editor-time / headless tooling (Assets/Editor, driven by root build.sh) that sets up the project (TextMesh Pro essentials, Always-Included Shaders), builds the player from the hand-authored, checked-in Assets/Scenes/MainScene.unity (GameBuilder - the tooling no longer generates the scene), imports/reports on Kenney and Asset Store art, verifies spawns/materials/shaders, and produces the Linux player build plus smoke-test screenshots. Runs only at build/dev time - never shipped in the game itself.
 
 **Tech:** Unity Editor scripting (UnityEditor), Bash (build.sh), Headless Linux batchmode build
 <!-- generated:end comp:build-editor-tooling -->

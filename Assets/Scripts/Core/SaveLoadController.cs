@@ -27,7 +27,7 @@ namespace PetShop.Core
         {
             _game.Show.Withdraw();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
-            foreach (var p in _game.Generator.StarterLayout(_game.Grid))
+            foreach (var p in _game.Layout.StarterLayout(_game.Grid))
             {
                 var def = BuildCatalog.Get(p.CatalogId);
                 var go  = _game.Build.Place(p.Cell, def, p.Variant, p.Rotation, charge: false);

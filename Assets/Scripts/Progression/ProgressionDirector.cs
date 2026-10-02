@@ -33,15 +33,15 @@ namespace PetShop.Progression
         private readonly List<string>     _latestMilestones = new();
 
         private GameManager   _game;
-        private ShopGenerator _generator;
+        private ShopLayout _layout;
 
         private ShopManager Shop => _game != null ? _game.Shop : null;
 
         /// <summary>Wires the director to the scene. Called by GameBootstrapper before the game begins.</summary>
-        public void Init(GameManager game, ShopGenerator generator, BuildMode build)
+        public void Init(GameManager game, ShopLayout layout, BuildMode build)
         {
             _game      = game;
-            _generator = generator;
+            _layout    = layout;
             if (build != null) build.PenVariantSource = () => ProgressionRules.PenVariantsForTier(Tier);
         }
 
@@ -91,7 +91,7 @@ namespace PetShop.Progression
 
         private void ApplyLotStage()
         {
-            if (_generator != null) _generator.ApplyLotStage(ProgressionRules.LotStageForTier(Tier));
+            if (_layout != null) _layout.ApplyLotStage(ProgressionRules.LotStageForTier(Tier));
         }
 
         /// <summary>Mean health of every resident animal; full marks when there are none.</summary>

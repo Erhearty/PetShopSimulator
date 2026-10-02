@@ -10,25 +10,49 @@ Unity **6000.6.2f1** on Linux (Nobara/Fedora), **Built-in Render Pipeline**, **o
 Art is **procedural geometry plus the CC0 Kenney model kits** in `Assets/Resources/Kenney/`
 (see `THIRD-PARTY.md`). Audio is still fully synthesised in `AudioManager.cs` — there are no
 audio files. The earlier "no external assets at all" rule was lifted deliberately when the
-street was added; the procedural paths all still exist as fallbacks, and **deleting
-`Assets/Resources/Kenney/` must leave the game running**, just plainer. Keep it that way:
-every `ModelLibrary.Spawn` call can return null and every caller has to cope.
+street was added. The world (shop, yard, street, props) and the furniture prefabs are baked
+assets that do not depend on the kits: their meshes/materials live in `Assets/Environment/Baked/`.
+Models spawned at runtime (characters, pets, products) still go through `ModelLibrary`, and
+**deleting `Assets/Resources/Kenney/` must leave the game running**, just plainer. Keep it that
+way: every `ModelLibrary.Spawn` call can return null and every caller has to cope. Furniture has
+no procedural fallback: `FurnitureFactory.Spawn` needs `Assets/Prefabs/Furniture/FurniturePrefabs.asset`.
 
 This is a **3D** game. Do not reintroduce `SpriteRenderer`, `Camera.orthographic`, or 2D physics.
+
+## The world is authored in the scene — no generators
+
+The shop, the yard, the street and every prop are ordinary GameObjects saved in
+`Assets/Scenes/MainScene.unity`. Placeable furniture (shelves, pens, counter, walls, fence) is one
+prefab per `BuildCatalog` id in `Assets/Prefabs/Furniture/`. The meshes, materials and textures the
+scene and those prefabs use are assets under `Assets/Environment/Baked/`. A `ShopLayout` component in
+the scene holds the yard and room dimensions, the anchors (shop centre, door, forecourt, player
+start, pavement), the paddock rect, the lot stages and the NavMesh bake. `StarterPiece` markers
+define the starter furniture of a new game: catalog id, variant and rotation, with the cell taken
+from the marker's position.
+
+**Standing rule: never add runtime generators or build-time scene generators.** New world content
+is added in the editor: make or edit a prefab, place it in MainScene, save the scene and commit it.
+No code may build the shop, yard or street at runtime, and no editor script or `build.sh` step may
+write `MainScene.unity`.
+
+History: the world used to be generated at runtime by `ShopGenerator` and `StreetGenerator` (plus
+the `Shop/Generation/` and `Shop/Street/` builders), and the editor script `SceneBuilder` wrote an
+empty MainScene holding only the Bootstrap object. A one-off `SceneBaker` captured the generated
+world into the scene and prefabs. All of them have been removed.
 
 ## How to run
 
 **From a terminal (no editor interaction needed):**
 
 ```bash
-./build.sh          # setup → scene → Linux player → headless smoke test
+./build.sh          # setup → Linux player → headless smoke test
 ./build.sh run      # launch the built player
 ```
 
-**From the editor:** open `Assets/Scenes/MainScene.unity` and press Play. The scene contains only a
-`Bootstrap` GameObject with `GameBootstrapper` on it; everything else is generated at runtime.
+**From the editor:** open `Assets/Scenes/MainScene.unity` and press Play. The scene holds the whole
+world (see above). Its `Bootstrap` GameObject carries `GameBootstrapper`, which builds the systems and UI.
 
-`build.sh` sub-commands: `setup`, `scene`, `linux`, `windows`, `run`, `smoke`.
+`build.sh` sub-commands: `setup`, `linux`, `windows`, `run`, `smoke`.
 
 ## Controls — first person
 
@@ -65,8 +89,8 @@ invisible at eye level are obvious there, and every layout problem so far was fo
 way: a city that was one thin strip of randomly-rotated towers, a yard that was a featureless
 green field, a paddock four times the size of the pens inside it.
 
-**The yard is zoned, not scattered.** `ShopGenerator.DressYard` lays down surfacing first
-and props second:
+**The yard is zoned, not scattered.** The zones are scene objects in MainScene: surfacing
+first, props on top:
 
 | Zone | What it is |
 |---|---|
@@ -76,8 +100,8 @@ and props second:
 | Garden | planted bed with kerb, tree and benches, filling the gap between shop and paddock |
 | Beds | hedging along the back and west walls |
 
-`PaddockArea` must stay sized to the pens. `StarterLayout` places them on a 4-cell pitch
-from its corner, so if you change one, check the other.
+`ShopLayout.PaddockRect` must stay sized to the pens, and the pens' `StarterPiece` markers
+must sit inside it. If you change one, check the other.
 
 **Asset traps found the hard way, both invisible in code review:**
 
@@ -102,12 +126,14 @@ street  beyond the yard's front edge at z = +17
 Shelves and the till go **indoors**; pet pens go **outdoors in the yard**. Both use the same
 placement path, so the only difference is which cells the starter layout picks.
 
-`ShopGenerator.StarterLayout(grid)` derives every cell from the live geometry rather than
-hard-coding, so resizing the yard or shop does not break it.
+`ShopLayout.StarterLayout(grid)` turns each `StarterPiece` marker into a placement, taking the
+cell from the marker's world position. To change the starter shop, move, add or remove markers
+in the scene.
 
-**The street's cross-section is measured from `YardFrontZ`.** `ShopGenerator.Generate` sets
-`Street.KerbZ` and `Street.FarPavementZ` explicitly — forgetting that left the road sitting
-on top of the yard, with parked cars in the shop doorway and the player spawning on tarmac.
+**The street starts at `YardFrontZ`.** It is scene geometry, so if you resize the yard in
+`ShopLayout`, move the street objects to match. The old generator got this wrong once and left
+the road sitting on top of the yard, with parked cars in the shop doorway and the player
+spawning on tarmac.
 
 ## First person
 
@@ -152,7 +178,7 @@ animation. Without the pack it falls back to `MeshBuilder.CreateHumanoid`.
 repo; use it after any visual change instead of guessing.
 
 ```bash
-./build.sh look          # renders Screenshots/00..10_*.png of a freshly generated shop
+./build.sh look          # renders Screenshots/00..10_*.png of a fresh game
 ```
 
 How it works, and why each part is load-bearing:
@@ -176,7 +202,7 @@ A player build also honours `-tour <dir>` and `-screenshot <path>`.
 
 ## The world outside
 
-`StreetGenerator` builds everything beyond the shop window. Its cross-section, running out
+Everything beyond the shop window is scene geometry in MainScene. Its cross-section, running out
 from the shopfront along +Z:
 
 ```
@@ -190,9 +216,9 @@ z 26 +       block opposite, then the skyline
 Two rules keep this cheap and predictable:
 
 - **Kenney models never carry colliders.** `KenneyModelPostprocessor` disables them. All
-  collision is procedural boxes placed by `StreetGenerator`, so what is walkable is decided
+  collision comes from explicit collider objects in the scene, so what is walkable is decided
   explicitly rather than inherited from art.
-- **The pavement is drawn full-length but only collides within `WalkableHalf` (26 m).**
+- **The pavement is drawn full-length but only collides within 26 m of the shop door, either side.**
   The NavMesh bake volume comes from colliders, so this is what keeps the bake small. If you
   widen the walkable area, expect the bake to get slower.
 
@@ -330,8 +356,11 @@ Assets/
 │   ├── AssetStoreImporter.cs       ← imports downloaded Asset Store packs (one per run)
 │   ├── SpawnVerify.cs              ← checks spawned models for size/orientation/grounding
 │   ├── FacingProbe.cs              ← works out which way a building model faces
-│   ├── SceneBuilder.cs             ← generates Assets/Scenes/MainScene.unity
 │   └── GameBuilder.cs              ← headless Linux/Windows player builds
+│
+├── Scenes/MainScene.unity          ← the whole world, authored in the editor
+├── Prefabs/Furniture/              ← one prefab per BuildCatalog id
+├── Environment/Baked/              ← meshes, materials, textures used by the scene and prefabs
 │
 ├── Resources/
 │   ├── Kenney/                     ← CC0 model kits
@@ -356,22 +385,10 @@ Assets/
     │   └── SaveSystem.cs           ← JSON save incl. full furniture layout
     │
     ├── Shop/
-    │   ├── ShopGenerator.cs        ← orchestrates the shop builders; NavMesh, starter layout
-    │   ├── StreetGenerator.cs      ← orchestrates the street builders; pavement, road, parade, block opposite, barriers
-    │   ├── Generation/
-    │   │   ├── ShopBuildContext.cs     ← shared state + placement helpers for one ShopGenerator run
-    │   │   ├── ShopBuildingBuilder.cs  ← yard ground, perimeter, railing; shop shell and roof plant
-    │   │   ├── ShopFrontBuilder.cs     ← glazed shopfront, awning, sign, storeys above
-    │   │   ├── ShopInteriorBuilder.cs  ← floor grid, lighting, interior dressing
-    │   │   ├── YardDresser.cs          ← yard surfaces, paddock, planting, props (seeded)
-    │   │   └── PlayerRigSpawner.cs     ← spawns the shopkeeper and the camera rig
-    │   ├── Street/
-    │   │   ├── StreetBuildContext.cs   ← shared state, seeded RNG + place/track helpers for one street run
-    │   │   ├── StreetModels.cs         ← model path tables, best pack first
-    │   │   ├── CityBlockBuilder.cs     ← city blocks behind the street, backdrop row
-    │   │   └── StreetFurnitureBuilder.cs ← lamps, traffic lights, trees, parked cars
+    │   ├── ShopLayout.cs           ← scene component: dimensions, anchors, lot stages, NavMesh, starter layout
+    │   ├── StarterPiece.cs         ← scene marker for one piece of starter furniture
     │   ├── GridManager.cs          ← CellSize 2 m, XZ plane, footprint helpers
-    │   ├── FurnitureFactory.cs     ← BuildCatalog (ids/costs/sizes) + Spawn()
+    │   ├── FurnitureFactory.cs     ← BuildCatalog (ids/costs/sizes) + Spawn() from Assets/Prefabs/Furniture
     │   └── BuildMode.cs            ← floor-plane cursor, ghost, placement, refunds
     │
     ├── Player/
@@ -437,7 +454,7 @@ or the object sinks into the floor.
 footprints use `FootprintCenter(cell, size)`, not `GridToWorld` — the latter is the *root cell*
 centre and a 2×1 shelf placed there is off by half a cell.
 
-**NavMesh is baked at runtime** by `ShopGenerator.BakeNavMesh()` — `CollectObjects.Children` over the
+**NavMesh is baked at runtime** by `ShopLayout.BakeNavMesh()` — `CollectObjects.Children` over the
 `Shop` root, using **PhysicsColliders**, excluding the Character layer. It is rebaked whenever build
 mode exits. New static geometry that is not a child of `ShopRoot` will not be in the NavMesh.
 
@@ -497,8 +514,8 @@ needs it, otherwise buy an animal, otherwise report.
 
 ## Known issues / not yet done
 
-- `Assets/Sprites/`, `Assets/Prefabs/`, `Assets/ScriptableObjects/` and `Assets/Audio/` are empty
-  leftovers from the 2D version. Nothing references them.
+- `Assets/Sprites/`, `Assets/ScriptableObjects/` and `Assets/Audio/` are empty leftovers from the
+  2D version. Nothing references them. (`Assets/Prefabs/` is no longer one: it holds the furniture prefabs.)
 - `ShopManager._stock` (the string-keyed ledger) is vestigial — real inventory lives on `ShelfUnit`.
   It is still saved/loaded for compatibility.
 - A customer already inside at closing time checks out into the *next* day's sales log.
@@ -511,9 +528,10 @@ needs it, otherwise buy an animal, otherwise report.
   eye. `SpawnVerify` confirms sizes/orientation and `FacingProbe` settled building facing,
   but **composition** — whether the street reads well, whether props sit at sensible spots,
   whether UI panels overlap — is unchecked. Start there.
-- `StreetGenerator.BuildingFacing` was derived from the city pack's demo scene (+Z won 28
-  votes to 15 across 56 buildings). A plurality, not a certainty — if the parade shows its
-  back, flip that one constant.
+- The parade's building facing was derived from the city pack's demo scene (+Z won 28
+  votes to 15 across 56 buildings) when the removed `StreetGenerator` placed them. A plurality,
+  not a certainty — if the parade shows its back, rotate those buildings in MainScene
+  (`FacingProbe` reports which way a model faces).
 - **A killed editor leaves `Temp/UnityLockfile` behind**, and every later batch run then
   fails with what looks like a compiler error. `build.sh` clears it when nothing holds it.
 - **Asset Store packages are extracted, not imported by Unity.** `build.sh assets` runs

@@ -129,16 +129,29 @@ namespace PetShop.Shop
         }
     }
 
+    /// <summary>Which catalogue section an entry belongs to.</summary>
+    public enum BuildCategory
+    {
+        /// <summary>Working furniture: shelves, pens, the counter.</summary>
+        Furniture,
+        /// <summary>Building fabric: walls, doorways, fences.</summary>
+        Structure,
+        /// <summary>Purely visual decor; never interactable.</summary>
+        Decoration,
+    }
+
     /// <summary>Catalogue entry describing one placeable furniture type.</summary>
     [System.Serializable]
     public class PlacedObjectData
     {
-        public string     Id;
-        public string     DisplayName;
-        public string     Type;          // "shelf" | "pen" | "counter"
-        public Vector2Int Size = Vector2Int.one;
-        public float      Cost;
-        public Color      Tint = Color.white;
+        public string        Id;
+        public string        DisplayName;
+        public string        Type;          // "shelf" | "pen" | "counter" | "wall" | ... | "decoration"
+        public BuildCategory Category = BuildCategory.Furniture;
+        public string        Description = "";
+        public Vector2Int    Size = Vector2Int.one;
+        public float         Cost;
+        public Color         Tint = Color.white;
     }
 
     public class GridEntry

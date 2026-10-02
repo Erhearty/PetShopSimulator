@@ -12,7 +12,7 @@ namespace PetShop.Core
     public static class SaveMigrator
     {
         /// <summary>The save format version written by this build.</summary>
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 5;
 
         /// <summary>Saves written before the Version field existed; they parse as 0.</summary>
         private const int LegacyVersion = 0;
@@ -46,7 +46,30 @@ namespace PetShop.Core
             { FirstVersion,  NormaliseDefaults },
             { PreProgressionVersion, SeedProgressionTier },
             { StaffCountVersion, NormaliseStaffList },
+            { PreFurnitureSupplyVersion, UpgradeToVersion5 },
         };
+
+        /// <summary>Saves from before furniture was ordered, delivered and kept in an inventory.</summary>
+        private const int PreFurnitureSupplyVersion = 4;
+
+        /// <summary>
+        /// Version 4 → 5. Each addition made in format 5 has its own sub-step here, so a later
+        /// version-5 field only needs one more line.
+        /// </summary>
+        private static void UpgradeToVersion5(SaveData data)
+        {
+            SeedFurnitureSupply(data);
+        }
+
+        /// <summary>
+        /// Older saves had no furniture inventory or orders: everything they own is already placed,
+        /// so both start empty.
+        /// </summary>
+        private static void SeedFurnitureSupply(SaveData data)
+        {
+            data.FurnitureInventory     ??= new List<SaveData.StockEntry>();
+            data.PendingFurnitureOrders ??= new List<SaveData.FurnitureOrderSave>();
+        }
 
         /// <summary>Saves that kept only a staff head count, not who the staff were.</summary>
         private const int StaffCountVersion = 3;

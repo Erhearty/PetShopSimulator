@@ -43,7 +43,7 @@ namespace PetShop.Core
         /// <summary>Puts the pallet on the forecourt and tells the player it has landed.</summary>
         public void OnDeliveryArrived(SupplierOrder order)
         {
-            Vector3 spot = _game.Generator != null ? _game.Generator.ForecourtPosition : Vector3.zero;
+            Vector3 spot = _game.Layout != null ? _game.Layout.ForecourtPosition : Vector3.zero;
             // Spread pallets out so two deliveries never stack in the same spot.
             spot += new Vector3(UnityEngine.Random.Range(-2.4f, 2.4f), 0f, UnityEngine.Random.Range(-1f, 1.4f));
 

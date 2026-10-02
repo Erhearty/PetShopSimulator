@@ -52,6 +52,19 @@ namespace PetShop.Core
         public List<LineageEntrySave> Lineage   = new();
         /// <summary>Auto-reorder rule per product category.</summary>
         public List<ReorderRuleSave> AutoReorder = new();
+        /// <summary>Unplaced furniture the player owns, keyed by catalogue id (save version 5+).</summary>
+        public List<StockEntry> FurnitureInventory = new();
+        /// <summary>Furniture paid for but not yet collected from the forecourt (save version 5+).</summary>
+        public List<FurnitureOrderSave> PendingFurnitureOrders = new();
+
+        /// <summary>One furniture order as saved: what it is, when it lands, and whether it has.</summary>
+        [Serializable]
+        public class FurnitureOrderSave
+        {
+            public string catalogId;
+            public float  arrivalProgress;
+            public bool   arrived;
+        }
 
         [Serializable]
         public class StockEntry { public string id; public int qty; }

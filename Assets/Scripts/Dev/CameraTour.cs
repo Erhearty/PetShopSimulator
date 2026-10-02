@@ -168,7 +168,7 @@ namespace PetShop.Dev
 
         private List<Shot> BuildShots()
         {
-            var gen  = FindAnyObjectByType<ShopGenerator>();
+            var gen  = FindAnyObjectByType<ShopLayout>();
             var ui   = FindAnyObjectByType<GameUI>();
             var game = GameManager.Instance;
 

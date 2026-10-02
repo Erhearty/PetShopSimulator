@@ -28,7 +28,7 @@ namespace PetShop.Core
         [HideInInspector] public ShopManager     Shop;
         [HideInInspector] public CustomerSpawner Spawner;
         [HideInInspector] public AudioManager    Audio;
-        [HideInInspector] public ShopGenerator   Generator;
+        [HideInInspector] public ShopLayout      Layout;
         [HideInInspector] public CheckoutQueue    Queue;
         [HideInInspector] public ProgressionDirector Progression;
         [HideInInspector] public ShopEventDirector   Events;
@@ -127,7 +127,7 @@ namespace PetShop.Core
             if (save != null) _saveLoad.LoadGame(save);
             else              _saveLoad.NewGame();
 
-            Generator?.BakeNavMesh();
+            Layout?.BakeNavMesh();
             StartDay();
         }
 
