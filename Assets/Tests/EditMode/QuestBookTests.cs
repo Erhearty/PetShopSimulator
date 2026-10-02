@@ -197,5 +197,18 @@ namespace PetShop.Tests
             Assert.AreEqual(QuestChapter.Early, restored.CurrentChapter);
             Assert.IsTrue(restored.IsChapterComplete(QuestChapter.Tutorial));
         }
+
+        /// <summary>A saved chapter ahead of the completed set is not trusted: the chapter is re-derived.</summary>
+        [Test]
+        public void Restore_SavedChapterAheadOfCompletedSet_ResumesAtFirstIncompleteChapter()
+        {
+            var progress = new QuestProgress { Chapter = QuestChapter.End };
+
+            var restored = new QuestBook();
+            restored.Restore(progress);
+
+            Assert.AreEqual(QuestChapter.Tutorial, restored.CurrentChapter);
+            Assert.IsFalse(restored.AllComplete);
+        }
     }
 }

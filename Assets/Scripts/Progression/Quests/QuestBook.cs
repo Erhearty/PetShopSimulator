@@ -129,8 +129,9 @@ namespace PetShop.Progression.Quests
 
         /// <summary>
         /// Replaces this book's state with saved <paramref name="progress"/>. Unknown ids are
-        /// ignored; the chapter then moves past any chapter that is already complete. Null
-        /// resets to a fresh book.
+        /// ignored. The chapter is re-derived from the completed set (the saved chapter is not
+        /// trusted), so a quest added to an earlier chapter after the save is still reached.
+        /// Null resets to a fresh book.
         /// </summary>
         public void Restore(QuestProgress progress)
         {
@@ -142,7 +143,6 @@ namespace PetShop.Progression.Quests
             foreach (var id in progress.CompletedIds ?? new List<string>())
                 if (Find(id) != null) _completed.Add(id);
             foreach (var flag in progress.Flags ?? new List<string>()) RaiseFlag(flag);
-            CurrentChapter = ClampChapter(progress.Chapter);
             AdvanceChapters();
         }
 
@@ -197,7 +197,5 @@ namespace PetShop.Progression.Quests
             return null;
         }
 
-        private static QuestChapter ClampChapter(QuestChapter chapter) =>
-            chapter < FirstChapter ? FirstChapter : chapter > LastChapter ? LastChapter : chapter;
     }
 }
