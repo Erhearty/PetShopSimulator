@@ -12,6 +12,19 @@ namespace PetShop.Core
         private static int _furniture = -1;
         private static int _ghost     = -1;
         private static int _scenery   = -1;
+        private static int _heldItem  = -1;
+
+        /// <summary>Name of the layer the first-person held-item viewmodel renders on.</summary>
+        public const string HeldItemLayerName = "HeldItem";
+
+        /// <summary>
+        /// The held-item viewmodel, drawn only by its overlay camera. Unlike the other lookups
+        /// this is -1 (not Default) when the layer is missing, so callers never hide Default.
+        /// </summary>
+        public static int HeldItem =>
+            _heldItem >= 0 ? _heldItem : (_heldItem = LayerMask.NameToLayer(HeldItemLayerName));
+
+        private static int HeldItemBit => HeldItem >= 0 ? 1 << HeldItem : 0;
 
         /// <summary>Player and customers — excluded from camera collision and build raycasts.</summary>
         public static int Character => Resolve(ref _character, "Character");
@@ -37,7 +50,7 @@ namespace PetShop.Core
         /// camera that ducks every time the player walks past a lamp post reads as stutter.
         /// </summary>
         public static LayerMask CameraBlocker =>
-            ~((1 << Character) | (1 << Ghost) | (1 << Scenery));
+            ~((1 << Character) | (1 << Ghost) | (1 << Scenery) | HeldItemBit);
 
         private static int Resolve(ref int cache, string name)
         {

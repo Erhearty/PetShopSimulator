@@ -150,10 +150,12 @@ namespace PetShop.Shop
         /// Instantiate the baked prefab for a catalogue entry at a grid cell.
         /// <paramref name="variant"/> is a ProductCategory name for shelves and a
         /// Pet.Species name for pens; null picks a sensible default. Decorations get no
-        /// behaviour component and go on the Default layer.
+        /// behaviour component and go on the Default layer. <paramref name="footprint"/> is the
+        /// occupied size the object centres on; null uses <c>def.Size</c>.
         /// </summary>
         public static GameObject Spawn(PlacedObjectData def, Vector2Int cell, string variant,
-                                       GridManager grid, Transform parent, float yRotation = 0f)
+                                       GridManager grid, Transform parent, float yRotation = 0f,
+                                       Vector2Int? footprint = null)
         {
             if (def == null || grid == null) return null;
 
@@ -170,7 +172,7 @@ namespace PetShop.Shop
             if (!decor) AddBehaviour(go, def, variant);
 
             go.name = $"Placed_{def.Id}_{cell.x}_{cell.y}";
-            go.transform.position      = grid.FootprintCenter(cell, def.Size);
+            go.transform.position      = grid.FootprintCenter(cell, footprint ?? def.Size);
             go.transform.eulerAngles   = new Vector3(0f, yRotation, 0f);
             MeshBuilder.SetLayerRecursive(go, decor ? DecorationLayer : GameLayers.Furniture);
             return go;

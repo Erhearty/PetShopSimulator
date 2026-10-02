@@ -76,6 +76,8 @@ namespace PetShop.Core
             public int    cellX, cellY;
             public string variant;
             public float  rotation;
+            /// <summary>True when a hand-placed item occupies its catalogue footprint with x/y swapped.</summary>
+            public bool   footprintRotated;
             public List<StockEntry>  shelfStock = new();
             public List<PetSaveData> pets       = new();
         }

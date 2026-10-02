@@ -5,15 +5,19 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using PetShop.Core;
 using PetShop.Commerce;
+using PetShop.Pets;
 
 namespace PetShop.Shop
 {
     /// <summary>
     /// 3D build mode — projects the mouse onto the floor plane, shows a translucent
     /// ghost of the item, and places real furniture on LMB.
-    /// LMB place | R rotate | Q cycle pen species | RMB/Esc/B cancel | Delete-key or middle-click removes.
+    /// LMB place | R / Shift+R rotate (wheel too while holding an item) | Q cycle pen species |
+    /// RMB/Esc/B cancel | Delete-key or middle-click removes.
+    /// Held-item placement (from the furniture inventory) lives in BuildMode.Held.cs, the ghost
+    /// in BuildMode.Ghost.cs.
     /// </summary>
-    public class BuildMode : MonoBehaviour
+    public partial class BuildMode : MonoBehaviour
     {
         [Header("References")]
         public GridManager GridManager;
@@ -44,17 +48,18 @@ namespace PetShop.Shop
 
         /// <summary>Catalog type of pens, the only item whose species can be picked.</summary>
         private const string PenType = "pen";
+        /// <summary>Share of an item's cost refunded when removed without a furniture inventory.</summary>
+        private const float SellBackShare = 0.5f;
         /// <summary>Index into the current pen variant options; wrapped on use.</summary>
         private int _penVariantIndex;
 
+        /// <summary>True while build mode is open.</summary>
         public bool             IsActive    { get; private set; }
+        /// <summary>The catalogue entry being placed, or the last one placed.</summary>
         public PlacedObjectData CurrentItem { get; private set; }
 
-        private GameObject _ghost;
-        private Material   _ghostMat;
         private Camera     _cam;
         private float      _rotation;
-        private float      _ghostHeight = 1.5f;
         private Vector2Int _hoverCell;
         private bool       _hoverValid;
 
@@ -68,21 +73,34 @@ namespace PetShop.Shop
 
         // ── Mode control ────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Opens paid build mode for <paramref name="item"/>: placing charges its catalogue cost.
+        /// Any item held from the furniture inventory goes back first.
+        /// </summary>
         public void EnterBuildMode(PlacedObjectData item)
         {
             if (item == null) return;
+            ReturnHeld();
+            BeginMode(item);
+        }
+
+        /// <summary>Shared entry for paid and held placement: resets rotation and builds the ghost.</summary>
+        private void BeginMode(PlacedObjectData item)
+        {
             CurrentItem = item;
             IsActive    = true;
             _rotation   = 0f;
             CreateGhost();
             OnBuildModeEntered.Invoke(item);
-            if (item.Type == PenType) AnnouncePenVariant();
+            if (item.Type == PenType && _heldVariant == null) AnnouncePenVariant();
         }
 
+        /// <summary>Closes build mode; a held item goes back into the furniture inventory.</summary>
         public void ExitBuildMode()
         {
             if (!IsActive) return;
             IsActive = false;
+            ReturnHeld();
             DestroyGhost();
             OnBuildModeExited.Invoke();
         }
@@ -95,7 +113,7 @@ namespace PetShop.Shop
             if (InputBindings.GetKeyDown(GameAction.BuildMode) || Input.GetMouseButtonDown(1))
             { ExitBuildMode(); return; }
 
-            if (InputBindings.GetKeyDown(GameAction.BuildRotate)) _rotation = (_rotation + 90f) % 360f;
+            HandleRotationInput();
             if (Input.GetKeyDown(KeyCode.Q)) CyclePenVariant();
 
             UpdateGhost();
@@ -113,6 +131,7 @@ namespace PetShop.Shop
         {
             if (!RaycastFloor(out var worldPos)) return;
             var cell = GridManager.WorldToGrid(worldPos);
+            if (IsHolding) { PlaceHeld(cell); return; }
 
             if (!GridManager.CanPlace(cell, CurrentItem.Size))
             {
@@ -157,17 +176,20 @@ namespace PetShop.Shop
 
         /// <summary>
         /// Place furniture and register it on the grid. Shared by the player, the starter
-        /// layout and save loading.
+        /// layout and save loading. <paramref name="footprintRotated"/> swaps the catalogue
+        /// footprint's x/y (hand-placed items turned 90/270°); false keeps <c>def.Size</c>.
         /// </summary>
         public GameObject Place(Vector2Int cell, PlacedObjectData def, string variant,
-                                float rotation, bool charge)
+                                float rotation, bool charge, bool footprintRotated = false)
         {
-            if (def == null || !GridManager.PlaceObject(cell, def, def.Size)) return null;
+            if (def == null) return null;
+            Vector2Int size = FootprintSize(def, footprintRotated);
+            if (!GridManager.PlaceObject(cell, def, size)) return null;
 
             if (charge && Shop != null)
                 Shop.ChangeBalance(-def.Cost, $"Build {def.DisplayName}");
 
-            var go = FurnitureFactory.Spawn(def, cell, variant, GridManager, ObjectRoot, rotation);
+            var go = FurnitureFactory.Spawn(def, cell, variant, GridManager, ObjectRoot, rotation, size);
             _placedNodes[cell] = go;
 
             if (GridManager.TryGetObject(cell, out var entry))
@@ -181,89 +203,76 @@ namespace PetShop.Shop
             return go;
         }
 
+        /// <summary>Removes whatever stands on the floor cell under the aim point.</summary>
         public void TryRemoveUnderCursor()
         {
             if (!RaycastFloor(out var worldPos)) return;
             RemoveAtWorldPos(worldPos);
         }
 
+        /// <summary>
+        /// Removes the object covering <paramref name="worldPos"/>. With a furniture
+        /// <see cref="Supply"/> the item goes back into the inventory (shelf stock to the
+        /// warehouse, an occupied pen refuses); without one it is sold back for half its cost.
+        /// </summary>
         public void RemoveAtWorldPos(Vector3 worldPos)
         {
             var cell = GridManager.WorldToGrid(worldPos);
             if (!GridManager.TryGetObject(cell, out var entry)) return;
+            if (Supply != null && PenHasPets(entry.Instance))
+            {
+                OnBuildMessage.Invoke("Move the pets out before packing this pen away.");
+                return;
+            }
 
             var root = entry.Root;
             var def  = entry.Data;
+            if (Supply != null) ReturnShelfStock(entry.Instance);
             if (!GridManager.RemoveObject(cell)) return;
 
-            if (_placedNodes.TryGetValue(root, out var go))
-            {
-                OnFurnitureDespawning.Invoke(go);
-                Destroy(go);
-                _placedNodes.Remove(root);
-            }
-            if (Shop != null && def != null)
-                Shop.ChangeBalance(def.Cost * 0.5f, $"Sold {def.DisplayName}");
-
+            DespawnNode(root);
+            string message = SettleRemoval(def);
             OnObjectRemovedVisually.Invoke(root);
-            OnBuildMessage.Invoke(def != null ? $"Removed {def.DisplayName} (+€{def.Cost * 0.5f:N0})" : "Removed.");
+            OnBuildMessage.Invoke(message);
         }
 
-        // ── Ghost ───────────────────────────────────────────────────────────────
-
-        private void CreateGhost()
+        /// <summary>Destroys the spawned object rooted at <paramref name="root"/>, if any.</summary>
+        private void DespawnNode(Vector2Int root)
         {
-            DestroyGhost();
-            float cs = GridManager.CellSize;
+            if (!_placedNodes.TryGetValue(root, out var go)) return;
+            OnFurnitureDespawning.Invoke(go);
+            PrefabPreview.DestroySafe(go);
+            _placedNodes.Remove(root);
+        }
 
-            _ghostMat = MaterialFactory.CreateTransparent("ghost", ValidColor);
-
-            // The ghost mimics the shape of what is being placed — a wall preview shaped
-            // like a shelf tells you nothing about how it will sit against its neighbours.
-            bool isWall = BuildCatalog.IsBuildingPiece(CurrentItem.Id);
-            float ghostW, ghostD;
-
-            if (isWall)
+        /// <summary>Returns the removed item to the inventory, or refunds half its cost; gives the message.</summary>
+        private string SettleRemoval(PlacedObjectData def)
+        {
+            if (def == null) return "Removed.";
+            if (Supply != null)
             {
-                _ghostHeight = CurrentItem.Id == BuildCatalog.Fence ? 1.05f : 3.2f;
-                ghostW = cs;
-                ghostD = 0.24f;
+                Supply.AddOwned(def.Id);
+                return $"Packed {def.DisplayName} back into your furniture inventory.";
             }
-            else
-            {
-                _ghostHeight = CurrentItem.Type == "pen" ? 0.7f : 1.5f;
-                ghostW = CurrentItem.Size.x * cs * 0.9f;
-                ghostD = CurrentItem.Size.y * cs * 0.9f;
-            }
-
-            _ghost = MeshBuilder.CreateBox(ghostW, _ghostHeight, ghostD, null, "Ghost");
-            _ghost.transform.SetParent(transform, false);
-            MeshBuilder.SetMaterialRecursive(_ghost, _ghostMat);
-            MeshBuilder.SetLayerRecursive(_ghost, GameLayers.Ghost);
-            foreach (var col in _ghost.GetComponentsInChildren<Collider>(true)) Destroy(col);
+            float refund = def.Cost * SellBackShare;
+            if (Shop != null) Shop.ChangeBalance(refund, $"Sold {def.DisplayName}");
+            return $"Removed {def.DisplayName} (+€{refund:N0})";
         }
 
-        private void DestroyGhost()
+        /// <summary>True when <paramref name="go"/> is a pen with animals still in it.</summary>
+        private static bool PenHasPets(GameObject go)
         {
-            if (_ghost    != null) Destroy(_ghost);
-            if (_ghostMat != null) Destroy(_ghostMat);
-            _ghost = null; _ghostMat = null;
+            var pen = go != null ? go.GetComponent<PetPen>() : null;
+            return pen != null && pen.Count > 0;
         }
 
-        private void UpdateGhost()
+        /// <summary>Moves every unit on a shelf being packed away back into the warehouse.</summary>
+        private void ReturnShelfStock(GameObject go)
         {
-            if (_ghost == null || !RaycastFloor(out var worldPos)) return;
-
-            _hoverCell  = GridManager.WorldToGrid(worldPos);
-            _hoverValid = GridManager.CanPlace(_hoverCell, CurrentItem.Size)
-                       && (Shop == null || Shop.Balance >= CurrentItem.Cost);
-
-            Vector3 centre = GridManager.FootprintCenter(_hoverCell, CurrentItem.Size);
-            _ghost.transform.position      = centre + Vector3.up * (_ghostHeight * 0.5f + 0.02f);
-            _ghost.transform.eulerAngles   = new Vector3(0f, _rotation, 0f);
-
-            if (_ghostMat != null)
-                MaterialFactory.SetColor(_ghostMat, _hoverValid ? ValidColor : InvalidColor);
+            var shelf = go != null ? go.GetComponent<ShelfUnit>() : null;
+            if (shelf == null || Shop == null) return;
+            foreach (var line in shelf.Lines)
+                if (line.Product != null) Shop.AddToWarehouse(line.Product.category, line.Units);
         }
 
         /// <summary>

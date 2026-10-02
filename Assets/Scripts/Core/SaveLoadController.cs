@@ -128,6 +128,7 @@ namespace PetShop.Core
                 cellY     = entry.Root.y,
                 variant   = entry.Variant,
                 rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
+                footprintRotated = BuildMode.IsFootprintRotated(entry),
             };
             if (entry.Instance != null) AddInstanceContents(item, entry.Instance);
             return item;
@@ -191,10 +192,11 @@ namespace PetShop.Core
                 // Saves from before lot stages could build anywhere in the yard; keep the
                 // ground under each saved piece so it is not silently dropped on load.
                 var cell = new Vector2Int(item.cellX, item.cellY);
-                _game.Build.GridManager.EnsureFloor(cell, def.Size);
+                _game.Build.GridManager.EnsureFloor(cell, BuildMode.FootprintSize(def, item.footprintRotated));
 
                 var go = _game.Build.Place(cell, def,
-                                           item.variant, item.rotation, charge: false);
+                                           item.variant, item.rotation, charge: false,
+                                           footprintRotated: item.footprintRotated);
                 if (go == null) continue;
 
                 var shelf = go.GetComponent<ShelfUnit>();
