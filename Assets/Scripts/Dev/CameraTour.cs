@@ -64,7 +64,7 @@ namespace PetShop.Dev
         private IEnumerator Start()
         {
             // A new game starts with an empty shop; the shots need furniture, pets and customers.
-            DevFurnisher.Furnish(GameManager.Instance);
+            DevFurnisher.Furnish(GameManager.Instance, PlaytestOptions.Seed ?? DevFurnisher.DefaultSeed);
 
             float waited = 0f;
             while (waited < WarmupSeconds)

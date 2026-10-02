@@ -22,8 +22,12 @@ namespace PetShop.Dev
         /// <summary>Seed for the pets' random traits when the caller gives none.</summary>
         public const int DefaultSeed = 1234;
 
-        /// <summary>Metres from the till spot towards the back wall where the counter goes.</summary>
-        private const float CounterBehindTill = 2f;
+        /// <summary>Metres beside the till spot (along +x) where the counter goes.</summary>
+        private const float CounterBesideTill = 2.5f;
+        /// <summary>Cells behind the till (towards the back wall) kept free for the staff station.</summary>
+        private const int StaffCellsBehindTill = 1;
+        /// <summary>Cells in front of the till (the queue line, +z) kept free.</summary>
+        private const int QueueCellsInFrontOfTill = 3;
         /// <summary>Share of the room width each shelf sits from the shop centre.</summary>
         private const float ShelfSideShare = 0.3f;
         /// <summary>Metres either side of the paddock centre the two pens sit.</summary>
@@ -79,10 +83,10 @@ namespace PetShop.Dev
             Vector3 till    = layout.TillPosition;
             Vector3 paddock = PaddockCentre(layout.PaddockArea);
             Vector3 side    = Vector3.right * (layout.RoomWidth * ShelfSideShare);
-            Vector2Int keepClear = game.Build.GridManager.WorldToGrid(till);
+            RectInt keepClear = TillLane(game.Build.GridManager.WorldToGrid(till));
 
             int placed = 0;
-            placed += Count(PlaceNear(game, BuildCatalog.Counter, null, till + Vector3.back * CounterBehindTill, keepClear));
+            placed += Count(PlaceNear(game, BuildCatalog.Counter, null, till + Vector3.right * CounterBesideTill, keepClear));
             placed += Count(PlaceShelf(game, ProductCategory.Food, shop - side, keepClear));
             placed += Count(PlaceShelf(game, ProductCategory.Toy,  shop + side, keepClear));
             placed += Count(PlacePen(game, Pet.Species.Dog, paddock + Vector3.left  * PenSpacing, keepClear));
@@ -90,8 +94,16 @@ namespace PetShop.Dev
             return placed;
         }
 
+        /// <summary>
+        /// The till column from the staff station (behind the till, -z) through the queue line
+        /// (in front, +z): furniture there would trap the assistant or block the queue.
+        /// </summary>
+        private static RectInt TillLane(Vector2Int tillCell) =>
+            new(tillCell.x, tillCell.y - StaffCellsBehindTill,
+                1, StaffCellsBehindTill + 1 + QueueCellsInFrontOfTill);
+
         private static GameObject PlaceShelf(GameManager game, ProductCategory category, Vector3 target,
-                                             Vector2Int keepClear)
+                                             RectInt keepClear)
         {
             var go = PlaceNear(game, BuildCatalog.ShelfLarge, category.ToString(), target, keepClear);
             if (go != null) Stock(go.GetComponent<ShelfUnit>(), game.Catalog);
@@ -108,7 +120,7 @@ namespace PetShop.Dev
         }
 
         private static GameObject PlacePen(GameManager game, Pet.Species species, Vector3 target,
-                                           Vector2Int keepClear)
+                                           RectInt keepClear)
         {
             var go  = PlaceNear(game, BuildCatalog.PetPen, species.ToString(), target, keepClear);
             var pen = go != null ? go.GetComponent<PetPen>() : null;
@@ -119,7 +131,7 @@ namespace PetShop.Dev
 
         /// <summary>Places <paramref name="id"/> on the free lot-0 cell nearest <paramref name="target"/>.</summary>
         private static GameObject PlaceNear(GameManager game, string id, string variant, Vector3 target,
-                                            Vector2Int keepClear)
+                                            RectInt keepClear)
         {
             var def = BuildCatalog.Get(id);
             if (def == null) return null;
@@ -133,10 +145,10 @@ namespace PetShop.Dev
 
         /// <summary>
         /// Deterministic scan of lot stage 0: the placeable cell whose footprint centre is nearest
-        /// <paramref name="target"/>, never covering <paramref name="keepClear"/>. Ties keep the first found.
+        /// <paramref name="target"/>, never overlapping <paramref name="keepClear"/>. Ties keep the first found.
         /// </summary>
         private static bool TryFindCell(GameManager game, Vector2Int size, Vector3 target,
-                                        Vector2Int keepClear, out Vector2Int best)
+                                        RectInt keepClear, out Vector2Int best)
         {
             GridManager grid = game.Build.GridManager;
             RectInt lot = game.Layout.LotStageCells(ShopLayout.StarterLotStage);
@@ -145,7 +157,7 @@ namespace PetShop.Dev
             float bestDistance = float.MaxValue;
             foreach (Vector2Int cell in lot.allPositionsWithin)
             {
-                if (!grid.CanPlace(cell, size) || new RectInt(cell, size).Contains(keepClear)) continue;
+                if (!grid.CanPlace(cell, size) || new RectInt(cell, size).Overlaps(keepClear)) continue;
                 float distance = (grid.FootprintCenter(cell, size) - target).sqrMagnitude;
                 if (distance >= bestDistance) continue;
                 bestDistance = distance;

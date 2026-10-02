@@ -1,5 +1,7 @@
 using System.Collections;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.TestTools;
 using PetShop.Core;
 using PetShop.Customer;
@@ -19,6 +21,8 @@ namespace PetShop.Tests
         /// <summary>Counter, two shelves and two pens.</summary>
         private const int   ExpectedPieces = 5;
         private const int   ExpectedPetsPerPen = 2;
+        /// <summary>How far from the staff station the NavMesh may be and still count as reachable.</summary>
+        private const float StationNavTolerance = 0.5f;
 
         /// <summary>Always leaves the statics clean, even when an assertion fails mid-run.</summary>
         [TearDown]
@@ -41,6 +45,11 @@ namespace PetShop.Tests
             foreach (var pen in game.Pens) Assert.AreEqual(ExpectedPetsPerPen, pen.Count, $"{pen.PenSpecies} pen");
             Assert.IsTrue(CustomerSpawner.CanTrade(game.Spawner.HasCounter, game.Shelves.Count, game.Pens.Count));
             Assert.IsTrue(game.Spawner.CanTradeNow);
+
+            // The assistant stands at the staff station: furniture must not cut it out of the NavMesh.
+            Vector3 station = game.StaffStation.position;
+            Assert.IsTrue(NavMesh.SamplePosition(station, out _, StationNavTolerance, NavMesh.AllAreas),
+                          $"staff station {station} is off the NavMesh after furnishing");
         }
 
         /// <summary>A second call on a furnished shop places nothing.</summary>

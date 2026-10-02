@@ -111,7 +111,7 @@ namespace PetShop.UI
             {
                 var cont = UIFactory.Button($"Continue{slot}", slab, ContinueText,
                     min, new Vector2(MidLeftX, buttonTop), ButtonFont, UIFactory.ButtonOn);
-                cont.onClick.AddListener(() => Start(slot, true));
+                cont.onClick.AddListener(() => BeginSlot(slot, true));
                 row.Add(cont);
                 min.x = MidRightX;
             }
@@ -134,7 +134,7 @@ namespace PetShop.UI
                     label.text = OverwritePrompt;
                     return;
                 }
-                Start(slot, false);
+                BeginSlot(slot, false);
             });
             return button;
         }
@@ -205,7 +205,7 @@ namespace PetShop.UI
             _hint.text = HotkeyHelp.TitleHint();
         }
 
-        private void Start(int slot, bool continueSave)
+        private void BeginSlot(int slot, bool continueSave)
         {
             Hide();
             _onStart?.Invoke(slot, continueSave);
