@@ -137,10 +137,16 @@ namespace PetShop.UI
 
             bool ok = _game.OrderFurniture(catalogId);
             SetStatus(ok ? $"Ordered a {def.DisplayName} — it arrives on the forecourt later today."
-                         : $"Not enough money for a {def.DisplayName} (€ {def.Cost:N0}).", ok);
+                         : OrderFailure(def), ok);
             Refresh();
             return ok;
         }
+
+        /// <summary>Why ordering <paramref name="def"/> failed: no shop to pay, or not enough money.</summary>
+        private string OrderFailure(PlacedObjectData def) =>
+            _game.Shop == null
+                ? $"Cannot order a {def.DisplayName} — there is no shop to pay for it."
+                : $"Not enough money for a {def.DisplayName} (€ {def.Cost:N0}).";
 
         /// <summary>
         /// Closes the panel and takes one owned <paramref name="catalogId"/> into the hand for

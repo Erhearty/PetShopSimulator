@@ -20,6 +20,8 @@ namespace PetShop.Tests
         private const float  RichBalance = 5000f;
         private const float  PoorBalance = 1f;
         private const float  Tolerance   = 1e-3f;
+        /// <summary>Furthest a crate may land from the forecourt centre (the origin with no layout), in metres.</summary>
+        private const float  ForecourtReach = 3f;
         private static readonly Vector2Int FloorSize = new(6, 6);
 
         private FurniturePrefabs      _saved;
@@ -129,6 +131,83 @@ namespace PetShop.Tests
             Assert.IsFalse(_panel.IsOpen);
             Assert.IsFalse(_game.IsModalOpen);
             Assert.AreEqual(0, _game.Furniture.OwnedCount(BuildCatalog.ShelfSmall));
+        }
+
+        [Test]
+        public void Order_WithoutShop_SaysThereIsNoShop()
+        {
+            _game.Shop = null;
+
+            Assert.IsFalse(_panel.Order(BuildCatalog.Counter));
+            Assert.AreEqual(0, _game.Furniture.Pending.Count);
+            StringAssert.Contains("no shop", _panel.Status);
+            StringAssert.DoesNotContain("Not enough money", _panel.Status);
+        }
+
+        [Test]
+        public void Load_WithCrateOnForecourt_RespawnsTheCrate()
+        {
+            Assert.IsTrue(_game.OrderFurniture(BuildCatalog.Counter));
+            _game.Furniture.ArriveAll();
+            Object.DestroyImmediate(FindFurnitureCrate().gameObject);   // a fresh scene has no crates
+            var data = new SaveData();
+            SaveFurniture.Capture(data, _game.Furniture, _build);
+
+            SaveFurniture.Apply(data, _game.Furniture);
+
+            var crate = FindFurnitureCrate();
+            Assert.IsNotNull(crate, "loading respawns the waiting crate");
+            Assert.AreEqual(BuildCatalog.Counter, crate.FurnitureOrder.CatalogId);
+            var flat = new Vector3(crate.transform.position.x, 0f, crate.transform.position.z);
+            Assert.LessOrEqual(flat.magnitude, ForecourtReach, "the crate lands on the forecourt");
+        }
+
+        [Test]
+        public void Escape_ClosesCatalogueBeforeBuildMode()
+        {
+            if (FurnitureFactory.Prefabs == null) Assert.Ignore("Furniture prefabs are only loadable in the editor.");
+            var ui = _canvas.AddComponent<GameUI>();
+            ui.WireForTests(_game, _build, _panel);
+            _game.Furniture.AddOwned(BuildCatalog.ShelfSmall);
+            Assert.IsTrue(_build.EnterPlacement(BuildCatalog.ShelfSmall, null));
+            _panel.Show();
+
+            ui.HandleEscape();
+            Assert.IsFalse(_panel.IsOpen, "Esc closes the catalogue first");
+            Assert.IsTrue(_game.IsBuildModeActive, "build mode survives the first Esc");
+            Assert.IsFalse(_game.IsModalOpen);
+
+            ui.HandleEscape();
+            Assert.IsFalse(_game.IsBuildModeActive, "the second Esc leaves build mode");
+            Assert.IsFalse(_game.IsModalOpen);
+        }
+
+        [Test]
+        public void BuildKey_TogglesCatalogueClosed()
+        {
+            Assert.IsFalse(GameBootstrapper.RouteCatalogueInput(_panel, true), "a closed catalogue leaves the key alone");
+            _panel.Show();
+
+            Assert.IsTrue(GameBootstrapper.RouteCatalogueInput(_panel, false));
+            Assert.IsTrue(_panel.IsOpen, "no key press, still open");
+
+            Assert.IsTrue(GameBootstrapper.RouteCatalogueInput(_panel, true));
+            Assert.IsFalse(_panel.IsOpen);
+            Assert.IsFalse(_game.IsModalOpen);
+        }
+
+        [Test]
+        public void ChangePage_ClampsAtFirstAndLastPage()
+        {
+            _panel.SelectTab(BuildCategory.Decoration);
+            int last = _panel.PageCount - 1;
+            Assert.Greater(last, 0, "decorations span several pages");
+
+            _panel.ChangePage(-1);
+            Assert.AreEqual(0, _panel.Page, "clamped at the first page");
+
+            for (int i = 0; i <= _panel.PageCount; i++) _panel.ChangePage(1);
+            Assert.AreEqual(last, _panel.Page, "clamped at the last page");
         }
 
         [Test]

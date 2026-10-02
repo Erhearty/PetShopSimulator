@@ -1,3 +1,6 @@
+using UnityEngine;
+using PetShop.Commerce;
+using PetShop.Pets;
 using PetShop.Shop;
 
 namespace PetShop.Core
@@ -5,7 +8,7 @@ namespace PetShop.Core
     /// <summary>
     /// The furniture supply chain as seen from the facade: the inventory and orders live in a
     /// <see cref="FurnitureSupply"/>; ordering and crate handling are delegated to
-    /// <see cref="ShopFloorActions"/>.
+    /// <see cref="ShopFloorActions"/>. Also keeps the registry of placed shelves and pens.
     /// </summary>
     public partial class GameManager
     {
@@ -17,5 +20,51 @@ namespace PetShop.Core
         /// as a crate on the forecourt. False (with a notification) when unknown or unaffordable.
         /// </summary>
         public bool OrderFurniture(string catalogId) => _floor.OrderFurniture(catalogId);
+
+        /// <summary>Drops a crate on the forecourt whenever a furniture order lands. Called from Awake.</summary>
+        private void WireFurnitureSupply() => Furniture.OnArrived += _floor.OnFurnitureArrived;
+
+        /// <summary>Lands the furniture orders due by now. Called every trading frame.</summary>
+        private void TickFurniture() => Furniture.Tick(DayProgress);
+
+        /// <summary>Furniture still on the road at close lands overnight.</summary>
+        private void LandFurnitureOvernight() => Furniture.ArriveAll();
+
+        // ── Furniture registry ────────────────────────────────────────────────
+
+        /// <summary>Adds a placed shelf or pen to the registry the customers shop from.</summary>
+        public void RegisterFurniture(GameObject go)
+        {
+            if (go == null) return;
+            var shelf = go.GetComponent<ShelfUnit>();
+            if (shelf != null && !_shelves.Contains(shelf)) _shelves.Add(shelf);
+
+            var pen = go.GetComponent<PetPen>();
+            if (pen != null && !_pens.Contains(pen)) _pens.Add(pen);
+
+            PushListsToSpawner();
+        }
+
+        /// <summary>Removes a shelf or pen that is being taken off the floor from the registry.</summary>
+        public void UnregisterFurniture(GameObject go)
+        {
+            if (go == null) return;
+            var shelf = go.GetComponent<ShelfUnit>();
+            if (shelf != null) _shelves.Remove(shelf);
+
+            var pen = go.GetComponent<PetPen>();
+            if (pen != null) _pens.Remove(pen);
+
+            PushListsToSpawner();
+        }
+
+        private void PushListsToSpawner()
+        {
+            _shelves.RemoveAll(s => s == null);
+            _pens.RemoveAll(p => p == null);
+            if (Spawner == null) return;
+            Spawner.Shelves = _shelves;
+            Spawner.PetPens = _pens;
+        }
     }
 }

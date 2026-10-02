@@ -70,7 +70,13 @@ namespace PetShop.Core
         public bool OrderFurniture(string catalogId)
         {
             var def = BuildCatalog.Get(catalogId);
-            if (def == null || _game.Shop == null) return false;
+            if (def == null) return false;
+            if (_game.Shop == null)
+            {
+                _game.Notify($"Cannot order a {def.DisplayName} — there is no shop to pay for it.");
+                _game.Audio?.PlaySfx("deny");
+                return false;
+            }
 
             if (_game.Furniture.Order(catalogId, _game.Shop, _game.DayProgress) == null)
             {

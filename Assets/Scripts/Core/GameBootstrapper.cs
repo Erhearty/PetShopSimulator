@@ -92,13 +92,8 @@ namespace PetShop.Core
         private void Update()
         {
             if (_game == null || _game.IsGameOver) return;
-            if (_ui != null && _ui.Catalogue != null && _ui.Catalogue.IsOpen)
-            {
-                // The build key toggles the catalogue shut; this is its only owner, so one press
-                // cannot close and reopen it in the same frame.
-                if (InputBindings.GetKeyDown(GameAction.BuildMode)) _ui.Catalogue.Hide();
-                return;
-            }
+            if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
+                                    InputBindings.GetKeyDown(GameAction.BuildMode))) return;
             if (_ui != null && _ui.AnyModalOpen) return;
             // BuildMode closes itself on the build key; don't reopen the catalogue on that press.
             if (Time.frameCount == _buildExitFrame) return;
@@ -120,6 +115,18 @@ namespace PetShop.Core
         {
             if (_build.IsActive) { _build.ExitBuildMode(); return; }
             _ui?.Catalogue?.Open(catalogId);
+        }
+
+        /// <summary>
+        /// While the catalogue is open it owns the keyboard: the build key toggles it shut. This is
+        /// its only owner, so one press cannot close and reopen it in the same frame. True when the
+        /// catalogue was open and the frame's input is consumed.
+        /// </summary>
+        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown)
+        {
+            if (catalogue == null || !catalogue.IsOpen) return false;
+            if (buildKeyDown) catalogue.Hide();
+            return true;
         }
 
         // ── Systems ─────────────────────────────────────────────────────────────

@@ -108,7 +108,7 @@ namespace PetShop.Core
             _saveLoad = new SaveLoadController(this);
             _floor    = new ShopFloorActions(this);
             _roster   = new StaffRoster(this);
-            Furniture.OnArrived += _floor.OnFurnitureArrived;
+            WireFurnitureSupply();
             Catalog  = ItemDatabase.Load();
             ApplyCommandLineOverrides();
         }
@@ -150,7 +150,7 @@ namespace PetShop.Core
             _dayElapsed += Time.deltaTime;
 
             Shop?.PollDeliveries(DayProgress);
-            Furniture.Tick(DayProgress);
+            TickFurniture();
 
             // Stop letting new customers in shortly before closing time
             if (Spawner != null && !Spawner.DoorsClosed && DayProgress > 0.88f)
@@ -175,41 +175,6 @@ namespace PetShop.Core
                 }
             }
             _autoContinue = Application.isBatchMode;
-        }
-
-        // ── Furniture registry ────────────────────────────────────────────────
-
-        public void RegisterFurniture(GameObject go)
-        {
-            if (go == null) return;
-            var shelf = go.GetComponent<ShelfUnit>();
-            if (shelf != null && !_shelves.Contains(shelf)) _shelves.Add(shelf);
-
-            var pen = go.GetComponent<PetPen>();
-            if (pen != null && !_pens.Contains(pen)) _pens.Add(pen);
-
-            PushListsToSpawner();
-        }
-
-        public void UnregisterFurniture(GameObject go)
-        {
-            if (go == null) return;
-            var shelf = go.GetComponent<ShelfUnit>();
-            if (shelf != null) _shelves.Remove(shelf);
-
-            var pen = go.GetComponent<PetPen>();
-            if (pen != null) _pens.Remove(pen);
-
-            PushListsToSpawner();
-        }
-
-        private void PushListsToSpawner()
-        {
-            _shelves.RemoveAll(s => s == null);
-            _pens.RemoveAll(p => p == null);
-            if (Spawner == null) return;
-            Spawner.Shelves = _shelves;
-            Spawner.PetPens = _pens;
         }
 
         // ── Interactions (delegated to ShopFloorActions) ─────────────────────
@@ -274,7 +239,7 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
-            Furniture.ArriveAll();   // furniture still on the road at close lands overnight
+            LandFurnitureOvernight();
             ShowJudging.Run(this);
 
             DaySummary summary = CloseDayWithProgression();

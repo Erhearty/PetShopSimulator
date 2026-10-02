@@ -119,6 +119,14 @@ namespace PetShop.UI
             return canvas;
         }
 
+        /// <summary>Wires just the pieces the Escape routing needs, without building the panels. Test seam.</summary>
+        internal void WireForTests(GameManager game, BuildMode build, FurnitureCatalogPanel catalogue)
+        {
+            _game     = game;
+            _build    = build;
+            Catalogue = catalogue;
+        }
+
         private void Update()
         {
             if (_game == null || Title == null || Title.IsOpen) return;
@@ -134,7 +142,7 @@ namespace PetShop.UI
         /// Escape, most-transient first: cancel a placement, close a popup, close the ledger,
         /// otherwise open or close the pause menu.
         /// </summary>
-        private void HandleEscape()
+        internal void HandleEscape()
         {
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
             if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
