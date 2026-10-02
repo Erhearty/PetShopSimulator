@@ -18,7 +18,7 @@ namespace PetShop.Core
     /// <see cref="SaveLoadController"/>, shop-floor interactions to
     /// <see cref="ShopFloorActions"/>, and hiring/firing to <see cref="StaffRoster"/>.
     /// </summary>
-    public class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
 
@@ -108,6 +108,7 @@ namespace PetShop.Core
             _saveLoad = new SaveLoadController(this);
             _floor    = new ShopFloorActions(this);
             _roster   = new StaffRoster(this);
+            Furniture.OnArrived += _floor.OnFurnitureArrived;
             Catalog  = ItemDatabase.Load();
             ApplyCommandLineOverrides();
         }
@@ -149,6 +150,7 @@ namespace PetShop.Core
             _dayElapsed += Time.deltaTime;
 
             Shop?.PollDeliveries(DayProgress);
+            Furniture.Tick(DayProgress);
 
             // Stop letting new customers in shortly before closing time
             if (Spawner != null && !Spawner.DoorsClosed && DayProgress > 0.88f)
@@ -272,6 +274,7 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
+            Furniture.ArriveAll();   // furniture still on the road at close lands overnight
             ShowJudging.Run(this);
 
             DaySummary summary = CloseDayWithProgression();

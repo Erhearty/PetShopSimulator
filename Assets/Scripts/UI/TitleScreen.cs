@@ -202,9 +202,7 @@ namespace PetShop.UI
         public void RefreshKeyHints()
         {
             if (_hint == null) return;
-            _hint.text = $"{InputBindings.MoveLabel()} move  ·  RMB orbit  ·  " +
-                         $"{InputBindings.Label(GameAction.Interact)} interact  ·  " +
-                         $"1-{BuildCatalog.HotkeyOrder.Length} build  ·  {InputBindings.Label(GameAction.Help)} help";
+            _hint.text = HotkeyHelp.TitleHint();
         }
 
         private void Start(int slot, bool continueSave)

@@ -36,6 +36,11 @@ namespace PetShop.UI
         private GameObject _crosshair;
         private Image      _repFill;
 
+        private string   _buildHintBase = string.Empty;
+
+        /// <summary>The furniture catalogue the build bar opens; set by GameUI.</summary>
+        public FurnitureCatalogPanel Catalogue { get; set; }
+
         private readonly Dictionary<string, Image> _buildButtons = new();
         private float _notifyTimer;
         private float _alertTimer;
@@ -171,7 +176,7 @@ namespace PetShop.UI
                 int index = i;
                 var btn = UIFactory.Button($"Build_{def.Id}", bar.transform, "",
                     new Vector2(x0, 0.30f), new Vector2(x0 + slot, 0.94f));
-                btn.onClick.AddListener(() => _game.Build.EnterBuildMode(BuildCatalog.Get(BuildCatalog.HotkeyOrder[index])));
+                btn.onClick.AddListener(() => { if (Catalogue != null) Catalogue.Open(BuildCatalog.HotkeyOrder[index]); });
 
                 var caption = UIFactory.Label("Name", btn.transform, def.DisplayName,
                     new Vector2(0.01f, 0.40f), new Vector2(0.99f, 0.95f), 13f, UIFactory.Ink,
@@ -196,7 +201,7 @@ namespace PetShop.UI
                 TextAlignmentOptions.Center);
             var hr = UIFactory.Rect(_buildHint.gameObject);
             hr.offsetMin = new Vector2(0f, 96f);
-            hr.offsetMax = new Vector2(0f, 126f);
+            hr.offsetMax = new Vector2(0f, 150f);
             _buildHint.enabled = false;
         }
 
@@ -216,35 +221,17 @@ namespace PetShop.UI
         {
             _helpPanel = UIFactory.Panel("Help", canvas, new Vector2(0f, 0f), new Vector2(0f, 0f),
                                          new Color(0.07f, 0.09f, 0.13f, 0.80f),
-                                         new Vector2(12f, 12f), new Vector2(268f, 244f));
+                                         new Vector2(12f, 12f), new Vector2(268f, 264f));
 
-            _helpText = UIFactory.Label("HelpText", _helpPanel.transform, HelpText(),
+            _helpText = UIFactory.Label("HelpText", _helpPanel.transform, HotkeyHelp.Controls(),
                 new Vector2(0.06f, 0.04f), new Vector2(0.97f, 0.96f), 14.5f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
-        }
-
-        /// <summary>The controls cheat-sheet, built from the current key bindings.</summary>
-        private static string HelpText()
-        {
-            static string L(GameAction a) => InputBindings.Label(a);
-            return "<b>Controls</b>\n" +
-                $"{InputBindings.MoveLabel()}  move  ·  {L(GameAction.Jump)}  jump\n" +
-                "Mouse  look\n" +
-                $"{L(GameAction.Interact)}  interact / restock\n" +
-                $"1-{BuildCatalog.HotkeyOrder.Length} or {L(GameAction.BuildMode)}  build mode\n" +
-                $"LMB place · {L(GameAction.BuildRotate)} rotate\n" +
-                $"Middle-click / {L(GameAction.BuildRemove)}  remove\n" +
-                $"{L(GameAction.EndDay)}  close up early\n" +
-                $"{L(GameAction.Interact)} at the counter  serve the queue\n" +
-                $"{L(GameAction.Ledger)}  the ledger\n" +
-                $"Esc  pause  ·  {L(GameAction.QuickSave)} save\n" +
-                $"{L(GameAction.Help)}  hide this panel";
         }
 
         /// <summary>Rebuilds the controls cheat-sheet after a key has been rebound.</summary>
         public void RefreshHelp()
         {
-            if (_helpText != null) _helpText.text = HelpText();
+            if (_helpText != null) _helpText.text = HotkeyHelp.Controls();
         }
 
         // ── Runtime ─────────────────────────────────────────────────────────────
@@ -265,6 +252,8 @@ namespace PetShop.UI
 
             if (InputBindings.GetKeyDown(GameAction.Help) && _helpPanel != null && (_game == null || !_game.IsModalOpen))
                 _helpPanel.SetActive(!_helpPanel.activeSelf);
+
+            RefreshBuildHint();
 
             if (_crosshair != null && _game != null)
                 _crosshair.SetActive(!_game.IsModalOpen && !_game.IsGameOver);
@@ -309,11 +298,18 @@ namespace PetShop.UI
 
             if (_buildHint != null)
             {
-                _buildHint.text    = $"Placing {item.DisplayName} — LMB place · " +
-                                     $"{InputBindings.Label(GameAction.BuildRotate)} rotate · " +
+                _buildHintBase     = $"Placing {item.DisplayName} — LMB place · " +
                                      $"middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
+                _buildHint.text    = $"{_buildHintBase}\n{_build.PlacementHint}";
                 _buildHint.enabled = true;
             }
+        }
+
+        /// <summary>The angle changes as the player rotates, so the placement hint is rebuilt each frame.</summary>
+        private void RefreshBuildHint()
+        {
+            if (_buildHint != null && _buildHint.enabled && _build != null)
+                _buildHint.text = $"{_buildHintBase}\n{_build.PlacementHint}";
         }
 
         private void OnBuildExited()

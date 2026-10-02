@@ -26,6 +26,7 @@ namespace PetShop.Core
         public void NewGame()
         {
             _game.Show.Withdraw();
+            _game.Furniture.Clear();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
             foreach (var p in _game.Layout.StarterLayout(_game.Grid))
             {
@@ -114,6 +115,7 @@ namespace PetShop.Core
 
             SaveLineage.Capture(data);
             SaveReorder.Capture(data, _game.AutoReorder);
+            SaveFurniture.Capture(data, _game.Furniture, _game.Build);
             data.ShowEntryPetId = _game.Show.EntryPetId;
             return data;
         }
@@ -218,6 +220,7 @@ namespace PetShop.Core
             }
             SaveLineage.Apply(data, loadedPets, data.Day);
             SaveReorder.Apply(data, _game.AutoReorder);
+            SaveFurniture.Apply(data, _game.Furniture);
             RestoreShowEntry(data.ShowEntryPetId, loadedPets);
 
             _game.RestoreStaff(data);

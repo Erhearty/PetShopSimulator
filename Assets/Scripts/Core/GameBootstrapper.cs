@@ -12,7 +12,7 @@ namespace PetShop.Core
     /// Single entry point. Lives in MainScene next to the scene-authored <see cref="ShopLayout"/>;
     /// it creates every system and the UI and wires them to the baked world.
     ///
-    /// WASD move · RMB orbit · scroll zoom · E interact · 1-4/B build · Enter close day · F5 save
+    /// WASD move · RMB orbit · scroll zoom · E interact · 1-8/B furniture catalogue · Enter close day · F5 save
     /// </summary>
     public class GameBootstrapper : MonoBehaviour
     {
@@ -30,6 +30,9 @@ namespace PetShop.Core
         private ShopLayout      _layout;
 
         private GameUI _ui;
+
+        /// <summary>Frame build mode last closed on, so the same build-key press can't reopen the catalogue.</summary>
+        private int _buildExitFrame = -1;
 
         /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
         private const int MaxPackFallbacksReported = 10;
@@ -83,32 +86,40 @@ namespace PetShop.Core
                 }, () => _ui.Settings.Show());
             }
 
-            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, 1-4 build, Tab ledger, Enter to close the day.");
+            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B furniture catalogue, Tab ledger, Enter to close the day.");
         }
 
         private void Update()
         {
             if (_game == null || _game.IsGameOver) return;
+            if (_ui != null && _ui.Catalogue != null && _ui.Catalogue.IsOpen)
+            {
+                // The build key toggles the catalogue shut; this is its only owner, so one press
+                // cannot close and reopen it in the same frame.
+                if (InputBindings.GetKeyDown(GameAction.BuildMode)) _ui.Catalogue.Hide();
+                return;
+            }
             if (_ui != null && _ui.AnyModalOpen) return;
+            // BuildMode closes itself on the build key; don't reopen the catalogue on that press.
+            if (Time.frameCount == _buildExitFrame) return;
 
             var ids = BuildCatalog.HotkeyOrder;
             for (int i = 0; i < ids.Length; i++)
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                     ToggleBuild(ids[i]);
 
-            if (InputBindings.GetKeyDown(GameAction.BuildMode))
-                ToggleBuild(_build.CurrentItem != null ? _build.CurrentItem.Id : BuildCatalog.ShelfSmall);
+            if (InputBindings.GetKeyDown(GameAction.BuildMode) && !_build.IsActive)
+                ToggleBuild(null);
         }
 
+        /// <summary>
+        /// Closes build mode when it is open; otherwise opens the furniture catalogue, on the tab
+        /// holding <paramref name="catalogId"/> when one is given.
+        /// </summary>
         private void ToggleBuild(string catalogId)
         {
-            var def = BuildCatalog.Get(catalogId);
-            if (def == null) return;
-
-            if (_build.IsActive && _build.CurrentItem != null && _build.CurrentItem.Id == def.Id)
-                _build.ExitBuildMode();
-            else
-                _build.EnterBuildMode(def);
+            if (_build.IsActive) { _build.ExitBuildMode(); return; }
+            _ui?.Catalogue?.Open(catalogId);
         }
 
         // ── Systems ─────────────────────────────────────────────────────────────
@@ -146,6 +157,7 @@ namespace PetShop.Core
             _game.Spawner = _spawner;
             _game.Audio   = _audio;
             _game.Queue   = _queue;
+            _build.Supply = _game.Furniture;   // placing draws on, and removal returns to, the inventory
             gmGO.AddComponent<AutoReorderRunner>().Attach(_game);
         }
 
@@ -284,6 +296,7 @@ namespace PetShop.Core
             _build.OnBuildModeEntered.AddListener(_ => _audio.PlaySfx("click"));
             _build.OnBuildModeExited.AddListener(() =>
             {
+                _buildExitFrame = Time.frameCount;
                 _audio.PlaySfx("build");
                 _layout.BakeNavMesh();
             });

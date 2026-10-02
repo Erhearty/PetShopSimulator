@@ -1,6 +1,7 @@
 using UnityEngine;
 using PetShop.Commerce;
 using PetShop.Pets;
+using PetShop.Shop;
 
 namespace PetShop.Core
 {
@@ -12,6 +13,13 @@ namespace PetShop.Core
     /// </summary>
     internal sealed class ShopFloorActions
     {
+        /// <summary>How far either side of the forecourt centre a crate may land, in metres.</summary>
+        private const float SpreadX      = 2.4f;
+        /// <summary>Nearest a crate lands behind the forecourt centre, in metres.</summary>
+        private const float SpreadBackZ  = -1f;
+        /// <summary>Furthest a crate lands in front of the forecourt centre, in metres.</summary>
+        private const float SpreadFrontZ = 1.4f;
+
         private readonly GameManager _game;
 
         /// <summary>Creates the actions for <paramref name="game"/>; nothing is read yet.</summary>
@@ -43,20 +51,71 @@ namespace PetShop.Core
         /// <summary>Puts the pallet on the forecourt and tells the player it has landed.</summary>
         public void OnDeliveryArrived(SupplierOrder order)
         {
-            Vector3 spot = _game.Layout != null ? _game.Layout.ForecourtPosition : Vector3.zero;
-            // Spread pallets out so two deliveries never stack in the same spot.
-            spot += new Vector3(UnityEngine.Random.Range(-2.4f, 2.4f), 0f, UnityEngine.Random.Range(-1f, 1.4f));
-
-            DeliveryCrate.Spawn(spot, order.Category, order.Units);
+            DeliveryCrate.Spawn(ForecourtSpot(), order.Category, order.Units);
             _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. " +
                          $"Press {InputBindings.Label(GameAction.Interact)} to collect.");
             _game.Audio?.PlaySfx("restock");
         }
 
-        /// <summary>Carries a delivered pallet into the stockroom.</summary>
+        /// <summary>A landing spot on the forecourt for a delivery.</summary>
+        private Vector3 ForecourtSpot()
+        {
+            Vector3 spot = _game.Layout != null ? _game.Layout.ForecourtPosition : Vector3.zero;
+            // Spread pallets out so two deliveries never stack in the same spot.
+            return spot + new Vector3(UnityEngine.Random.Range(-SpreadX, SpreadX), 0f,
+                                      UnityEngine.Random.Range(SpreadBackZ, SpreadFrontZ));
+        }
+
+        /// <summary>Orders one catalogue item, paid now, to arrive later today as a crate.</summary>
+        public bool OrderFurniture(string catalogId)
+        {
+            var def = BuildCatalog.Get(catalogId);
+            if (def == null || _game.Shop == null) return false;
+
+            if (_game.Furniture.Order(catalogId, _game.Shop, _game.DayProgress) == null)
+            {
+                _game.Notify($"Not enough money for a {def.DisplayName} (€{def.Cost:N0}).");
+                _game.Audio?.PlaySfx("deny");
+                return false;
+            }
+
+            _game.Notify($"Ordered a {def.DisplayName} for €{def.Cost:N0} — it arrives on the forecourt later today.");
+            _game.Audio?.PlaySfx("click");
+            return true;
+        }
+
+        /// <summary>Puts a furniture crate on the forecourt and tells the player it has landed.</summary>
+        public void OnFurnitureArrived(FurnitureOrder order)
+        {
+            if (order == null) return;
+
+            var crate = DeliveryCrate.SpawnFurniture(ForecourtSpot(), order);
+            if (crate == null) return;
+            _game.Notify($"Delivery: a {crate.FurnitureName} crate is on the forecourt. " +
+                         $"Press {InputBindings.Label(GameAction.Interact)} to unpack it.");
+            _game.Audio?.PlaySfx("restock");
+        }
+
+        /// <summary>Unpacks a furniture crate into the furniture inventory.</summary>
+        private void CollectFurnitureCrate(DeliveryCrate crate)
+        {
+            string name = crate.FurnitureName;
+            if (!crate.CollectFurniture(_game.Furniture))
+            {
+                _game.Notify("There is nothing left in that crate.");
+                _game.Audio?.PlaySfx("deny");
+                return;
+            }
+            _game.Notify($"Unpacked the {name} — it is in your furniture inventory. " +
+                         $"Press {InputBindings.Label(GameAction.BuildMode)} to place it.");
+            _game.Audio?.PlaySfx("restock");
+        }
+
+        /// <summary>Carries a delivered pallet into the stockroom, or unpacks a furniture crate.</summary>
         public void CollectDelivery(DeliveryCrate crate)
         {
             if (crate == null) return;
+            if (crate.IsFurniture) { CollectFurnitureCrate(crate); return; }
 
             int units = crate.Collect(_game.Shop);
             _game.Notify($"Collected {units} units — they are in the stockroom, ready to shelve.");

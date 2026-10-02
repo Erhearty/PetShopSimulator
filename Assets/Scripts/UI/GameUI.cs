@@ -27,6 +27,9 @@ namespace PetShop.UI
         public ShowcasePanel   Showcase  { get; private set; }
         public ReorderPanel    Reorder   { get; private set; }
 
+        /// <summary>The furniture catalogue: order furniture and pick owned pieces up to place.</summary>
+        public FurnitureCatalogPanel Catalogue { get; private set; }
+
         /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
         public SettingsPanel   Settings  { get; private set; }
 
@@ -48,6 +51,7 @@ namespace PetShop.UI
             (Breeding != null && Breeding.IsOpen) ||
             (StaffBoard != null && StaffBoard.IsOpen) ||
             (Reorder != null && Reorder.IsOpen) ||
+            (Catalogue != null && Catalogue.IsOpen) ||
             (Settings != null && Settings.IsOpen) ||
             (Title    != null && Title.IsOpen);
 
@@ -92,6 +96,7 @@ namespace PetShop.UI
             FamilyTree = canvasGO.AddComponent<FamilyTreePanel>();
             Showcase   = canvasGO.AddComponent<ShowcasePanel>();
             Reorder    = canvasGO.AddComponent<ReorderPanel>();
+            Catalogue  = canvasGO.AddComponent<FurnitureCatalogPanel>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
@@ -102,6 +107,8 @@ namespace PetShop.UI
             GameOver.Build(canvasGO.transform, game);
             Stats.Build(canvasGO.transform, game, Reorder);
             Reorder.Build(canvasGO.transform, game);
+            Catalogue.Build(canvasGO.transform, game, build);
+            HUD.Catalogue = Catalogue;
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
@@ -119,7 +126,7 @@ namespace PetShop.UI
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
             if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
-                && !Reorder.IsOpen)
+                && !Reorder.IsOpen && !Catalogue.IsOpen)
                 Stats.Toggle();
         }
 
@@ -132,6 +139,7 @@ namespace PetShop.UI
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
             if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
+            if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
             if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
             if (Showcase != null && Showcase.IsOpen) { Showcase.Hide();        return; }
