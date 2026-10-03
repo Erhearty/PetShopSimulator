@@ -45,3 +45,7 @@ UserSettings/
 /libdecor-0.so.0
 /libdecor-cairo.so
 /PetShop_BackUpThisFolder_ButDontShipItWithYourGame/
+
+# Machine-local MCP client config: holds an absolute path to the user's Unity
+# relay binary, so it must never be committed.
+/.mcp.json
