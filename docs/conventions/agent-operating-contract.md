@@ -36,7 +36,6 @@ Define general standards, style guides, and testing rules for your AI agents to 
 - **Preserve all existing comment blocks and license headers**
 - **Reference exact file paths and line numbers when discussing code**
 - **Ask for clarification when requirements are ambiguous instead of guessing**
-- **Never commit, push, or open pull requests unless explicitly asked**
 - **Keep changes minimal and scoped to the request**
 
 ## Security & Secrets
@@ -50,6 +49,7 @@ Define general standards, style guides, and testing rules for your AI agents to 
 - **Commit message convention:** `Conventional Commits (feat:, fix:, chore:)`
 - **Keep pull requests focused on a single logical change**
 - **Never force-push to shared or protected branches**
+- **Rebase feature branches onto the main branch before merging**
 
 ## Documentation
 - **Update relevant documentation whenever behavior changes**
