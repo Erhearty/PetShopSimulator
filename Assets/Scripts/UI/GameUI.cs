@@ -27,6 +27,12 @@ namespace PetShop.UI
         public ShowcasePanel   Showcase  { get; private set; }
         public ReorderPanel    Reorder   { get; private set; }
 
+        /// <summary>The quest journal, opened with <see cref="QuestJournalPanel.OpenKey"/>.</summary>
+        public QuestJournalPanel Journal { get; private set; }
+
+        /// <summary>The furniture catalogue: order furniture and pick owned pieces up to place.</summary>
+        public FurnitureCatalogPanel Catalogue { get; private set; }
+
         /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
         public SettingsPanel   Settings  { get; private set; }
 
@@ -48,7 +54,9 @@ namespace PetShop.UI
             (Breeding != null && Breeding.IsOpen) ||
             (StaffBoard != null && StaffBoard.IsOpen) ||
             (Reorder != null && Reorder.IsOpen) ||
+            (Catalogue != null && Catalogue.IsOpen) ||
             (Settings != null && Settings.IsOpen) ||
+            (Journal  != null && Journal.IsOpen)  ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -92,9 +100,11 @@ namespace PetShop.UI
             FamilyTree = canvasGO.AddComponent<FamilyTreePanel>();
             Showcase   = canvasGO.AddComponent<ShowcasePanel>();
             Reorder    = canvasGO.AddComponent<ReorderPanel>();
+            Catalogue  = canvasGO.AddComponent<FurnitureCatalogPanel>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
+            Journal  = canvasGO.AddComponent<QuestJournalPanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
             Info.Build(canvasGO.transform);
@@ -102,14 +112,25 @@ namespace PetShop.UI
             GameOver.Build(canvasGO.transform, game);
             Stats.Build(canvasGO.transform, game, Reorder);
             Reorder.Build(canvasGO.transform, game);
+            Catalogue.Build(canvasGO.transform, game, build);
+            HUD.Catalogue = Catalogue;
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
             StaffBoard.Build(canvasGO.transform, game);
             Settings.Build(canvasGO.transform, game);
+            Journal.Build(canvasGO.transform, game);
             Pause.Build(canvasGO.transform, game, audio, Settings);
 
             return canvas;
+        }
+
+        /// <summary>Wires just the pieces the Escape routing needs, without building the panels. Test seam.</summary>
+        internal void WireForTests(GameManager game, BuildMode build, FurnitureCatalogPanel catalogue)
+        {
+            _game     = game;
+            _build    = build;
+            Catalogue = catalogue;
         }
 
         private void Update()
@@ -119,19 +140,31 @@ namespace PetShop.UI
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
             if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
-                && !Reorder.IsOpen)
+                && !Reorder.IsOpen && !Catalogue.IsOpen && !Journal.IsOpen)
                 Stats.Toggle();
+
+            if (Input.GetKeyDown(QuestJournalPanel.OpenKey)) ToggleJournal();
+        }
+
+        /// <summary>Closes the journal when open; opens it only when nothing else holds the keyboard.</summary>
+        private void ToggleJournal()
+        {
+            if (Journal == null) return;
+            if (Journal.IsOpen) { Journal.Hide(); return; }
+            if (!_game.IsGameOver && !_game.IsModalOpen) Journal.Show();
         }
 
         /// <summary>
         /// Escape, most-transient first: cancel a placement, close a popup, close the ledger,
         /// otherwise open or close the pause menu.
         /// </summary>
-        private void HandleEscape()
+        internal void HandleEscape()
         {
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
             if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
+            if (Journal != null && Journal.IsOpen) { Journal.Hide(); return; }
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
+            if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
             if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
             if (Showcase != null && Showcase.IsOpen) { Showcase.Hide();        return; }

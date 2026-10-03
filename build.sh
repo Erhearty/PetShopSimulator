@@ -2,9 +2,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  build.sh — takes this project from a fresh checkout to a playable build.
 #
-#    ./build.sh            full pipeline (setup → scene → Linux player)
+#    ./build.sh            full pipeline (setup → Linux player → smoke)
 #    ./build.sh setup      TMP essentials + runtime shaders + repair URP materials
-#    ./build.sh scene      (re)generate Assets/Scenes/MainScene.unity
 #    ./build.sh linux      build the Linux player
 #    ./build.sh windows    build the Windows player
 #    ./build.sh run        run the last Linux build
@@ -82,7 +81,7 @@ run_editor() {
         fi
         exit 1
     fi
-    grep -E "^\[(ProjectSetup|ShaderInclusion|SceneBuilder|GameBuilder)\]" "$log" | head -5 || true
+    grep -E "^\[(ProjectSetup|ShaderInclusion|GameBuilder)\]" "$log" | head -5 || true
 }
 
 do_setup() {
@@ -99,7 +98,7 @@ do_smoke() {
     # must neither pick up nor overwrite the player's real save.
     local save_dir; save_dir=$(mktemp -d)
     echo "▶ headless smoke run (6 short days)"
-    timeout 90 "$PLAYER" -batchmode -nographics -seed 1 -daylength 12 \
+    timeout 90 "$PLAYER" -batchmode -nographics -seed 1 -daylength 12 -furnish \
         -savepath "$save_dir/save.json" -logFile "$log" >/dev/null 2>&1 || true
     rm -rf "$save_dir"
 
@@ -217,7 +216,7 @@ do_soak() {
 
     echo "▶ headless economy soak (${SOAK_DAYS:-15} days, seed ${SEED:-1})"
     local rc=0
-    timeout 400 "$PLAYER" -batchmode -nographics -seed "${SEED:-1}" -daylength 12 \
+    timeout 400 "$PLAYER" -batchmode -nographics -seed "${SEED:-1}" -daylength 12 -furnish \
         -quitafterdays "${SOAK_DAYS:-15}" -savepath "$save" -telemetry "$jsonl" \
         -logFile "$log" >/dev/null 2>&1 || rc=$?
 
@@ -365,15 +364,17 @@ ensure_kenney() {
 }
 
 case "${1:-all}" in
-    setup|scene|linux|windows|test|playmode|soak|spawnverify|playtest|look|look-diff|all|assets)
+    setup|linux|windows|test|playmode|soak|spawnverify|playtest|look|look-diff|all|assets)
         ensure_kenney ;;
 esac
 
 case "${1:-all}" in
     setup)   do_setup ;;
-    scene)   run_editor SceneBuilder.BuildMainScene scene ;;
     linux)   run_editor GameBuilder.BuildLinux   player-linux ;;
     windows) run_editor GameBuilder.BuildWindows player-windows ;;
+    # Retired: MainScene.unity is authored in the editor now. Kept as a no-op so old
+    # check commands and scripts that still call it do not fail; it never touches the scene.
+    scene)   echo "▶ scene: no-op — MainScene.unity is hand-authored, nothing is generated" ;;
     smoke)   do_smoke ;;
     test)    do_test ;;
     playmode)    do_playmode ;;
@@ -403,7 +404,6 @@ case "${1:-all}" in
     kenney)  ensure_kenney ;;
     all)
         do_setup
-        run_editor SceneBuilder.BuildMainScene scene
         run_editor GameBuilder.BuildLinux player-linux
         do_smoke
         echo ""

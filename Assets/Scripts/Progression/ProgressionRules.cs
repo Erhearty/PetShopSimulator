@@ -55,7 +55,7 @@ namespace PetShop.Progression
         /// <summary>First tier at which Tiger pens can be placed.</summary>
         public const int TigerTier = TownLandmarkTier;
 
-        /// <summary>Lot stage 0: the shop room and the paddock.</summary>
+        /// <summary>Lot stage 0: the shop room and its forecourt.</summary>
         public const int StarterLotStage = 0;
 
         /// <summary>Lot stage 1: stage 0 plus the strip behind it.</summary>

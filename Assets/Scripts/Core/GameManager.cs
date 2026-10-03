@@ -18,7 +18,7 @@ namespace PetShop.Core
     /// <see cref="SaveLoadController"/>, shop-floor interactions to
     /// <see cref="ShopFloorActions"/>, and hiring/firing to <see cref="StaffRoster"/>.
     /// </summary>
-    public class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
 
@@ -28,7 +28,7 @@ namespace PetShop.Core
         [HideInInspector] public ShopManager     Shop;
         [HideInInspector] public CustomerSpawner Spawner;
         [HideInInspector] public AudioManager    Audio;
-        [HideInInspector] public ShopGenerator   Generator;
+        [HideInInspector] public ShopLayout      Layout;
         [HideInInspector] public CheckoutQueue    Queue;
         [HideInInspector] public ProgressionDirector Progression;
         [HideInInspector] public ShopEventDirector   Events;
@@ -108,6 +108,7 @@ namespace PetShop.Core
             _saveLoad = new SaveLoadController(this);
             _floor    = new ShopFloorActions(this);
             _roster   = new StaffRoster(this);
+            WireFurnitureSupply();
             Catalog  = ItemDatabase.Load();
             ApplyCommandLineOverrides();
         }
@@ -118,17 +119,24 @@ namespace PetShop.Core
         }
 
         /// <summary>Called by GameBootstrapper once the room and player exist.</summary>
-        public void Begin()
+        public void Begin(bool skipTutorial = false)
         {
             Shop?.OnDeliveryArrived.AddListener(_floor.OnDeliveryArrived);
 
             LineageRegistry.Reset(); // statics survive scene reloads
             var save = SaveSystem.Load();
             if (save != null) _saveLoad.LoadGame(save);
-            else              _saveLoad.NewGame();
+            else              StartNewGame(skipTutorial);
 
-            Generator?.BakeNavMesh();
+            Layout?.BakeNavMesh();
             StartDay();
+        }
+
+        /// <summary>A fresh, empty shop; -furnish (dev/test runs only) places the starter furniture.</summary>
+        private void StartNewGame(bool skipTutorial)
+        {
+            _saveLoad.NewGame(skipTutorial);
+            if (PlaytestOptions.Furnish) Dev.DevFurnisher.Furnish(this, PlaytestOptions.Seed ?? Dev.DevFurnisher.DefaultSeed);
         }
 
         private void Update()
@@ -149,6 +157,7 @@ namespace PetShop.Core
             _dayElapsed += Time.deltaTime;
 
             Shop?.PollDeliveries(DayProgress);
+            TickFurniture();
 
             // Stop letting new customers in shortly before closing time
             if (Spawner != null && !Spawner.DoorsClosed && DayProgress > 0.88f)
@@ -173,41 +182,6 @@ namespace PetShop.Core
                 }
             }
             _autoContinue = Application.isBatchMode;
-        }
-
-        // ── Furniture registry ────────────────────────────────────────────────
-
-        public void RegisterFurniture(GameObject go)
-        {
-            if (go == null) return;
-            var shelf = go.GetComponent<ShelfUnit>();
-            if (shelf != null && !_shelves.Contains(shelf)) _shelves.Add(shelf);
-
-            var pen = go.GetComponent<PetPen>();
-            if (pen != null && !_pens.Contains(pen)) _pens.Add(pen);
-
-            PushListsToSpawner();
-        }
-
-        public void UnregisterFurniture(GameObject go)
-        {
-            if (go == null) return;
-            var shelf = go.GetComponent<ShelfUnit>();
-            if (shelf != null) _shelves.Remove(shelf);
-
-            var pen = go.GetComponent<PetPen>();
-            if (pen != null) _pens.Remove(pen);
-
-            PushListsToSpawner();
-        }
-
-        private void PushListsToSpawner()
-        {
-            _shelves.RemoveAll(s => s == null);
-            _pens.RemoveAll(p => p == null);
-            if (Spawner == null) return;
-            Spawner.Shelves = _shelves;
-            Spawner.PetPens = _pens;
         }
 
         // ── Interactions (delegated to ShopFloorActions) ─────────────────────
@@ -272,6 +246,7 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
+            LandFurnitureOvernight();
             ShowJudging.Run(this);
 
             DaySummary summary = CloseDayWithProgression();
@@ -312,6 +287,7 @@ namespace PetShop.Core
             var inspection = Progression?.RunInspectionIfDue(Shop.Day);
             DaySummary summary = Shop.CloseDay();
             CollectProgressionHeadlines(summary, inspection);
+            CollectQuestHeadlines(summary);
             return summary;
         }
 

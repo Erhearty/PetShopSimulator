@@ -5,6 +5,7 @@ using System.IO;
 using UnityEngine;
 using PetShop.Core;
 using PetShop.Shop;
+using PetShop.Traffic;
 using PetShop.UI;
 
 namespace PetShop.Dev
@@ -40,6 +41,7 @@ namespace PetShop.Dev
             public float   OrthoSize;
             public Action  Setup;      // opens a panel / sets a state before the frame
             public Action  Teardown;
+            public bool    FromMainCamera;  // render through the player's camera (held item + aim ghost)
         }
 
         public static bool TryCreate(out CameraTour tour)
@@ -62,6 +64,9 @@ namespace PetShop.Dev
 
         private IEnumerator Start()
         {
+            // A new game starts with an empty shop; the shots need furniture, pets and customers.
+            DevFurnisher.Furnish(GameManager.Instance, PlaytestOptions.Seed ?? DevFurnisher.DefaultSeed);
+
             float waited = 0f;
             while (waited < WarmupSeconds)
             {
@@ -70,6 +75,10 @@ namespace PetShop.Dev
             }
             Debug.Log("[Tour] warmup done, capturing...");
             Debug.Log(NavProbe.Run());
+
+            // Frozen cars keep every screenshot deterministic.
+            var traffic = FindAnyObjectByType<TrafficDirector>();
+            if (traffic != null) traffic.Freeze();
 
             Directory.CreateDirectory(OutputDir);
 
@@ -102,6 +111,8 @@ namespace PetShop.Dev
                 yield return null;
                 yield return null;
 
+                if (shot.FromMainCamera) MatchMainCamera(cam);
+
                 cam.targetTexture = rt;
                 cam.Render();
                 cam.targetTexture = null;
@@ -124,6 +135,7 @@ namespace PetShop.Dev
 
             Destroy(cam.gameObject);
             rt.Release();
+            if (traffic != null) traffic.Unfreeze();
 
             // After the camera work: paths that cannot be photographed get checked instead.
             Debug.Log(BreedProbe.Run());
@@ -168,7 +180,7 @@ namespace PetShop.Dev
 
         private List<Shot> BuildShots()
         {
-            var gen  = FindAnyObjectByType<ShopGenerator>();
+            var gen  = FindAnyObjectByType<ShopLayout>();
             var ui   = FindAnyObjectByType<GameUI>();
             var game = GameManager.Instance;
 
@@ -179,7 +191,7 @@ namespace PetShop.Dev
             float front   = shop.z + d * 0.5f;
             float yardEnd = gen != null ? gen.YardFrontZ : 17f;
 
-            Vector3 pens = PenCentre(out Vector3 firstPen);
+            Vector3 firstPen = FirstPenPosition();
 
             var shots = new List<Shot>
             {
@@ -192,15 +204,16 @@ namespace PetShop.Dev
                                             new Vector3(shop.x + 6f, 1.5f, shop.z - 6f), 60f),
                 World("yard_wide",          new Vector3(shop.x + 32f, 10f, shop.z - 18f),
                                             new Vector3(shop.x + 4f, 1f, shop.z - 2f), 62f),
-                World("garden",             new Vector3(shop.x + 12f, 3.2f, shop.z - 16f),
-                                            new Vector3(shop.x + 15f, 1.2f, shop.z - 11f), 55f),
-                World("paddock",            pens + new Vector3(-13f, 7f, -13f), pens + Vector3.up, 58f),
+                World("yard_back_corner",   new Vector3(shop.x + 26f, 4f, shop.z - 17f),
+                                            new Vector3(shop.x + 4f, 0.8f, shop.z - 4f), 58f),
+                World("yard_east",          new Vector3(shop.x + 30f, 5f, shop.z + 8f),
+                                            new Vector3(shop.x + 16f, 0.5f, shop.z - 6f), 58f),
                 // Offset diagonally: straight back from a pen puts the camera inside the
                 // sign of the pen behind it.
                 World("pen_close",          firstPen + new Vector3(-3.4f, 2.0f, -3.6f),
                                             firstPen + Vector3.up * 0.9f, 50f),
-                World("pergola",            pens + new Vector3(-9f, 2.2f, -11f),
-                                            pens + new Vector3(2f, 2.4f, 2f), 60f),
+                World("shop_rear",          new Vector3(shop.x, 3f, shop.z - d * 0.5f - 9f),
+                                            new Vector3(shop.x, 2f, shop.z - d * 0.5f), 60f),
                 World("interior_wide",      new Vector3(shop.x, h - 1.1f, shop.z + d * 0.5f - 1.4f),
                                             new Vector3(shop.x, 0.9f, shop.z - d * 0.35f), 68f),
                 World("interior_counter",   new Vector3(shop.x + 2.2f, 1.7f, shop.z - d * 0.10f),
@@ -243,12 +256,17 @@ namespace PetShop.Dev
                              () => ui.Pause.Open(),
                              () => { ui.Pause.Close(); Time.timeScale = 1f; }));
 
+            // The real flow: a pen from the furniture inventory in hand, its ghost where the player aims.
             if (game != null && game.Build != null)
-                shots.Add(Ui("build_mode",
-                             new Vector3(shop.x + 9f, 3.4f, shop.z - 6f),
-                             new Vector3(shop.x + 13f, 0f, shop.z - 11f),
-                             () => game.Build.EnterBuildMode(BuildCatalog.Get(BuildCatalog.PetPen)),
-                             () => game.Build.ExitBuildMode()));
+            {
+                var build = Ui("build_mode",
+                               new Vector3(shop.x + 9f, 3.4f, shop.z - 6f),
+                               new Vector3(shop.x + 13f, 0f, shop.z - 11f),
+                               () => HoldFromInventory(game, BuildCatalog.PetPen),
+                               () => PutBackInInventory(game, BuildCatalog.PetPen));
+                build.FromMainCamera = true;
+                shots.Add(build);
+            }
 
             // Plan views last: orthographic, so distances read true for design review.
             Vector3 plot = Vector3.zero;
@@ -258,6 +276,10 @@ namespace PetShop.Dev
             shots.Add(World("city_oblique", plot + new Vector3(-80f, 90f, -70f),
                             plot + new Vector3(10f, 0f, 40f), 55f));
 
+            // Appended, so the HUD stays on 16: along the street (x, z 24..34, y ~0.33) over the cars.
+            shots.Add(World("street_traffic", new Vector3(-26f, 3.2f, 22f),
+                            new Vector3(4f, 0.8f, 29f), 55f));
+
             // Appended rather than slotted in with the other panels, so the HUD stays on 16.
             if (ui != null && ui.Breeding != null)
                 shots.Add(Ui("breeding_panel", uiFrom, uiTo,
@@ -266,6 +288,12 @@ namespace PetShop.Dev
             if (ui != null && ui.StaffBoard != null)
                 shots.Add(Ui("staff_board", uiFrom, uiTo,
                              () => ui.StaffBoard.Show(), ui.StaffBoard.Hide));
+
+            // Quests: the tracker is on by default, so a plain HUD view shows it.
+            shots.Add(Ui("quest_tracker", uiFrom, uiTo, null, null));
+            if (ui != null && ui.Journal != null)
+                shots.Add(Ui("quest_journal", uiFrom, uiTo,
+                             () => ui.Journal.Show(), ui.Journal.Hide));
 
             // Deliveries: order a pallet and force it to land so the forecourt loop is on film.
             if (game != null && gen != null)
@@ -302,15 +330,34 @@ namespace PetShop.Dev
             new() { Name = name, Kind = Kind.Ui, Position = from, LookAt = to, Fov = 60f,
                     Setup = setup, Teardown = teardown };
 
-        private Vector3 PenCentre(out Vector3 firstPen)
+        /// <summary>Gives the inventory one <paramref name="id"/> and takes it into the hand.</summary>
+        private static void HoldFromInventory(GameManager game, string id)
         {
-            var pens = FindObjectsByType<PetShop.Pets.PetPen>(FindObjectsSortMode.None);
-            if (pens.Length == 0) { firstPen = Vector3.zero; return Vector3.zero; }
+            game.Furniture.AddOwned(id);
+            if (!game.Build.EnterPlacement(id)) Debug.LogWarning($"[Tour] could not hold {id} for build_mode");
+        }
 
-            Vector3 centre = Vector3.zero;
-            foreach (var pen in pens) centre += pen.transform.position;
-            firstPen = pens[0].transform.position;
-            return centre / pens.Length;
+        /// <summary>Closes build mode and removes the item <see cref="HoldFromInventory"/> handed out.</summary>
+        private static void PutBackInInventory(GameManager game, string id)
+        {
+            game.Build.ExitBuildMode();   // the held item goes back into the inventory
+            game.Furniture.TakeOwned(id);
+        }
+
+        /// <summary>Copies the player's camera pose so viewmodel and ghost frame as in play.</summary>
+        private static void MatchMainCamera(Camera cam)
+        {
+            var main = Camera.main;
+            if (main == null || main == cam) return;
+            cam.transform.SetPositionAndRotation(main.transform.position, main.transform.rotation);
+            cam.orthographic = false;
+            cam.fieldOfView  = main.fieldOfView;
+        }
+
+        private Vector3 FirstPenPosition()
+        {
+            var pen = FindAnyObjectByType<PetShop.Pets.PetPen>();
+            return pen != null ? pen.transform.position : Vector3.zero;
         }
 
         private string PenDescription()

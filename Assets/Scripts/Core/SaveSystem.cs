@@ -11,7 +11,7 @@ namespace PetShop.Core
     /// furniture together with its shelf stock or pen residents.
     /// </summary>
     [Serializable]
-    public class SaveData
+    public partial class SaveData
     {
         public int    Version = SaveMigrator.CurrentVersion;
         /// <summary>Permanent reputation tier reached (see ProgressionRules).</summary>
@@ -52,6 +52,19 @@ namespace PetShop.Core
         public List<LineageEntrySave> Lineage   = new();
         /// <summary>Auto-reorder rule per product category.</summary>
         public List<ReorderRuleSave> AutoReorder = new();
+        /// <summary>Unplaced furniture the player owns, keyed by catalogue id (save version 5+).</summary>
+        public List<StockEntry> FurnitureInventory = new();
+        /// <summary>Furniture paid for but not yet collected from the forecourt (save version 5+).</summary>
+        public List<FurnitureOrderSave> PendingFurnitureOrders = new();
+
+        /// <summary>One furniture order as saved: what it is, when it lands, and whether it has.</summary>
+        [Serializable]
+        public class FurnitureOrderSave
+        {
+            public string catalogId;
+            public float  arrivalProgress;
+            public bool   arrived;
+        }
 
         [Serializable]
         public class StockEntry { public string id; public int qty; }
@@ -63,6 +76,8 @@ namespace PetShop.Core
             public int    cellX, cellY;
             public string variant;
             public float  rotation;
+            /// <summary>True when a hand-placed item occupies its catalogue footprint with x/y swapped.</summary>
+            public bool   footprintRotated;
             public List<StockEntry>  shelfStock = new();
             public List<PetSaveData> pets       = new();
         }

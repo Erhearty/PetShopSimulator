@@ -2,6 +2,14 @@
   "version": 2,
   "checks": [
     {
+      "id": "unity-smoke",
+      "name": "Unity player build + headless smoke",
+      "kind": "external",
+      "command": "./build.sh assets && ./build.sh linux && ./build.sh smoke",
+      "enabled": true,
+      "scope": "repo"
+    },
+    {
       "id": "playmode",
       "name": "PlayMode tests",
       "kind": "test",
@@ -14,14 +22,6 @@
       "name": "Full playtest (build + spawnverify, playmode, smoke, soak)",
       "kind": "external",
       "command": "./build.sh linux && ./build.sh playtest",
-      "enabled": true,
-      "scope": "repo"
-    },
-    {
-      "id": "unity-smoke",
-      "name": "Unity scene build + headless smoke",
-      "kind": "external",
-      "command": "./build.sh assets && ./build.sh scene && ./build.sh linux && ./build.sh smoke",
       "enabled": true,
       "scope": "repo"
     },

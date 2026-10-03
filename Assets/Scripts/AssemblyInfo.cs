@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
 
-// Lets the EditMode test assembly reach the internal pure-function seams.
+// Lets the test assemblies reach the internal seams.
 [assembly: InternalsVisibleTo("PetShop.Tests.EditMode")]
+[assembly: InternalsVisibleTo("PetShop.Tests.PlayMode")]

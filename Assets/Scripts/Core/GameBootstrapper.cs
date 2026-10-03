@@ -9,25 +9,16 @@ using PetShop.UI;
 namespace PetShop.Core
 {
     /// <summary>
-    /// Single entry point. Drop this on an empty GameObject in an otherwise blank scene
-    /// and press Play — it creates every system, the shop, the player and the UI.
+    /// Single entry point. Lives in MainScene next to the scene-authored <see cref="ShopLayout"/>;
+    /// it creates every system and the UI and wires them to the baked world.
     ///
-    /// WASD move · RMB orbit · scroll zoom · E interact · 1-4/B build · Enter close day · F5 save
+    /// WASD move · RMB orbit · scroll zoom · E interact · 1-8/B furniture catalogue · Enter close day · F5 save
     /// </summary>
     public class GameBootstrapper : MonoBehaviour
     {
         [Header("Shop starting values")]
         public float StartBalance    = 1000f;
         [Range(0f, 100f)] public float StartReputation = 40f;
-
-        [Header("Shop building")]
-        public float RoomWidth  = 16f;
-        public float RoomDepth  = 12f;
-        public float WallHeight = 4f;
-
-        [Header("Yard — the open lot around the shop")]
-        public float YardWidth = 64f;
-        public float YardDepth = 34f;
 
         private GridManager     _grid;
         private BuildMode       _build;
@@ -36,9 +27,12 @@ namespace PetShop.Core
         private CheckoutQueue   _queue;
         private AudioManager    _audio;
         private GameManager     _game;
-        private ShopGenerator   _generator;
+        private ShopLayout      _layout;
 
         private GameUI _ui;
+
+        /// <summary>Frame build mode last closed on, so the same build-key press can't reopen the catalogue.</summary>
+        private int _buildExitFrame = -1;
 
         /// <summary>Most pack fallbacks named in the start-up '[Models]' warning.</summary>
         private const int MaxPackFallbacksReported = 10;
@@ -46,6 +40,20 @@ namespace PetShop.Core
         private void Awake()
         {
             PlaytestOptions.Apply(PlaytestOptions.Parse(System.Environment.GetCommandLineArgs()));
+
+            _layout = FindAnyObjectByType<ShopLayout>();
+            if (_layout == null)
+            {
+                Debug.LogError("[Bootstrap] No ShopLayout in the scene — the world is authored in " +
+                               "Assets/Scenes/MainScene.unity. Aborting start-up.");
+                enabled = false;
+                return;
+            }
+
+            FurnitureFactory.Prefabs = _layout.FurniturePrefabs;
+            if (FurnitureFactory.Prefabs == null)
+                Debug.LogError("[Bootstrap] ShopLayout.FurniturePrefabs is not assigned; furniture cannot be spawned.");
+
             BuildSystems();
             BuildWorld();
             string packFallbacks = ModelLibrary.PackFallbackReport(MaxPackFallbacksReported);
@@ -74,36 +82,51 @@ namespace PetShop.Core
                     SaveSystem.ActiveSlot = slot;
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
-                    _game.Begin();
+                    _game.Begin(_ui.Title.SkipTutorial);
                 }, () => _ui.Settings.Show());
             }
 
-            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, 1-4 build, Tab ledger, Enter to close the day.");
+            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B furniture catalogue, Tab ledger, Enter to close the day.");
         }
 
         private void Update()
         {
             if (_game == null || _game.IsGameOver) return;
+            if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
+                                    InputBindings.GetKeyDown(GameAction.BuildMode))) return;
             if (_ui != null && _ui.AnyModalOpen) return;
+            // BuildMode closes itself on the build key; don't reopen the catalogue on that press.
+            if (Time.frameCount == _buildExitFrame) return;
 
             var ids = BuildCatalog.HotkeyOrder;
             for (int i = 0; i < ids.Length; i++)
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                     ToggleBuild(ids[i]);
 
-            if (InputBindings.GetKeyDown(GameAction.BuildMode))
-                ToggleBuild(_build.CurrentItem != null ? _build.CurrentItem.Id : BuildCatalog.ShelfSmall);
+            if (InputBindings.GetKeyDown(GameAction.BuildMode) && !_build.IsActive)
+                ToggleBuild(null);
         }
 
+        /// <summary>
+        /// Closes build mode when it is open; otherwise opens the furniture catalogue, on the tab
+        /// holding <paramref name="catalogId"/> when one is given.
+        /// </summary>
         private void ToggleBuild(string catalogId)
         {
-            var def = BuildCatalog.Get(catalogId);
-            if (def == null) return;
+            if (_build.IsActive) { _build.ExitBuildMode(); return; }
+            _ui?.Catalogue?.Open(catalogId);
+        }
 
-            if (_build.IsActive && _build.CurrentItem != null && _build.CurrentItem.Id == def.Id)
-                _build.ExitBuildMode();
-            else
-                _build.EnterBuildMode(def);
+        /// <summary>
+        /// While the catalogue is open it owns the keyboard: the build key toggles it shut. This is
+        /// its only owner, so one press cannot close and reopen it in the same frame. True when the
+        /// catalogue was open and the frame's input is consumed.
+        /// </summary>
+        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown)
+        {
+            if (catalogue == null || !catalogue.IsOpen) return false;
+            if (buildKeyDown) catalogue.Hide();
+            return true;
         }
 
         // ── Systems ─────────────────────────────────────────────────────────────
@@ -141,33 +164,72 @@ namespace PetShop.Core
             _game.Spawner = _spawner;
             _game.Audio   = _audio;
             _game.Queue   = _queue;
+            _build.Supply = _game.Furniture;   // placing draws on, and removal returns to, the inventory
             gmGO.AddComponent<AutoReorderRunner>().Attach(_game);
+        }
 
-            _generator = gameObject.AddComponent<ShopGenerator>();
-            _generator.RoomWidth  = RoomWidth;
-            _generator.RoomDepth  = RoomDepth;
-            _generator.WallHeight = WallHeight;
-            _generator.YardWidth  = YardWidth;
-            _generator.YardDepth  = YardDepth;
-            _game.Generator = _generator;
+        /// <summary>Wires the scene-authored player and camera; creates the furniture root if missing.</summary>
+        private void BuildSceneWorld()
+        {
+            if (_layout.FurnitureRoot == null)
+            {
+                var root = new GameObject("Furniture").transform;
+                root.SetParent(_layout.ShopRoot != null ? _layout.ShopRoot : _layout.transform, false);
+                _layout.FurnitureRoot = root;
+            }
+
+            if (_layout.Player == null)
+            {
+                var found = GameObject.Find("Player");
+                if (found != null) _layout.Player = found.transform;
+                else Debug.LogWarning("[Bootstrap] No 'Player' object in the scene.");
+            }
+
+            if (RenderSettings.skybox != null) DynamicGI.UpdateEnvironment();
+
+            if (_layout.Player != null)
+            {
+                // The shopkeeper's body comes from the character pack, so the baked scene omits it.
+                if (_layout.Player.Find("Body") == null)
+                {
+                    var controller = _layout.Player.GetComponent<CharacterController>();
+                    CharacterFactory.Attach(_layout.Player.gameObject, () => controller != null ? controller.velocity : Vector3.zero, variant: 1);
+                }
+
+                if (_layout.PlayerStartAnchor != null)
+                {
+                    var cc = _layout.Player.GetComponent<CharacterController>();
+                    if (cc != null) cc.enabled = false;
+                    _layout.Player.position = _layout.PlayerStartPosition;
+                    if (cc != null) cc.enabled = true;
+                }
+
+                Camera cam = Camera.main;
+                if (cam != null)
+                {
+                    var fpc = cam.GetComponent<Player.FirstPersonCamera>() ?? cam.gameObject.AddComponent<Player.FirstPersonCamera>();
+                    fpc.Body = _layout.Player;
+                }
+            }
         }
 
         private void BuildWorld()
         {
-            _generator.Generate(_grid);
-            _build.ObjectRoot = _generator.FurnitureRoot;
+            BuildSceneWorld();
+
+            _game.Layout = _layout;
+            _layout.FillFloorGrid(_grid);
+            _build.ObjectRoot = _layout.FurnitureRoot;
 
             var points = new GameObject("CustomerWaypoints");
             points.transform.SetParent(_spawner.transform, false);
 
-            Vector3 pavement = _generator.Street != null
-                ? _generator.Street.PavementCentre
-                : _generator.DoorPosition + Vector3.forward * 3f;
+            Vector3 pavement = _layout.PavementCentre;
 
             _spawner.SpawnPoint    = MakePoint(points.transform, "SpawnPoint",    pavement);
             _spawner.ExitPoint     = MakePoint(points.transform, "ExitPoint",     pavement);
-            _spawner.EntryPoint    = MakePoint(points.transform, "EntryPoint",    _generator.ForecourtPosition);
-            Vector3 till = _generator.ShopCentre + new Vector3(0f, 0f, -RoomDepth * 0.5f + 2.6f);
+            _spawner.EntryPoint    = MakePoint(points.transform, "EntryPoint",    _layout.ForecourtPosition);
+            Vector3 till = _layout.TillPosition;
             _spawner.RegisterPoint = MakePoint(points.transform, "RegisterPoint", till);
 
             // The queue runs from the till back towards the door.
@@ -181,7 +243,7 @@ namespace PetShop.Core
             _queue.TillPoint      = _spawner.RegisterPoint;
             _queue.QueueDirection = Vector3.forward;
             _spawner.Queue        = _queue;
-            if (_generator.Street != null) _spawner.SpawnSpreadX = _generator.Street.PavementSpread;
+            _spawner.SpawnSpreadX = _layout.PavementSpread;
         }
 
         private static Transform MakePoint(Transform parent, string name, Vector3 pos)
@@ -203,14 +265,18 @@ namespace PetShop.Core
         // ── Wiring ──────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Adds the progression director to the game object and hands it the generator and
+        /// Adds the progression director to the game object and hands it the layout and
         /// build mode, so tiers can open lot stages and pen species.
         /// </summary>
         private void WireProgression()
         {
             var progression = _game.gameObject.AddComponent<ProgressionDirector>();
-            progression.Init(_game, _generator, _build);
+            progression.Init(_game, _layout, _build);
             _game.Progression = progression;
+
+            var quests = _game.gameObject.AddComponent<PetShop.Progression.Quests.QuestDirector>();
+            quests.Init(_game);
+            _game.Quests = quests;
         }
 
         /// <summary>
@@ -235,21 +301,22 @@ namespace PetShop.Core
             // until build mode exits lets customers walk through a wall you just built.
             _build.OnObjectPlacedVisually.AddListener((_, def) =>
             {
-                if (BuildCatalog.IsBuildingPiece(def.Id)) _generator.BakeNavMesh();
+                if (BuildCatalog.IsBuildingPiece(def.Id)) _layout.BakeNavMesh();
             });
-            _build.OnObjectRemovedVisually.AddListener(_ => _generator.BakeNavMesh());
+            _build.OnObjectRemovedVisually.AddListener(_ => _layout.BakeNavMesh());
             _build.OnBuildModeEntered.AddListener(_ => _audio.PlaySfx("click"));
             _build.OnBuildModeExited.AddListener(() =>
             {
+                _buildExitFrame = Time.frameCount;
                 _audio.PlaySfx("build");
-                _generator.BakeNavMesh();
+                _layout.BakeNavMesh();
             });
 
             _game.OnDayEnded.AddListener(_ui.Results.Show);
             _game.OnInfoPanel.AddListener(_ui.Info.Show);
             _game.OnGameOver.AddListener(_ui.GameOver.Show);
 
-            var player = _generator.Player;
+            var player = _layout.Player;
             if (player != null)
             {
                 var interaction = player.GetComponent<Player.InteractionSystem>();

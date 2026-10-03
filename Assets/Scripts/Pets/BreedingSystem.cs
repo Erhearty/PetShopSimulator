@@ -24,6 +24,12 @@ namespace PetShop.Pets
         private const int   CoatSamples          = 21;
         private const float BreedChancePerNight  = 0.45f;
 
+        /// <summary>Animals born in the shop's pens since the game began; saved with the game.</summary>
+        public static int PetsBred { get; private set; }
+
+        /// <summary>Sets <see cref="PetsBred"/> from a save (or 0 for a new game).</summary>
+        public static void RestorePetsBred(int count) => PetsBred = Mathf.Max(0, count);
+
         // ── Public API ───────────────────────────────────────────────
 
         /// <summary>Breed two pets. Returns null if prerequisites fail.</summary>
@@ -99,6 +105,7 @@ namespace PetShop.Pets
                 var baby = Breed(adults[0], adults[1]);
                 if (baby != null && pen.AddPet(baby)) born.Add(baby);
             }
+            PetsBred += born.Count;
             return born;
         }
 

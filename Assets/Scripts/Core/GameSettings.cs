@@ -9,6 +9,10 @@ namespace PetShop.Core
         /// <summary>Persisted key for <see cref="AutosaveEachMorning"/>.</summary>
         public const string AutosaveMorningKey = "settings.autosaveMorning";
 
+        /// <summary>Persisted key for <see cref="ShowQuestTracker"/>.</summary>
+        public const string ShowQuestTrackerKey = "settings.showQuestTracker";
+
+        private const bool   ShowQuestTrackerDefault = true;
         private const bool   AutosaveMorningDefault = true;
         private const string TrueValue  = "1";
         private const string FalseValue = "0";
@@ -27,6 +31,13 @@ namespace PetShop.Core
         {
             get => ReadBool(AutosaveMorningKey, AutosaveMorningDefault);
             set => _store.Write(AutosaveMorningKey, value ? TrueValue : FalseValue);
+        }
+
+        /// <summary>When true the HUD shows the quest tracker. Defaults to true.</summary>
+        public static bool ShowQuestTracker
+        {
+            get => ReadBool(ShowQuestTrackerKey, ShowQuestTrackerDefault);
+            set => _store.Write(ShowQuestTrackerKey, value ? TrueValue : FalseValue);
         }
 
         /// <summary>The stored flag under <paramref name="key"/>, or <paramref name="fallback"/> when unset.</summary>

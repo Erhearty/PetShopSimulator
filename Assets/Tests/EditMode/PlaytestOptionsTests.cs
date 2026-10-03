@@ -21,6 +21,23 @@ namespace PetShop.Tests
             Assert.IsNull(s.SavePath);
             Assert.IsNull(s.TelemetryPath);
             Assert.IsNull(s.QuitAfterDays);
+            Assert.IsFalse(s.Furnish);
+        }
+
+        [Test]
+        public void Parse_Furnish_SetsFurnish()
+        {
+            Assert.IsTrue(PlaytestOptions.Parse(new[] { Exe, "-batchmode", "-FURNISH" }).Furnish);
+        }
+
+        [Test]
+        public void Parse_ValueFlagFollowedByFurnish_DoesNotSwallowIt()
+        {
+            LogAssert.Expect(LogType.Warning, new Regex(@"\[Game\] Ignoring -savepath: it needs a value"));
+            var s = PlaytestOptions.Parse(new[] { "-savepath", "-furnish" });
+
+            Assert.IsNull(s.SavePath);
+            Assert.IsTrue(s.Furnish);
         }
 
         [Test]

@@ -6,7 +6,8 @@
 > gitignored and have been purged from the repository history.
 >
 > The CC0 Kenney kits are not in the repository either (kept out to keep it small), so a
-> fresh clone builds and runs on procedural geometry only. To restore the full art, download
+> fresh clone builds and runs with the baked world (`Assets/Environment/Baked/`, copies of the
+> kit meshes/materials the scene uses) but without the runtime-spawned models. To restore the full art, download
 > each pack through Package Manager → My Assets, then run `./build.sh assets`
 > (`./build.sh assets?` reports which packs are present); restore the Kenney kits as
 > described under *Kenney asset kits* below.
@@ -93,12 +94,15 @@ then either:
 - drop its prefabs under `Assets/Resources/<YourKit>/` and load them through
   `KenneyLibrary` — it takes any Resources path and sizes models by measured bounds, so it
   is not Kenney-specific; or
-- assign them to the serialized fields on `ShopGenerator` / `StreetGenerator`.
+- place its prefabs directly in `Assets/Scenes/MainScene.unity` in the editor. The world is
+  authored in the scene; never write a generator for it. (`ShopGenerator` / `StreetGenerator`,
+  which once took models through serialized fields, have been removed.)
 
 Nothing in the game hard-depends on any art pack. `ModelLibrary.FirstAvailable` picks the
-best installed model and every spawn is allowed to return null, so the chain degrades
-Asset Store pack → Kenney kit → procedural geometry. Delete all of them and the game still
-builds and runs, just plainer.
+best installed model and every spawn is allowed to return null, so runtime-spawned models
+degrade Asset Store pack → Kenney kit → plainer fallback. The world in `MainScene.unity` and the
+furniture prefabs use baked copies in `Assets/Environment/Baked/` and do not depend on the packs.
+Delete all of them and the game still builds and runs, just plainer.
 
 ## TextMesh Pro essentials
 

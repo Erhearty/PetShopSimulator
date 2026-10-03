@@ -9,7 +9,7 @@ using PetShop.Core;
 ///
 /// Shopfront buildings put their glazing on the front, so the centroid of the triangles
 /// using a window/glass material, measured against the building's own centre, points at
-/// the front. The answer feeds StreetGenerator.BuildingFacing.
+/// the front. Use the answer to rotate building models when placing them in MainScene.
 /// </summary>
 public static class FacingProbe
 {

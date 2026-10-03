@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using PetShop.Progression;
+using PetShop.Progression.Quests;
+using PetShop.Shop;
 
 namespace PetShop.Core
 {
@@ -12,7 +14,7 @@ namespace PetShop.Core
     public static class SaveMigrator
     {
         /// <summary>The save format version written by this build.</summary>
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 5;
 
         /// <summary>Saves written before the Version field existed; they parse as 0.</summary>
         private const int LegacyVersion = 0;
@@ -46,7 +48,57 @@ namespace PetShop.Core
             { FirstVersion,  NormaliseDefaults },
             { PreProgressionVersion, SeedProgressionTier },
             { StaffCountVersion, NormaliseStaffList },
+            { PreFurnitureSupplyVersion, UpgradeToVersion5 },
         };
+
+        /// <summary>Saves from before furniture was ordered, delivered and kept in an inventory.</summary>
+        private const int PreFurnitureSupplyVersion = 4;
+
+        /// <summary>
+        /// Version 4 → 5. Each addition made in format 5 has its own sub-step here, so a later
+        /// version-5 field only needs one more line.
+        /// </summary>
+        private static void UpgradeToVersion5(SaveData data)
+        {
+            SeedFurnitureSupply(data);
+            SeedQuestProgress(data);
+        }
+
+        /// <summary>
+        /// Older saves had no quest book. A shop that already has a counter and a shelf placed is
+        /// past the tutorial, so every tutorial step starts complete (no rewards are paid).
+        /// </summary>
+        private static void SeedQuestProgress(SaveData data)
+        {
+            var progress = new QuestProgress();
+            if (HasPlaced(data, BuildCatalog.Counter) &&
+                (HasPlaced(data, BuildCatalog.ShelfSmall) || HasPlaced(data, BuildCatalog.ShelfLarge)))
+            {
+                foreach (var quest in QuestCatalog.InChapter(QuestChapter.Tutorial))
+                    progress.CompletedIds.Add(quest.Id);
+                progress.Chapter = QuestChapter.Early;
+            }
+            data.Quests = progress;
+        }
+
+        /// <summary>True when the save has a placed piece with catalogue id <paramref name="catalogId"/>.</summary>
+        private static bool HasPlaced(SaveData data, string catalogId)
+        {
+            if (data.PlacedObjects == null) return false;
+            foreach (var item in data.PlacedObjects)
+                if (item != null && item.catalogId == catalogId) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Older saves had no furniture inventory or orders: everything they own is already placed,
+        /// so both start empty.
+        /// </summary>
+        private static void SeedFurnitureSupply(SaveData data)
+        {
+            data.FurnitureInventory     ??= new List<SaveData.StockEntry>();
+            data.PendingFurnitureOrders ??= new List<SaveData.FurnitureOrderSave>();
+        }
 
         /// <summary>Saves that kept only a staff head count, not who the staff were.</summary>
         private const int StaffCountVersion = 3;

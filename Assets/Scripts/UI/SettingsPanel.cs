@@ -23,6 +23,7 @@ namespace PetShop.UI
         private const float  StatusFont    = 15f;
         private const float  RowFill       = 0.88f;
         private const float  GeneralRowHeight = 0.09f;
+        private const float  GeneralRowGap    = 0.01f;
 
         private static readonly Vector2 Centre        = new(0.5f, 0.5f);
         private static readonly Vector2 PanelHalfSize = new(450f, 320f);
@@ -37,6 +38,8 @@ namespace PetShop.UI
         private Button      _closeButton;
         private Button      _autosaveButton;
         private TMP_Text    _autosaveLabel;
+        private Button      _trackerButton;
+        private TMP_Text    _trackerLabel;
 
         private readonly Dictionary<GameAction, TMP_Text> _keyLabels = new();
         private readonly List<Button> _rebindButtons = new();
@@ -92,6 +95,7 @@ namespace PetShop.UI
             _status.text = "";
             RefreshKeys();
             RefreshAutosaveLabel();
+            RefreshTrackerLabel();
             _root.SetActive(true);
             _root.transform.SetAsLastSibling();
             SelectFirstRow();
@@ -180,6 +184,35 @@ namespace PetShop.UI
             _autosaveLabel = _autosaveButton.GetComponentInChildren<TMP_Text>();
             _autosaveButton.onClick.AddListener(ToggleAutosave);
             RefreshAutosaveLabel();
+            BuildTrackerToggle();
+        }
+
+        /// <summary>The "Show quest tracker" toggle, one row under the autosave toggle.</summary>
+        private void BuildTrackerToggle()
+        {
+            float top = 1f - GeneralRowHeight - GeneralRowGap;
+            _trackerButton = UIFactory.Button("QuestTracker", GeneralSection, "",
+                new Vector2(0f, top - GeneralRowHeight), new Vector2(1f, top), RowFont);
+            _trackerLabel = _trackerButton.GetComponentInChildren<TMP_Text>();
+            _trackerButton.onClick.AddListener(ToggleTracker);
+            RefreshTrackerLabel();
+        }
+
+        /// <summary>Flips the quest tracker setting, applies it to the HUD and reports it.</summary>
+        private void ToggleTracker()
+        {
+            GameSettings.ShowQuestTracker = !GameSettings.ShowQuestTracker;
+            RefreshTrackerLabel();
+            if (_ui == null) _ui = FindAnyObjectByType<GameUI>();
+            if (_ui != null && _ui.HUD != null && _ui.HUD.Tracker != null) _ui.HUD.Tracker.Refresh();
+            _status.text = GameSettings.ShowQuestTracker ? "Quest tracker on." : "Quest tracker off.";
+        }
+
+        /// <summary>Shows the current quest tracker setting on its button.</summary>
+        private void RefreshTrackerLabel()
+        {
+            if (_trackerLabel == null) return;
+            _trackerLabel.text = $"Show quest tracker: {(GameSettings.ShowQuestTracker ? "on" : "off")}";
         }
 
         /// <summary>Flips the morning autosave setting and reports it.</summary>
@@ -197,10 +230,10 @@ namespace PetShop.UI
             _autosaveLabel.text = $"Autosave each morning: {(GameSettings.AutosaveEachMorning ? "on" : "off")}";
         }
 
-        /// <summary>Explicit up/down navigation: rebind rows top to bottom, then the autosave toggle, Reset, Close.</summary>
+        /// <summary>Explicit up/down navigation: rebind rows top to bottom, then the autosave and quest tracker toggles, Reset, Close.</summary>
         private void WireNavigation()
         {
-            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _resetButton, _closeButton };
+            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _trackerButton, _resetButton, _closeButton };
             for (int i = 0; i < chain.Count; i++)
             {
                 chain[i].navigation = new Navigation
@@ -304,6 +337,7 @@ namespace PetShop.UI
         {
             foreach (var button in _rebindButtons) button.interactable = interactable;
             if (_autosaveButton != null) _autosaveButton.interactable = interactable;
+            if (_trackerButton != null) _trackerButton.interactable = interactable;
             if (_resetButton != null) _resetButton.interactable = interactable;
         }
 

@@ -45,6 +45,10 @@ namespace PetShop.Player
         private static bool BuildModeActive =>
             GameManager.Instance != null && GameManager.Instance.IsBuildModeActive;
 
+        /// <summary>True while build mode holds an item from the inventory: the wheel rotates it.</summary>
+        private static bool HoldingItem =>
+            GameManager.Instance != null && GameManager.Instance.Build != null && GameManager.Instance.Build.IsHolding;
+
         private void LateUpdate()
         {
             if (Target == null) return;
@@ -57,7 +61,9 @@ namespace PetShop.Player
                 _curPitch  = Mathf.Clamp(_curPitch, MinPitch, MaxPitch);
             }
 
-            _desiredDist -= Input.GetAxis("Mouse ScrollWheel") * ZoomSpeed * 4f;
+            // While an item is in hand the wheel rotates it instead of zooming.
+            if (!HoldingItem)
+                _desiredDist -= Input.GetAxis("Mouse ScrollWheel") * ZoomSpeed * 4f;
             _desiredDist  = Mathf.Clamp(_desiredDist, MinDistance, MaxDistance);
             Distance      = Mathf.Lerp(Distance, _desiredDist, OrbitSmooth * Time.deltaTime);
 

@@ -17,14 +17,13 @@ namespace PetShop.Dev
     {
         public static string Run()
         {
-            var generator = Object.FindAnyObjectByType<ShopGenerator>();
-            if (generator == null) return "[Nav] no ShopGenerator";
+            var generator = Object.FindAnyObjectByType<ShopLayout>();
+            if (generator == null) return "[Nav] no ShopLayout";
 
-            Vector3 pavement  = generator.Street != null ? generator.Street.PavementCentre
-                                                         : generator.ForecourtPosition + Vector3.forward * 6f;
+            Vector3 pavement  = generator.PavementCentre;
             Vector3 forecourt = generator.ForecourtPosition;
             Vector3 inside    = generator.DoorPosition;
-            Vector3 till      = generator.ShopCentre + new Vector3(0f, 0f, -generator.RoomDepth * 0.5f + 2.6f);
+            Vector3 till      = generator.TillPosition;
 
             var report = new StringBuilder("[Nav] connectivity\n");
             bool allGood = true;

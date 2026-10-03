@@ -6,7 +6,7 @@ namespace PetShop.Core
     /// <summary>
     /// Command-line switches for automated playtests and soak runs:
     /// <c>-seed N</c>, <c>-nopacks</c>, <c>-savepath P</c>, <c>-telemetry P</c> and
-    /// <c>-quitafterdays N</c>. <c>-daylength</c> is deliberately not handled here —
+    /// <c>-quitafterdays N</c> and <c>-furnish</c>. <c>-daylength</c> is deliberately not handled here —
     /// <see cref="GameManager"/> owns it.
     ///
     /// With none of these flags given nothing changes: no seed is forced, the Asset Store
@@ -29,6 +29,9 @@ namespace PetShop.Core
         /// <summary>Quits the player after this many days have ended.</summary>
         public const string QuitAfterDaysFlag = "-quitafterdays";
 
+        /// <summary>Furnishes the empty shop of a new game (dev/test runs only), see Dev.DevFurnisher.</summary>
+        public const string FurnishFlag = "-furnish";
+
         /// <summary>The parsed values of the playtest switches. Default means "no flags given".</summary>
         public struct Settings
         {
@@ -46,6 +49,9 @@ namespace PetShop.Core
 
             /// <summary>Days to play before quitting, or null to run indefinitely.</summary>
             public int? QuitAfterDays;
+
+            /// <summary>True to place the dev starter furniture when a new game starts.</summary>
+            public bool Furnish;
         }
 
         /// <summary>The settings most recently passed to <see cref="Apply"/>.</summary>
@@ -59,6 +65,9 @@ namespace PetShop.Core
 
         /// <summary>The applied day limit, or null.</summary>
         public static int? QuitAfterDays => Current.QuitAfterDays;
+
+        /// <summary>True when -furnish was given.</summary>
+        public static bool Furnish => Current.Furnish;
 
         /// <summary>
         /// Pure parse of <paramref name="args"/> (typically Environment.GetCommandLineArgs()).
@@ -74,6 +83,7 @@ namespace PetShop.Core
             {
                 string flag = args[i]?.ToLowerInvariant();
                 if (flag == NoPacksFlag) { settings.NoPacks = true; continue; }
+                if (flag == FurnishFlag) { settings.Furnish = true; continue; }
                 if (!IsValueFlag(flag)) continue;
                 if (!TryTakeValue(args, i, flag, out string value)) continue;
 
@@ -117,7 +127,7 @@ namespace PetShop.Core
         private static bool IsKnownFlag(string arg)
         {
             string flag = arg?.ToLowerInvariant();
-            return flag == NoPacksFlag || IsValueFlag(flag);
+            return flag == NoPacksFlag || flag == FurnishFlag || IsValueFlag(flag);
         }
 
         /// <summary>The argument after <paramref name="index"/>, unless it is missing or another flag.</summary>

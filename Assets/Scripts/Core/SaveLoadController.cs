@@ -23,45 +23,20 @@ namespace PetShop.Core
 
         // ── New game / layout ─────────────────────────────────────────────────
 
-        public void NewGame()
+        /// <summary>
+        /// Starts a fresh game with an empty shop: the player orders, collects and places every
+        /// shelf, pen, counter and decoration from the furniture catalogue.
+        /// <paramref name="skipTutorial"/> marks every tutorial quest done (no rewards).
+        /// </summary>
+        public void NewGame(bool skipTutorial = false)
         {
             _game.Show.Withdraw();
+            SaveQuests.ResetForNewGame(_game, skipTutorial);
+            _game.Furniture.Clear();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
-            foreach (var p in _game.Generator.StarterLayout(_game.Grid))
-            {
-                var def = BuildCatalog.Get(p.CatalogId);
-                var go  = _game.Build.Place(p.Cell, def, p.Variant, p.Rotation, charge: false);
-                if (go == null) continue;
-
-                var shelf = go.GetComponent<ShelfUnit>();
-                if (shelf != null) SeedShelf(shelf);
-
-                var pen = go.GetComponent<PetPen>();
-                if (pen != null)
-                {
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                    pen.AddPet(BreedingSystem.GenerateRandom(pen.PenSpecies));
-                }
-            }
-            // You inherit one member of staff — without anyone on the till a new shop cannot
-            // trade at all while you are out in the yard. Inherited, so no sign-on fee.
-            var inherited = StaffCandidate.Generate();
-            inherited.SignOnFee = 0f;
-            inherited.Role      = StaffRole.Cashier;
-            _game.HireCandidate(inherited);
             _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
                          $"{InputBindings.Label(GameAction.Interact)} to interact, " +
                          $"{InputBindings.Label(GameAction.EndDay)} to close up.");
-        }
-
-        /// <summary>Stocks a fresh shelf for free — the starter inventory.</summary>
-        public void SeedShelf(ShelfUnit shelf)
-        {
-            var catalog = _game.Catalog;
-            if (catalog == null) return;
-            var products = catalog.GetByCategory(shelf.Category);
-            for (int i = 0; i < products.Count && i < shelf.MaxLines; i++)
-                shelf.AddStock(products[i], shelf.MaxPerLine);
         }
 
         // ── Save / load ───────────────────────────────────────────────────────
@@ -114,7 +89,9 @@ namespace PetShop.Core
 
             SaveLineage.Capture(data);
             SaveReorder.Capture(data, _game.AutoReorder);
+            SaveFurniture.Capture(data, _game.Furniture, _game.Build);
             data.ShowEntryPetId = _game.Show.EntryPetId;
+            SaveQuests.Capture(data, _game);
             return data;
         }
 
@@ -128,6 +105,7 @@ namespace PetShop.Core
                 cellY     = entry.Root.y,
                 variant   = entry.Variant,
                 rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
+                footprintRotated = BuildMode.IsFootprintRotated(entry),
             };
             if (entry.Instance != null) AddInstanceContents(item, entry.Instance);
             return item;
@@ -191,10 +169,11 @@ namespace PetShop.Core
                 // Saves from before lot stages could build anywhere in the yard; keep the
                 // ground under each saved piece so it is not silently dropped on load.
                 var cell = new Vector2Int(item.cellX, item.cellY);
-                _game.Build.GridManager.EnsureFloor(cell, def.Size);
+                _game.Build.GridManager.EnsureFloor(cell, BuildMode.FootprintSize(def, item.footprintRotated));
 
                 var go = _game.Build.Place(cell, def,
-                                           item.variant, item.rotation, charge: false);
+                                           item.variant, item.rotation, charge: false,
+                                           footprintRotated: item.footprintRotated);
                 if (go == null) continue;
 
                 var shelf = go.GetComponent<ShelfUnit>();
@@ -216,7 +195,9 @@ namespace PetShop.Core
             }
             SaveLineage.Apply(data, loadedPets, data.Day);
             SaveReorder.Apply(data, _game.AutoReorder);
+            SaveFurniture.Apply(data, _game.Furniture);
             RestoreShowEntry(data.ShowEntryPetId, loadedPets);
+            SaveQuests.Apply(data, _game);
 
             _game.RestoreStaff(data);
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);

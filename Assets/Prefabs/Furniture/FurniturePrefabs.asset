@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c2e5a91d4b84f06a3e1c9d82f5b6a40, type: 3}
+  m_Name: FurniturePrefabs
+  m_EditorClassIdentifier: PetShop::PetShop.Shop.FurniturePrefabs
+  Entries:
+  - Id: shelf_small
+    Prefab: {fileID: 1753617924193052275, guid: 1ff10ccb4df0af09a967a18dfbce6b3b, type: 3}
+  - Id: shelf_large
+    Prefab: {fileID: 123989488874513958, guid: 32c6512ace2045d79a6d0c2d0a4d2a6f, type: 3}
+  - Id: pet_pen
+    Prefab: {fileID: 4356842200879288440, guid: 93a5fbf0746cd8e60af97d1de2e7d4e0, type: 3}
+  - Id: counter
+    Prefab: {fileID: 2268668632931288249, guid: 036ea3ecfe72fc064a967234750a83e2, type: 3}
+  - Id: wall
+    Prefab: {fileID: 4375828854430169953, guid: cec3df7454c61b0d79808edd3cdac138, type: 3}
+  - Id: wall_window
+    Prefab: {fileID: 8092902620434097861, guid: 2ac98eecd2d10247cbf33e0d49a84b08, type: 3}
+  - Id: wall_door
+    Prefab: {fileID: 8577905364931294217, guid: 6115f6b37fb0f9bd2b48e914fecf7928, type: 3}
+  - Id: fence
+    Prefab: {fileID: 1847759623881491591, guid: 6f614a62eaf808f0ca106d0332cf9396, type: 3}
+  - Id: decor_plant_pot
+    Prefab: {fileID: 6505200522393836634, guid: 658c02499ba1ff7ce88ffee12983247f, type: 3}
+  - Id: decor_flowers
+    Prefab: {fileID: 6466646457195591589, guid: eeeb4f754097bccfbadb0de5404a2119, type: 3}
+  - Id: decor_bench
+    Prefab: {fileID: 5762863354068378438, guid: f6891cbd22f052bf08a0462c48df080a, type: 3}
+  - Id: decor_rug_round
+    Prefab: {fileID: 2520716914535628860, guid: 31bbcf24495907c75a2b7e8c722c8417, type: 3}
+  - Id: decor_bookshelf
+    Prefab: {fileID: 4216539523431388968, guid: 9060fe343b0821855ad2fe6d4c2d746a, type: 3}
+  - Id: decor_box_closed
+    Prefab: {fileID: 2386788103611760570, guid: 916d3e2e364526be388d55f6e4ef1420, type: 3}
+  - Id: decor_box_open
+    Prefab: {fileID: 7319176732572096726, guid: 00570a2392fa9ed3497914208c055e67, type: 3}
+  - Id: decor_dustbin
+    Prefab: {fileID: 3330645461323883469, guid: 51c113de87b97b51d9c55430ebee5576, type: 3}
+  - Id: decor_pallet
+    Prefab: {fileID: 1206685584338919430, guid: 92c5fea08935ad06f896a69850e14137, type: 3}
+  - Id: decor_feed_bag
+    Prefab: {fileID: 7361377223216889487, guid: c13c4fa8dcf63543a9f5738602763c70, type: 3}
+  - Id: decor_fish_tank
+    Prefab: {fileID: 4395721278838274441, guid: 2e7c5ed51fbe6e3ab943eca903c4d644, type: 3}
+  - Id: decor_notice_board
+    Prefab: {fileID: 2359163122657205207, guid: 5c68d36a93231d1d3bfdde347df6df04, type: 3}
+  - Id: decor_lead_rail
+    Prefab: {fileID: 6519422812074796344, guid: 09b16044579caad1cb80dd5f99fe4df7, type: 3}

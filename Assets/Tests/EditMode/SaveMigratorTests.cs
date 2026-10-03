@@ -58,6 +58,46 @@ namespace PetShop.Tests
             "{\"Version\":4,\"ProgressionTier\":1,\"Balance\":10.0,\"Day\":2,\"Staff\":1,\"PriceMultiplier\":1.0," +
             "\"StaffList\":[{\"name\":\"Ada\",\"role\":\"Feeder\",\"skill\":4,\"wage\":72.5,\"serviceSeconds\":3.25}]}";
 
+        /// <summary>A version 4 save with placed furniture but no furniture inventory or orders.</summary>
+        private const string V4FurnitureJson =
+            "{\"Version\":4,\"Balance\":10.0,\"Day\":2,\"Staff\":1,\"PriceMultiplier\":1.0," +
+            "\"PlacedObjects\":[{\"catalogId\":\"counter\",\"cellX\":1,\"cellY\":2}]}";
+
+        /// <summary>A version 5 save carrying a furniture inventory and a crate on the forecourt.</summary>
+        private const string V5FurnitureJson =
+            "{\"Version\":5,\"Balance\":10.0,\"Day\":2,\"Staff\":1,\"PriceMultiplier\":1.0," +
+            "\"FurnitureInventory\":[{\"id\":\"shelf_small\",\"qty\":2}]," +
+            "\"PendingFurnitureOrders\":[{\"catalogId\":\"pet_pen\",\"arrivalProgress\":0.4,\"arrived\":true}]}";
+
+        [Test]
+        public void Migrate_V4_ToV5_KeepsPlacedFurnitureAndStartsSupplyEmpty()
+        {
+            var data = SaveMigrator.Migrate(V4FurnitureJson);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(5, data.Version);
+            Assert.AreEqual(1, data.PlacedObjects.Count);
+            Assert.IsNotNull(data.FurnitureInventory);
+            Assert.IsNotNull(data.PendingFurnitureOrders);
+            Assert.AreEqual(0, data.FurnitureInventory.Count);
+            Assert.AreEqual(0, data.PendingFurnitureOrders.Count);
+        }
+
+        [Test]
+        public void Migrate_V5_KeepsFurnitureSupplyExactly()
+        {
+            var data = SaveMigrator.Migrate(V5FurnitureJson);
+
+            Assert.IsNotNull(data);
+            Assert.AreEqual(1, data.FurnitureInventory.Count);
+            Assert.AreEqual("shelf_small", data.FurnitureInventory[0].id);
+            Assert.AreEqual(2, data.FurnitureInventory[0].qty);
+            Assert.AreEqual(1, data.PendingFurnitureOrders.Count);
+            Assert.AreEqual("pet_pen", data.PendingFurnitureOrders[0].catalogId);
+            Assert.AreEqual(0.4f, data.PendingFurnitureOrders[0].arrivalProgress, Tolerance);
+            Assert.IsTrue(data.PendingFurnitureOrders[0].arrived);
+        }
+
         [Test]
         public void Migrate_V4_KeepsStaffListExactly()
         {
