@@ -25,6 +25,7 @@ namespace PetShop.Tests
         private const float SettleSeconds   = 20f;
         private const float MinMovement     = 0.5f;
         private const float OverlapSlack    = 0.05f;
+        private const float CrashDepth      = 0.05f;
         private const string CarPrefix      = "Vehicle_Car";
         private const string PavementName   = "Pavement";
 
@@ -59,7 +60,7 @@ namespace PetShop.Tests
 
             var trafficCars = new List<TrafficCar>(Object.FindObjectsByType<TrafficCar>(FindObjectsSortMode.None));
             var lanes = new HashSet<TrafficLane>();
-            foreach (var c in trafficCars) lanes.Add(c.Lane);
+            foreach (var c in trafficCars) if (c.Lane != null) lanes.Add(c.Lane);
             Assert.GreaterOrEqual(lanes.Count, 2, "both lanes need cars");
 
             var before = new Dictionary<TrafficCar, Vector3>();
@@ -74,9 +75,28 @@ namespace PetShop.Tests
             while (Time.realtimeSinceStartup < until)
             {
                 AssertNoLaneOverlap(trafficCars);
+                AssertNoCollisions(trafficCars);
                 yield return new WaitForSecondsRealtime(1f);
             }
             AssertNoLaneOverlap(trafficCars);
+            AssertNoCollisions(trafficCars);
+        }
+
+        /// <summary>No two cars' colliders interpenetrate anywhere: lanes, U-turns or the car park.</summary>
+        private static void AssertNoCollisions(List<TrafficCar> cars)
+        {
+            Physics.SyncTransforms();
+            for (int i = 0; i < cars.Count; i++)
+            for (int j = i + 1; j < cars.Count; j++)
+            {
+                var a = cars[i].GetComponentInChildren<Collider>();
+                var b = cars[j].GetComponentInChildren<Collider>();
+                if (a == null || b == null) continue;
+                bool hit = Physics.ComputePenetration(a, a.transform.position, a.transform.rotation,
+                                                      b, b.transform.position, b.transform.rotation,
+                                                      out _, out float depth);
+                Assert.IsFalse(hit && depth > CrashDepth, $"{cars[i].name} and {cars[j].name} collide ({depth:F2} m)");
+            }
         }
 
         private static void AssertNoLaneOverlap(List<TrafficCar> cars)
@@ -96,7 +116,7 @@ namespace PetShop.Tests
 
         private static IEnumerable<TrafficLane> LaneOf(List<TrafficCar> cars)
         {
-            foreach (var c in cars) yield return c.Lane;
+            foreach (var c in cars) if (c.Lane != null) yield return c.Lane;
         }
 
         private static List<Transform> FindCarRoots()

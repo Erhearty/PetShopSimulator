@@ -20,6 +20,32 @@ namespace PetShop.Traffic
 
         private TrafficLane[] _lanes = Array.Empty<TrafficLane>();
 
+        [Header("Deliveries")]
+        [Tooltip("Lane the delivery truck drives along to reach the shop.")]
+        [SerializeField] private TrafficLane deliveryLane;
+        [Tooltip("Distance along the delivery lane at which the truck pulls up outside the shop.")]
+        [SerializeField] private float deliveryStopDistance;
+
+        /// <summary>The active director, or null when the scene has none.</summary>
+        public static TrafficDirector Instance { get; private set; }
+
+        /// <summary>Lane the delivery truck drives along, or null when deliveries come without one.</summary>
+        public TrafficLane DeliveryLane => deliveryLane;
+
+        /// <summary>Where along <see cref="DeliveryLane"/> the truck stops outside the shop.</summary>
+        public float DeliveryStopDistance => deliveryStopDistance;
+
+        /// <summary>Adds a car built at runtime (a delivery truck) to the ticked set.</summary>
+        public static void Register(TrafficCar car)
+        {
+            if (car != null && !CarList.Contains(car)) CarList.Add(car);
+        }
+
+        /// <summary>Removes a car from the ticked set.</summary>
+        public static void Unregister(TrafficCar car) => CarList.Remove(car);
+
+        private void Awake() => Instance = this;
+
         /// <summary>Cars registered by the active director.</summary>
         public static IReadOnlyList<TrafficCar> Cars => CarList;
 
@@ -76,8 +102,20 @@ namespace PetShop.Traffic
             float dt = Time.deltaTime;
             for (int i = 0; i < CarList.Count; i++)
                 if (CarList[i] != null) CarList[i].Tick(dt);
+
+            // Cars that left the street (delivery trucks) are removed after the loop, never during it.
+            for (int i = CarList.Count - 1; i >= 0; i--)
+            {
+                if (CarList[i] != null && !CarList[i].Finished) continue;
+                if (CarList[i] != null) Destroy(CarList[i].gameObject);
+                CarList.RemoveAt(i);
+            }
         }
 
-        private void OnDestroy() => CarList.Clear();
+        private void OnDestroy()
+        {
+            CarList.Clear();
+            if (Instance == this) Instance = null;
+        }
     }
 }

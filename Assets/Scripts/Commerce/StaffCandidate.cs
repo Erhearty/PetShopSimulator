@@ -92,11 +92,14 @@ namespace PetShop.Commerce
         private static float SkillFraction(int skill) =>
             (Mathf.Clamp(skill, MinSkill, MaxSkill) - MinSkill) / (float)(MaxSkill - MinSkill);
 
-        /// <summary>Skill as filled and empty stars, e.g. ★★★☆☆.</summary>
+        /// <summary>
+        /// Skill as a row of dots, the earned ones bright and the rest dimmed (TextMeshPro rich text).
+        /// Dots rather than stars: the UI font has no ★/☆ glyphs, so stars drew as empty boxes.
+        /// </summary>
         public static string Stars(int skill)
         {
             int filled = Mathf.Clamp(skill, MinSkill, MaxSkill);
-            return new string('★', filled) + new string('☆', MaxSkill - filled);
+            return new string('•', filled) + "<alpha=#40>" + new string('•', MaxSkill - filled) + "<alpha=#FF>";
         }
 
         /// <summary>Plain-language skill level, for cards and the payroll.</summary>

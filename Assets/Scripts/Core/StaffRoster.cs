@@ -103,12 +103,7 @@ namespace PetShop.Core
         /// <summary>Builds an assistant from <paramref name="c"/> at the next till slot. Charges nothing.</summary>
         private Assistant Spawn(StaffCandidate c)
         {
-            var staffStation = _game.StaffStation;
-            Vector3 station = staffStation != null ? staffStation.position : Vector3.zero;
-            Vector3 facing  = staffStation != null ? staffStation.forward  : Vector3.forward;
-            Vector3 offset  = Vector3.right * (_assistants.Count * StationSpacing + StationStartOffset);
-
-            var assistant = Assistant.Create(_game.transform, station + offset, facing,
+            var assistant = Assistant.Create(_game.transform, StationSlot(_assistants.Count), StationFacing(),
                                              _game.Queue, _game.Shop, _assistants.Count);
             assistant.DailyWage      = c.DailyWage;
             assistant.ServiceSeconds = c.ServiceSeconds;
@@ -119,6 +114,25 @@ namespace PetShop.Core
             assistant.SetRole(c.Role);
             _assistants.Add(assistant);
             return assistant;
+        }
+
+        /// <summary>Where the assistant in <paramref name="slot"/> stands: side by side behind the till.</summary>
+        private Vector3 StationSlot(int slot)
+        {
+            var station = _game.StaffStation;
+            if (station == null) return Vector3.zero;
+            return station.position + station.right * (slot * StationSpacing + StationStartOffset);
+        }
+
+        private Vector3 StationFacing() =>
+            _game.StaffStation != null ? _game.StaffStation.forward : Vector3.forward;
+
+        /// <summary>Sends every assistant to their slot behind the till after the counter moved.</summary>
+        public void RepositionStaff()
+        {
+            Quaternion facing = Quaternion.LookRotation(StationFacing(), Vector3.up);
+            for (int i = 0; i < _assistants.Count; i++)
+                if (_assistants[i] != null) _assistants[i].SetHome(StationSlot(i), facing);
         }
 
         /// <summary>Tells the shop the current head count and wage bill.</summary>

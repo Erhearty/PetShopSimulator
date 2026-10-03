@@ -78,6 +78,52 @@ namespace PetShop.Core
             Spawner.Shelves    = _shelves;
             Spawner.PetPens    = _pens;
             Spawner.HasCounter = _counters.Count > 0;
+            PlaceTillAtCounter();
+        }
+
+        /// <summary>Gap in metres between the counter's back edge and the staff standing behind it.</summary>
+        private const float StaffBehindCounter = 0.5f;
+
+        /// <summary>
+        /// The till is wherever the first placed counter is: customers queue out from its front
+        /// (+Z, the customer side of every furniture prefab) and staff stand behind it. Without
+        /// this the queue sat at the shop's old fixed till spot, metres from any placed counter.
+        /// </summary>
+        private void PlaceTillAtCounter()
+        {
+            if (_counters.Count == 0 || Spawner == null || Spawner.RegisterPoint == null) return;
+            Transform counter = _counters[0].transform;
+
+            Vector3 forward = counter.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+            forward.Normalize();
+
+            float halfDepth = HalfDepthAlong(counter.gameObject, forward);
+            Vector3 centre  = new Vector3(counter.position.x, 0f, counter.position.z);
+
+            Spawner.RegisterPoint.position = centre + forward * halfDepth;
+            if (Queue != null)
+            {
+                Queue.TillPoint      = Spawner.RegisterPoint;
+                Queue.QueueDirection = forward;
+            }
+            if (StaffStation != null)
+            {
+                StaffStation.SetPositionAndRotation(centre - forward * (halfDepth + StaffBehindCounter),
+                                                    Quaternion.LookRotation(forward, Vector3.up));
+                _roster?.RepositionStaff();
+            }
+        }
+
+        /// <summary>Half the object's rendered extent along <paramref name="axis"/> (a flat unit vector).</summary>
+        private static float HalfDepthAlong(GameObject go, Vector3 axis)
+        {
+            var renderers = go.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return 0.5f;
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+            return Mathf.Abs(axis.x) * b.extents.x + Mathf.Abs(axis.z) * b.extents.z;
         }
     }
 }

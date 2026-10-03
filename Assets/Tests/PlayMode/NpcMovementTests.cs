@@ -70,11 +70,11 @@ namespace PetShop.Tests
         }
 
         /// <summary>(a) Every customer leaves, checks out or walks out within a minute of game time.</summary>
-        // KnownIssue: the nav-timeout issue in the header of Assets/Scripts/Dev/NavProbe.cs. When
-        // CustomerAI.NavigateTo times out, a shopper can be left out on the street and never resolve
-        // (seen 2026-09-25: Customer_1_4 never resolved in both modes, on a run where it had passed
-        // the time before). Kept out of the gated run (-testCategory "!KnownIssue") until the nav
-        // bug is fixed; the stuck, off-mesh and skating checks below stay gated.
+        // KnownIssue: still marginal. Shoppers now queue physically at the till and step aside off the
+        // line before leaving, which cut walk timeouts on the way out from ~18 a run to ~1, but an
+        // occasional one still pushes a customer just past the minute (63 s seen 2026-10-03). Kept
+        // out of the gated run (-testCategory "!KnownIssue"); the stuck, off-mesh and skating checks
+        // below stay gated.
         [UnityTest]
         [Category("KnownIssue")]
         public IEnumerator EveryCustomer_IsResolvedWithinAMinute()
@@ -98,12 +98,9 @@ namespace PetShop.Tests
         /// <summary>
         /// (e) Every checkout happens at the till, so sales equal customers who physically got there.
         /// </summary>
-        // KnownIssue: see the header of Assets/Scripts/Dev/NavProbe.cs. CustomerAI.NavigateTo gives
-        // up after a timeout but the shopper stays in the checkout queue regardless, so an assistant
-        // still rings up sales for people stranded on the pavement. Expected to fail on HEAD; kept
-        // out of the gated run (-testCategory "!KnownIssue") until the gameplay bug is fixed.
+        // Was a KnownIssue: a shopper stranded on the way stayed in the queue and was rung up anyway.
+        // CheckoutQueue.FrontReady now only serves someone standing at the till.
         [UnityTest]
-        [Category("KnownIssue")]
         public IEnumerator EveryCheckout_HappensAtTheTill()
         {
             var far = _monitor.CheckoutsAwayFromTill();

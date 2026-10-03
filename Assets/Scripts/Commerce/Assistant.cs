@@ -82,6 +82,17 @@ namespace PetShop.Commerce
             return assistant;
         }
 
+        /// <summary>
+        /// Moves this assistant's place behind the till (the counter was placed or moved). An
+        /// assistant standing at the till steps straight there; one out on the floor returns to it.
+        /// </summary>
+        public void SetHome(Vector3 position, Quaternion rotation)
+        {
+            _homePosition = position;
+            _homeRotation = rotation;
+            if (!_away) transform.SetPositionAndRotation(position, rotation);
+        }
+
         /// <summary>Adds a disabled NavMeshAgent, tuned like a shopper; enabled when a trip starts.</summary>
         private static NavMeshAgent CreateAgent(GameObject go)
         {
@@ -155,13 +166,13 @@ namespace PetShop.Commerce
         private void Update()
         {
             if (Role != StaffRole.Cashier || _away) { _timer = 0f; return; }
-            if (Queue == null || !Queue.AnyWaiting) { _timer = 0f; return; }
+            if (Queue == null || !Queue.FrontReady) { _timer = 0f; return; }
 
             _timer += Time.deltaTime;
             if (_timer < ServiceSeconds) return;
             _timer = 0f;
 
-            var shopper = Queue.Front;
+            var shopper = Queue.NextReady;
             if (shopper == null) return;
 
             float value = shopper.BasketValue;

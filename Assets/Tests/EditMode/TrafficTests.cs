@@ -85,5 +85,34 @@ namespace PetShop.Tests
             Assert.IsTrue(TrafficMath.CanWrap(MinGap, MinGap));
             Assert.IsFalse(TrafficMath.CanWrap(MinGap - 0.5f, MinGap));
         }
+
+        [Test]
+        public void GapIntoNextLane_CountsRestOfLaneAndDistanceOnNext()
+        {
+            // 10 m left on this lane + 4 m into the next, minus two 2 m half-lengths.
+            Assert.AreEqual(10f, TrafficMath.GapIntoNextLane(90f, 100f, 4f, 2f, 2f), Tolerance);
+        }
+
+        [Test]
+        public void MergeWindowClear_BlocksCarsInsideTheWindowOnly()
+        {
+            Assert.IsTrue(TrafficMath.MergeWindowClear(new[] { 10f, 90f }, 50f, 30f, 10f));
+            Assert.IsFalse(TrafficMath.MergeWindowClear(new[] { 25f }, 50f, 30f, 10f), "car approaching from behind");
+            Assert.IsFalse(TrafficMath.MergeWindowClear(new[] { 55f }, 50f, 30f, 10f), "car just past the exit");
+            Assert.IsTrue(TrafficMath.MergeWindowClear(new float[0], 50f, 30f, 10f));
+        }
+
+        [Test]
+        public void Fillet_KeepsEnds_AndRoundsTheCorner()
+        {
+            var path = TrafficMath.Fillet(Bend, 3f, 4);
+            Assert.AreEqual(Bend[0], path[0]);
+            Assert.AreEqual(Bend[2], path[path.Count - 1]);
+            Assert.IsFalse(path.Contains(Bend[1]), "the sharp corner should be replaced by an arc");
+            Assert.Less(TrafficMath.Length(path), TrafficMath.Length(Bend), "cutting the corner shortens the path");
+            // The arc starts 3 m before the corner on the first leg and ends 3 m after it on the second.
+            Assert.IsTrue(path.Contains(new Vector3(7, 0, 0)));
+            Assert.IsTrue(path.Contains(new Vector3(10, 0, 3)));
+        }
     }
 }

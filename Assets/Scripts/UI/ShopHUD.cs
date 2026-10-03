@@ -117,8 +117,9 @@ namespace PetShop.UI
                 TextAlignmentOptions.Right);
 
             _shopperLabel = UIFactory.Label("Shoppers", bar.transform, "",
-                new Vector2(0.665f, 0f), new Vector2(0.695f, 1f), 16f, UIFactory.InkMuted,
+                new Vector2(0.665f, 0f), new Vector2(0.70f, 1f), 15f, UIFactory.InkMuted,
                 TextAlignmentOptions.Center);
+            _shopperLabel.lineSpacing = -18f;
 
             _queueLabel = UIFactory.Label("Queue", bar.transform, "",
                 new Vector2(0.555f, 0f), new Vector2(0.665f, 0.45f), 15f, new Color(0.98f, 0.78f, 0.35f),
@@ -129,7 +130,7 @@ namespace PetShop.UI
         {
             var toast = UIFactory.Panel("Toast", canvas, new Vector2(0.22f, 1f), new Vector2(0.78f, 1f),
                                         new Color(0.10f, 0.13f, 0.19f, 0.92f),
-                                        new Vector2(0f, -96f), new Vector2(0f, -60f));
+                                        new Vector2(0f, -124f), new Vector2(0f, -88f));
             _notification = UIFactory.Label("ToastText", toast.transform, "",
                 new Vector2(0.02f, 0f), new Vector2(0.98f, 1f), 17f, new Color(1f, 0.94f, 0.72f),
                 TextAlignmentOptions.Center);
@@ -214,8 +215,9 @@ namespace PetShop.UI
                 new Vector2(0f, 1f), new Vector2(1f, 1f), 15f, new Color(0.95f, 0.72f, 0.42f),
                 TextAlignmentOptions.Center);
             var rt = UIFactory.Rect(_alertLabel.gameObject);
-            rt.offsetMin = new Vector2(0f, -80f);
-            rt.offsetMax = new Vector2(0f, -56f);
+            // Directly under the status bar; the toast sits below this strip so the two never overlap.
+            rt.offsetMin = new Vector2(0f, -84f);
+            rt.offsetMax = new Vector2(0f, -58f);
             _alertLabel.enabled = false;
         }
 
@@ -266,7 +268,8 @@ namespace PetShop.UI
             if (_shopperLabel != null && _game != null)
             {
                 int inShop = _game.CustomersInShop;
-                _shopperLabel.text = inShop > 0 ? $"\U0001F464 {inShop}" : "";
+                // Text, not an emoji: the UI font has no person glyph and drew a box.
+                _shopperLabel.text = inShop > 0 ? $"<size=70%>shoppers</size>\n{inShop}" : "";
             }
 
             if (_queueLabel != null && _game != null && _game.Queue != null)

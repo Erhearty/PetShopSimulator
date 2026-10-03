@@ -98,10 +98,17 @@ namespace PetShop.Dev
             Vector3 till    = layout.TillPosition;
             Vector3 penRow  = shop + Vector3.forward * (layout.RoomDepth * PenRowOffsetShare);
             Vector3 side    = Vector3.right * (layout.RoomWidth * ShelfSideShare);
-            RectInt keepClear = TillLane(game.Build.GridManager.WorldToGrid(till));
-
+            // The till follows the counter, so the queue lane is kept clear in front of the counter
+            // itself (and the staff strip behind it), wherever the scan put it.
             int placed = 0;
-            placed += Count(PlaceNear(game, BuildCatalog.Counter, null, till + Vector3.right * CounterBesideTill, keepClear));
+            RectInt keepClear = default;
+            var counterDef = BuildCatalog.Get(BuildCatalog.Counter);
+            if (counterDef != null && TryFindCell(game, counterDef.Size, till + Vector3.right * CounterBesideTill,
+                                                  default, out Vector2Int counterCell))
+            {
+                placed += Count(game.Build.Place(counterCell, counterDef, null, NoRotation, charge: false));
+                keepClear = TillLane(counterCell, counterDef.Size);
+            }
             placed += Count(PlaceShelf(game, ProductCategory.Food, shop - side, keepClear));
             placed += Count(PlaceShelf(game, ProductCategory.Toy,  shop + side, keepClear));
             placed += Count(PlacePen(game, Pet.Species.Dog, penRow + Vector3.left  * PenSpacing, keepClear));
@@ -110,12 +117,12 @@ namespace PetShop.Dev
         }
 
         /// <summary>
-        /// The till column from the staff station (behind the till, -z) through the queue line
+        /// The counter's columns from the staff strip (behind it, -z) through the queue line
         /// (in front, +z): furniture there would trap the assistant or block the queue.
         /// </summary>
-        private static RectInt TillLane(Vector2Int tillCell) =>
-            new(tillCell.x, tillCell.y - StaffCellsBehindTill,
-                1, StaffCellsBehindTill + 1 + QueueCellsInFrontOfTill);
+        private static RectInt TillLane(Vector2Int counterCell, Vector2Int counterSize) =>
+            new(counterCell.x, counterCell.y - StaffCellsBehindTill,
+                counterSize.x, StaffCellsBehindTill + counterSize.y + QueueCellsInFrontOfTill);
 
         private static GameObject PlaceShelf(GameManager game, ProductCategory category, Vector3 target,
                                              RectInt keepClear)

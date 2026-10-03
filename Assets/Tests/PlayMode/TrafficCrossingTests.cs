@@ -59,9 +59,10 @@ namespace PetShop.Tests
             Assert.IsTrue(zone.IsOccupied, "a Character-layer capsule inside the zone did not occupy it");
 
             // Cars already close to or past the line when the crossing filled cannot stop in time.
+            // Parked cars (and ones pulling in or out of the car park) are not approaching the crossing.
             var committed = new HashSet<TrafficCar>();
             foreach (var c in cars)
-                if (AlongToLine(zone, c) < CommittedMargin) committed.Add(c);
+                if (c.Lane == null || AlongToLine(zone, c) < CommittedMargin) committed.Add(c);
 
             TrafficCar stopped = null;
             float until = Time.realtimeSinceStartup + HoldTimeout;
@@ -70,7 +71,7 @@ namespace PetShop.Tests
                 yield return null;
                 foreach (var c in cars)
                 {
-                    if (committed.Contains(c)) continue;
+                    if (committed.Contains(c) || c.Lane == null) continue;
                     float along = AlongToLine(zone, c);
                     Assert.GreaterOrEqual(along, -LineTolerance,
                         $"{c.name} drove over the stop line while the crossing was occupied (speed {c.Speed}).");

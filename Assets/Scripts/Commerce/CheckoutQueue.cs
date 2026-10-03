@@ -18,6 +18,8 @@ namespace PetShop.Commerce
             float  BasketValue { get; }
             int    BasketCount { get; }
             string ShopperName { get; }
+            /// <summary>True once the shopper is physically standing at the front of the line.</summary>
+            bool   IsAtTill { get; }
             void   OnServed();
             void   OnGaveUp();
         }
@@ -99,12 +101,31 @@ namespace PetShop.Commerce
             return Mathf.Clamp01((Time.time - joined) / allowance);
         }
 
-        /// <summary>Serve the front of the queue. Returns the shopper served, or null.</summary>
+        /// <summary>
+        /// The first shopper in line who is standing at the till, or null. Someone still walking over
+        /// (or stranded on the way) cannot be rung up — their patience runs out instead, rather than a
+        /// sale being booked for a customer who never reached the counter — and they do not hold up
+        /// the people behind them who did get there.
+        /// </summary>
+        public IShopper NextReady
+        {
+            get
+            {
+                foreach (var shopper in _queue)
+                    if (shopper.IsAtTill) return shopper;
+                return null;
+            }
+        }
+
+        /// <summary>True when somebody at the till can be served.</summary>
+        public bool FrontReady => NextReady != null;
+
+        /// <summary>Serves <see cref="NextReady"/> and returns them, or null when nobody is at the till.</summary>
         public IShopper ServeFront()
         {
-            if (_queue.Count == 0) return null;
+            var shopper = NextReady;
+            if (shopper == null) return null;
 
-            var shopper = _queue[0];
             Leave(shopper);
             shopper.OnServed();
             return shopper;

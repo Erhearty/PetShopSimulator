@@ -8,10 +8,9 @@ namespace PetShop.Dev
     /// <summary>
     /// Checks that the places customers must walk between are actually joined on the NavMesh.
     ///
-    /// A break here is invisible in normal testing: <c>CustomerAI.NavigateTo</c> gives up
-    /// after a timeout but the shopper stays in the checkout queue regardless, so an
-    /// assistant still rings up sales for people stranded on the pavement. The logs look
-    /// healthy while nobody has entered the building.
+    /// A break here used to be invisible in normal testing: a shopper stranded on the way was
+    /// still rung up. The queue now only serves someone standing at the till, so a break shows
+    /// as customers giving up in the queue instead.
     /// </summary>
     public static class NavProbe
     {

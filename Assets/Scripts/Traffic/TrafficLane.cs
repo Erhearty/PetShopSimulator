@@ -5,6 +5,8 @@ namespace PetShop.Traffic
 {
     /// <summary>
     /// An authored one-way traffic lane. Its ordered child Transforms are waypoints forming a polyline.
+    /// A lane with a <see cref="Next"/> lane hands its cars on to it at the end (a U-turn joining the
+    /// two directions of the street, say); one without wraps its cars back to its own start.
     /// </summary>
     public class TrafficLane : MonoBehaviour
     {
@@ -16,11 +18,17 @@ namespace PetShop.Traffic
         [Tooltip("Speed limit in metres per second; cars never cruise faster than this.")]
         [SerializeField] private float speedLimit = 8f;
 
+        [Tooltip("Lane that cars continue onto at the end of this one. Empty: cars wrap to this lane's start.")]
+        [SerializeField] private TrafficLane next;
+
         private readonly List<Vector3> _points = new List<Vector3>();
         private float _length;
 
         /// <summary>Speed limit in metres per second.</summary>
         public float SpeedLimit => speedLimit;
+
+        /// <summary>The lane cars continue onto at the end, or null to wrap.</summary>
+        public TrafficLane Next => next;
 
         /// <summary>World-space waypoint positions in order (rebuilt on <see cref="Rebuild"/>).</summary>
         public IReadOnlyList<Vector3> Points { get { if (_points.Count == 0) Rebuild(); return _points; } }

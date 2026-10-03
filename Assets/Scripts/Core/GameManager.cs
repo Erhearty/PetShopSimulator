@@ -246,6 +246,8 @@ namespace PetShop.Core
             if (born.Count > 0)
                 Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
 
+            // Loads still on a truck land now, so the save below sees every crate.
+            Traffic.DeliveryTruck.FlushAll();
             LandFurnitureOvernight();
             ShowJudging.Run(this);
 

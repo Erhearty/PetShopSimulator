@@ -108,6 +108,20 @@ namespace PetShop.Customer
         public int    BasketCount => _basket.Count;
         public string ShopperName => name;
 
+        /// <summary>How close to the front-of-line spot counts as standing at the till, in metres.</summary>
+        private const float AtTillReach = 1.5f;
+
+        public bool IsAtTill
+        {
+            get
+            {
+                if (State != CustomerState.Queueing || Queue == null) return false;
+                Vector3 offset = Queue.StandingPosition(0) - transform.position;
+                offset.y = 0f;
+                return offset.magnitude <= AtTillReach;
+            }
+        }
+
         public void OnServed() => _served = true;
         public void OnGaveUp() => _gaveUp = true;
 
@@ -199,10 +213,14 @@ namespace PetShop.Customer
 
             // Rep hit for an empty basket is scaled by the customer's profile.
             ApplyBrowsePenalties();
+            bool queued = _basket.Count > 0 && Queue != null;
             if (_basket.Count > 0) yield return WaitToBeServed();
             else WalkedOutEmpty?.Invoke(this);
 
             State = CustomerState.Leaving;
+            // Off the queue line first: it runs from the till towards the door, and walking back
+            // down it through the people still waiting deadlocked the agents (walk timeouts).
+            if (queued) yield return NavigateTo(StepAsideFromTill());
             if (EntryPoint != null) yield return NavigateTo(EntryPoint.position);
             Vector3 exit = ExitPoint != null ? ExitPoint.position : transform.position + Vector3.forward * 10f;
             exit.x += Random.Range(-14f, 14f);
@@ -231,6 +249,9 @@ namespace PetShop.Customer
 
             Queue.Join(this, Profile.PatienceMultiplier);
             SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
+            // People standing in line hold their ground; shoppers walking past steer round them.
+            int walkingPriority = _agent.avoidancePriority;
+            _agent.avoidancePriority = QueueAvoidancePriority;
             int lastPlace = -1;
 
             while (!_served && !_gaveUp)
@@ -255,6 +276,7 @@ namespace PetShop.Customer
             }
 
             Queue.Leave(this);
+            _agent.avoidancePriority = walkingPriority;
 
             if (_served)
             {
@@ -273,6 +295,25 @@ namespace PetShop.Customer
                 _basket.Clear();
                 GaveUp?.Invoke(this);
             }
+        }
+
+        /// <summary>Avoidance priority while standing in line: lower numbers are given way to.</summary>
+        private const int QueueAvoidancePriority = 10;
+
+        /// <summary>How far beside the queue line a served shopper steps before heading out.</summary>
+        private const float StepAsideDistance = 1.8f;
+
+        /// <summary>A point beside the front of the line, on the side nearer the way out.</summary>
+        private Vector3 StepAsideFromTill()
+        {
+            Vector3 front = Queue.StandingPosition(0);
+            Vector3 along = Queue.QueueDirection;
+            along.y = 0f;
+            if (along.sqrMagnitude < 0.0001f) along = Vector3.forward;
+            Vector3 side = Vector3.Cross(Vector3.up, along.normalized);
+            Vector3 exit = EntryPoint != null ? EntryPoint.position : front + along * 10f;
+            if (Vector3.Dot(exit - front, side) < 0f) side = -side;
+            return front + side * StepAsideDistance;
         }
 
         private bool TryWarpToNavMesh()

@@ -51,10 +51,23 @@ namespace PetShop.Core
         /// <summary>Puts the pallet on the forecourt and tells the player it has landed.</summary>
         public void OnDeliveryArrived(SupplierOrder order)
         {
-            DeliveryCrate.Spawn(ForecourtSpot(), order.Category, order.Units);
-            _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. " +
-                         $"Press {InputBindings.Label(GameAction.Interact)} to collect.");
-            _game.Audio?.PlaySfx("restock");
+            ByTruck(() =>
+            {
+                DeliveryCrate.Spawn(ForecourtSpot(), order.Category, order.Units);
+                _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. " +
+                             $"Press {InputBindings.Label(GameAction.Interact)} to collect.");
+                _game.Audio?.PlaySfx("restock");
+            });
+        }
+
+        /// <summary>
+        /// Brings a load by delivery truck while the shop is trading: <paramref name="drop"/> runs when the
+        /// truck pulls up outside. Overnight, or with no street to drive, the load is dropped straight away.
+        /// </summary>
+        private void ByTruck(System.Action drop)
+        {
+            if (_game.IsDayRunning && Traffic.DeliveryTruck.Dispatch(drop)) return;
+            drop();
         }
 
         /// <summary>A landing spot on the forecourt for a delivery.</summary>
@@ -95,11 +108,14 @@ namespace PetShop.Core
         {
             if (order == null) return;
 
-            var crate = DeliveryCrate.SpawnFurniture(ForecourtSpot(), order);
-            if (crate == null) return;
-            _game.Notify($"Delivery: a {crate.FurnitureName} crate is on the forecourt. " +
-                         $"Press {InputBindings.Label(GameAction.Interact)} to unpack it.");
-            _game.Audio?.PlaySfx("restock");
+            ByTruck(() =>
+            {
+                var crate = DeliveryCrate.SpawnFurniture(ForecourtSpot(), order);
+                if (crate == null) return;
+                _game.Notify($"Delivery: a {crate.FurnitureName} crate is on the forecourt. " +
+                             $"Press {InputBindings.Label(GameAction.Interact)} to unpack it.");
+                _game.Audio?.PlaySfx("restock");
+            });
         }
 
         /// <summary>Unpacks a furniture crate into the furniture inventory.</summary>
@@ -213,9 +229,14 @@ namespace PetShop.Core
         public void UseCounter()
         {
             var queue = _game.Queue;
+            if (queue != null && queue.AnyWaiting && !queue.FrontReady)
+            {
+                _game.Notify("The next customer is still on their way to the till.");
+                return;
+            }
             if (queue != null && queue.AnyWaiting)
             {
-                var shopper = queue.Front;
+                var shopper = queue.NextReady;
                 float value = shopper.BasketValue;
                 int   items = shopper.BasketCount;
 

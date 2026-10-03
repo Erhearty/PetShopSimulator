@@ -223,8 +223,10 @@ namespace PetShop.UI
         private void Refresh()
         {
             var shop = _game.Shop;
-            _headerText.text = $"The ledger    <color=#9FB2C4>Day {shop.Day}  ·  € {shop.Balance:N2}  ·  " +
-                               $"reputation {shop.Reputation:0}/100  ·  rent tonight € {shop.DailyRent:N0}</color>";
+            // The details run smaller than the title so the whole line fits beside the Close button
+            // (at full size it was cut off after "reputation").
+            _headerText.text = $"The ledger    <size=68%><color=#9FB2C4>Day {shop.Day}  ·  € {shop.Balance:N2}  ·  " +
+                               $"reputation {shop.Reputation:0}/100  ·  rent tonight € {shop.DailyRent:N0}</color></size>";
 
             BuildShelvesPage();
             BuildPensPage();

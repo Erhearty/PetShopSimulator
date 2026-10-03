@@ -205,8 +205,10 @@ namespace PetShop.Core
             var prefab = Prefab(resourcePath);
             if (prefab == null) return null;
 
+            // The holder stays unparented (identity) until the model is inside it. Parenting it
+            // first made the model inherit the inverse of a rotated parent's yaw, so customers,
+            // spawned turned to face along the pavement, walked sideways.
             var holder = new GameObject(prefab.name);
-            if (parent != null) holder.transform.SetParent(parent, false);
 
             var instance = Object.Instantiate(prefab);
             instance.name = prefab.name;
@@ -245,6 +247,19 @@ namespace PetShop.Core
                 centreHorizontally ? -bounds.center.x : 0f,
                 -bounds.min.y,
                 centreHorizontally ? -bounds.center.z : 0f);
+
+            if (parent != null)
+            {
+                holder.transform.SetParent(parent, false);
+                // Undo the parent's scale so the fitted size stays in world metres.
+                Vector3 ps = parent.lossyScale;
+                if (ps.x > 0.0001f && ps.y > 0.0001f && ps.z > 0.0001f)
+                {
+                    var inverse = new Vector3(1f / ps.x, 1f / ps.y, 1f / ps.z);
+                    instance.transform.localScale    = Vector3.Scale(instance.transform.localScale, inverse);
+                    instance.transform.localPosition = Vector3.Scale(instance.transform.localPosition, inverse);
+                }
+            }
 
             holder.transform.position    = position;
             holder.transform.eulerAngles = new Vector3(0f, yRotation, 0f);

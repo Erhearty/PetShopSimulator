@@ -14,14 +14,13 @@ namespace PetShop.Core
         /// <summary>
         /// The City People cast, preferred over the generic bodies because the models are
         /// better and more varied. Paths are relative to Resources.
-        /// </summary>
-        /// <summary>
-        /// The City People cast, preferred over the generic bodies because the models are
-        /// better and more varied.
         ///
         /// "city/casual_Female_G" is deliberately absent: that variant is in swimwear, which
         /// looks like a bug when it walks into a pet shop in the middle of a city street. The
         /// downtown set is the everyday-clothes equivalent.
+        ///
+        /// "worker_Male_constructor_B" is absent too: its controller holds only tool-use clips and
+        /// no idle, so with nothing playing the body stands half sunk into the floor.
         /// </summary>
         public static readonly string[] CityPeople =
         {
@@ -33,7 +32,6 @@ namespace PetShop.Core
             "Packs/CityPeople/professions/Doctor_Male_B",
             "Packs/CityPeople/professions/police_Female_A",
             "Packs/CityPeople/disabilities/prostheticLeg_girl",
-            "Packs/CityPeople/worker_Male_constructor_B",
         };
 
         private static bool CityPeopleInstalled => ModelLibrary.Has(CityPeople[0]);
@@ -142,6 +140,11 @@ namespace PetShop.Core
     {
         private static readonly int MoveId  = Animator.StringToHash("move");
         private static readonly int SpeedId = Animator.StringToHash("speed");
+        private static readonly int VertId  = Animator.StringToHash("Vert");
+        private static readonly int StateId = Animator.StringToHash("State");
+
+        /// <summary>Seconds to blend the animal pack's Vert/State floats towards their targets.</summary>
+        private const float BlendDamping = 0.15f;
 
         /// <summary>
         /// State names to fall back on for controllers that expose no parameters. City
@@ -156,7 +159,7 @@ namespace PetShop.Core
         };
         private static readonly string[] WalkStates =
         {
-            "locom_m_basicWalk_30f", "locom_f_basicWalk_30f", "root_Walk", "Walk", "walk",
+            "locom_m_basicWalk_30f", "locom_f_basicWalk_30f", "root_Walk", "Walk", "walk", "forward",
         };
         private static readonly string[] RunStates =
         {
@@ -175,17 +178,34 @@ namespace PetShop.Core
         /// <summary>Locomotion band last sent to the animator: 0 idle, 1 walk, 2 run, -1 before the first update.</summary>
         public int CurrentMove => _lastMove;
 
+        private bool _resolved;
         private bool _usesParameters;
+        private bool _usesBlendTree;   // the animal pack: Vert 0 idle → 1 moving, State 0 walk → 1 run
         private int  _idleHash, _walkHash, _runHash;
 
         public void Init(Animator animator, Func<Vector3> velocitySource)
         {
             _animator = animator;
             _velocity = velocitySource;
-            if (_animator == null) return;
+            _resolved = false;
+            TryResolve();
+        }
+
+        /// <summary>
+        /// Works out how to drive the controller. Parameters and states only read back once the
+        /// Animator has initialised, which for a freshly spawned body can be a frame later, so
+        /// this retries from Update instead of concluding "stand still" too early.
+        /// </summary>
+        private void TryResolve()
+        {
+            if (_resolved || _animator == null || !_animator.isInitialized) return;
+            _resolved = true;
 
             _usesParameters = HasParameter("move");
             if (_usesParameters) return;
+
+            _usesBlendTree = HasParameter("Vert") && HasParameter("State");
+            if (_usesBlendTree) return;
 
             _idleHash = FirstExistingState(IdleStates);
             _walkHash = FirstExistingState(WalkStates);
@@ -223,6 +243,8 @@ namespace PetShop.Core
         private void Update()
         {
             if (_animator == null || _velocity == null) return;
+            TryResolve();
+            if (!_resolved) return;
 
             Vector3 v = _velocity();
             v.y = 0f;
@@ -236,6 +258,11 @@ namespace PetShop.Core
                 if (move != _lastMove) _animator.SetInteger(MoveId, move);
                 _animator.SetFloat(SpeedId, playback);
             }
+            else if (_usesBlendTree)
+            {
+                _animator.SetFloat(VertId,  move == 0 ? 0f : 1f, BlendDamping, Time.deltaTime);
+                _animator.SetFloat(StateId, move == 2 ? 1f : 0f, BlendDamping, Time.deltaTime);
+            }
             else if (move != _lastMove)
             {
                 int hash = move switch
@@ -247,7 +274,8 @@ namespace PetShop.Core
                 if (hash != 0) _animator.CrossFadeInFixedTime(hash, 0.18f, 0);
             }
 
-            if (!_usesParameters) _animator.speed = move == 0 ? 1f : playback;
+            if (!_usesParameters && !_usesBlendTree) _animator.speed = move == 0 ? 1f : playback;
+            else if (_usesBlendTree) _animator.speed = move == 0 ? 1f : Mathf.Clamp(playback, 0.7f, 1.5f);
             _lastMove = move;
         }
     }

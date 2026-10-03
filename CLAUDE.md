@@ -140,6 +140,20 @@ furnishes it through the supply chain:
 at least one shelf or pen (`CustomerSpawner.CanTrade`). Until then the player is told once a day
 to place them. The counter count comes from the `GameManager` furniture registry.
 
+**The till follows the counter.** Whenever counters are registered or removed,
+`GameManager.PlaceTillAtCounter` moves the register point to the first counter's front edge, points
+the queue out along its +Z and puts the staff station (and every assistant) behind it. Every furniture
+prefab's customer side is **+Z**; the counter prefab's model sits under a `Model` child turned 180°
+so its screen and cupboard doors face the staff. (The till used to stay at a fixed layout spot, so
+customers queued metres away from wherever the player put the counter.)
+
+**Only a shopper standing at the till can be served.** `CheckoutQueue.NextReady` is the first shopper in
+line whose `IsAtTill` is true; the assistant and the player's E both serve that one. Someone stranded on
+the way runs out of patience instead of being rung up from the pavement, and does not hold up the people
+behind. After paying, a shopper steps 1.8 m to the side of the line before heading for the door, and
+people standing in line have avoidance priority 10 — walking back down the line through them used to
+deadlock the agents.
+
 A new game starts with **no staff**; hire from the staff board (the dev furnisher hires one cashier for headless smoke/soak runs only).
 
 **The street starts at `YardFrontZ`.** It is scene geometry, so if you resize the yard in
@@ -184,6 +198,20 @@ That controller exposes `move` (0 idle / 1 walk / 2 run) and `speed` (playback m
 instead of skating. `applyRootMotion` is off: movement comes from the agent, never the
 animation. Without the pack it falls back to `MeshBuilder.CreateHumanoid`.
 
+`CharacterVisual` drives three controller styles: a `move` int (the 100-people pack), named states
+cross-faded by hand (City People), and the animal pack's blend tree (`Vert` 0 idle → 1 moving,
+`State` 0 walk → 1 run). It resolves which one only once `Animator.isInitialized` — asking a freshly
+spawned animator for its states reads back nothing, and the body then never moved.
+
+Two traps found by measuring, not by reading code:
+
+- **`ModelLibrary.Spawn` must fill its holder before parenting it.** It used to attach the holder to
+  the caller first and then reparent the model with `worldPositionStays`, so the model soaked up the
+  inverse of a rotated parent's yaw. Customers spawn turned 90° to face along the pavement, so they
+  walked sideways.
+- **`worker_Male_constructor_B` is not in the cast.** Its controller has only tool-use clips and no
+  idle; with nothing playing its feet sit 0.9 m below the floor.
+
 ## Looking at the game — `./build.sh look`
 
 **The game can be photographed head-lessly.** This is the single most useful tool in the
@@ -220,17 +248,35 @@ is appended after `city_oblique` so the HUD stays on shot 16.
 
 Traffic lives in `MainScene` under `Street/Traffic` (`Assets/Scripts/Traffic/`):
 
-- `TrafficLane` — one-way lane; its child Transforms, in order, are the waypoints. Has a speed limit.
-- `TrafficCar` — put on a car root and assign its `lane`; optional start distance, cruise speed, braking.
+- `TrafficLane` — one-way lane; its child Transforms, in order, are the waypoints. Has a speed limit
+  and an optional `next` lane that cars continue onto at the end (no `next`: they wrap to the start).
+- `TrafficCar` — put on a car root and assign its `lane`; optional start distance, cruise speed, braking,
+  and `startParkedIn` + `startBay` to begin parked. It keeps its gap to the car ahead **across lane
+  joins** (into `next` and the lane after), so cars never run into each other at a U-turn.
+- `ParkingLot` — a car park fed from one lane: cars turn in at `entryDistance`, nose into a free bay,
+  later reverse out, drive the exit path to its stop line and pull back in at `exitDistance` when the
+  lane is clear. **One car manoeuvres at a time**, which is what keeps the lot collision-free; cars on
+  the lane brake for a car still turning in or pulling out.
+- `DeliveryTruck` — a supplier run at runtime: joins the director's `deliveryLane`, stops at
+  `deliveryStopDistance` (outside the shop), drops the crate through a callback, drives on and leaves
+  the street. `ShopFloorActions` sends every stock and furniture delivery this way while the shop
+  trades; overnight, or with no street or truck model, the crate lands directly. `GameManager`
+  calls `DeliveryTruck.FlushAll()` before the end-of-day save so no load is ever lost on the road.
 - `CrosswalkZone` — trigger box over a crossing. Character-layer colliders inside make `IsOccupied`
-  true and cars brake to stop before `StopLinePosition`.
+  true and cars whose path crosses it brake to stop before `StopLinePosition`.
 - `TrafficDirector` — exactly one per scene; registers lanes/cars, jitters speeds from the playtest
   seed and ticks the cars. `Pause`/`Resume` for gameplay, `Freeze`/`Unfreeze` for screenshots.
+
+The street is **four lanes, right-hand traffic**: eastbound at z 25.75 (curb) and 29.25, westbound at
+32.75 and 36.25 (curb). Each pair is one loop joined by U-turn lanes past the ends of the street (outer
+loop at x = ±140, inner at ±128, so turning cars are never side by side). The car park opposite the
+yard (`Street/ParkingLot`, 22 bays) is fed from the westbound curb lane: in at x = 13, out at x = −30.
 
 **Add a car:** add `TrafficCar` to a car root in the editor and assign its lane. **Add a lane:**
 duplicate a `Lane` object and add or move its waypoint children (gizmos show the direction).
 **Add a crossing:** add `CrosswalkZone` (it makes its BoxCollider a trigger) over the crossing.
-Cover with `Assets/Tests/PlayMode/TrafficSceneTests.cs` and `TrafficCrossingTests.cs`.
+Cover with `Assets/Tests/PlayMode/TrafficSceneTests.cs` (which also asserts that no two car colliders
+ever interpenetrate) and `TrafficCrossingTests.cs`.
 
 ## The world outside
 
@@ -238,12 +284,15 @@ Everything beyond the shop window is scene geometry in MainScene. Its cross-sect
 from the shopfront along +Z:
 
 ```
-z 8.1        shop front wall (glazed — this is what makes the street worth building)
-z 7 – 14     near pavement    walkable; customers spawn here and walk in
-z 14 – 22    road             NOT walkable: it has no collider, so it bakes no NavMesh
-z 22 – 26    far pavement     decoration only
-z 26 +       block opposite, then the skyline
+z 10         shop front wall (glazed — this is what makes the street worth building)
+z 16 – 24    near pavement    walkable; customers spawn here and walk in
+z 24 – 38    road             four lanes; collider on Scenery for the cars, NavMeshModifier → Not Walkable
+z 38 – 44    far pavement     decoration only; two driveways cross it to the car park
+z 44 +       one row of shops opposite, with the car park (x −33 … 15) facing the yard
 ```
+
+There is one street. The cross streets, the avenue grid and the skyline the old generator left
+behind were removed, as were the buildings that overlapped each other or poked into the road.
 
 Two rules keep this cheap and predictable:
 
@@ -478,6 +527,15 @@ Assets/
     │   ├── InfoPanel.cs            ← shelf / pen / books popup
     │   └── GameOverPanel.cs        ← bankruptcy screen with Restart
     │
+    ├── Traffic/
+    │   ├── TrafficLane.cs          ← waypoint polyline + speed limit + optional next lane (U-turns)
+    │   ├── TrafficCar.cs           ← gap keeping across lane joins; car-park visits; hold/despawn for trucks
+    │   ├── TrafficDirector.cs      ← registers and ticks cars; the delivery lane and stop point
+    │   ├── TrafficMath.cs          ← pure maths: polylines, gaps, merge window, corner fillets
+    │   ├── ParkingLot.cs           ← bays, entry/exit routes, one car manoeuvring at a time
+    │   ├── DeliveryTruck.cs        ← supplier run: drive in, drop the crate, drive off
+    │   └── CrosswalkZone.cs        ← trigger over the zebra crossing
+    │
     └── Dev/
         ├── ScreenshotCapture.cs    ← -screenshot support
         ├── CameraTour.cs           ← the 35-shot tour (incl. quest_tracker, quest_journal, street_traffic); HUD is fixed at shot 16; freezes traffic while shooting
@@ -508,6 +566,10 @@ centre and a 2×1 shelf placed there is off by half a cell.
 **NavMesh is baked at runtime** by `ShopLayout.BakeNavMesh()` — `CollectObjects.Children` over the
 `Shop` root, using **PhysicsColliders**, excluding the Character layer. It is rebaked whenever build
 mode exits. New static geometry that is not a child of `ShopRoot` will not be in the NavMesh.
+The furniture prefabs (shelves, pens, counter), the road and the car park carry a `NavMeshModifier`
+set to **Not Walkable**: without it the low tops of pens and plinths baked as floor and customers
+walked across them. Colliders must not be `MeshCollider`s on unreadable meshes — the runtime bake
+cannot read them in a player (the counter used to carry twelve).
 
 **Day flow:** clock runs out (or Enter) → `GameManager.EndDaySequence()` → spawner stops →
 `BreedingSystem.AdvanceDay(pens)` ages pets and breeds → `ShopManager.CloseDay()` charges rent and
@@ -573,12 +635,11 @@ needs it, otherwise buy an animal, otherwise report.
 - No shop-upgrade system: the floor rect is fixed at 20 × 16 m.
 - `MaterialFactory.ForPet` / `ForProduct` are unused now that colours come from pet coats and
   `ProductItem.fallbackColor`. Kept as a palette reference.
-- **Nothing has been looked at.** GUI launch fails from a headless shell on this machine (the
-  player hangs at window creation under XWayland without the desktop session's `XAUTHORITY`),
-  so everything has been verified by measurement, logs and clean smoke runs rather than by
-  eye. `SpawnVerify` confirms sizes/orientation and `FacingProbe` settled building facing,
-  but **composition** — whether the street reads well, whether props sit at sensible spots,
-  whether UI panels overlap — is unchecked. Start there.
+- **The editor can be driven live through the Unity MCP server** (`com.unity.ai.assistant`, *Project
+  Settings → AI → Unity MCP Server*): run C# in the open editor, read the console, render views.
+  Do not run `build.sh` editor targets while the editor has the project open — the batch editor
+  cannot share the project and crashes. Edit scripts only outside Play mode: a recompile during
+  play resets every static (`GameManager.Instance` turns null mid-session).
 - The parade's building facing was derived from the city pack's demo scene (+Z won 28
   votes to 15 across 56 buildings) when the removed `StreetGenerator` placed them. A plurality,
   not a certainty — if the parade shows its back, rotate those buildings in MainScene

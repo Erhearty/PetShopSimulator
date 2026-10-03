@@ -83,5 +83,58 @@ namespace PetShop.Traffic
 
         /// <summary>True when a car may wrap to the lane start: the nearest car there is at least <paramref name="minGap"/> away.</summary>
         public static bool CanWrap(float gapAtStart, float minGap) => gapAtStart >= minGap;
+
+        /// <summary>
+        /// Bumper-to-bumper gap from a car <paramref name="distance"/> along a lane of
+        /// <paramref name="laneLength"/> to a car <paramref name="otherDistance"/> along the lane after it.
+        /// </summary>
+        public static float GapIntoNextLane(float distance, float laneLength, float otherDistance,
+                                            float halfLength, float otherHalfLength) =>
+            laneLength - distance + otherDistance - halfLength - otherHalfLength;
+
+        /// <summary>
+        /// True when no car in <paramref name="laneDistances"/> lies within
+        /// [<paramref name="mergeAt"/> − <paramref name="clearBehind"/>, <paramref name="mergeAt"/> + <paramref name="clearAhead"/>]:
+        /// a car leaving the parking lot may pull out at <paramref name="mergeAt"/>.
+        /// </summary>
+        public static bool MergeWindowClear(IReadOnlyList<float> laneDistances, float mergeAt,
+                                            float clearBehind, float clearAhead)
+        {
+            if (laneDistances == null) return true;
+            for (int i = 0; i < laneDistances.Count; i++)
+            {
+                float d = laneDistances[i];
+                if (d >= mergeAt - clearBehind && d <= mergeAt + clearAhead) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Rounds every interior corner of a polyline with a <paramref name="radius"/> arc of
+        /// <paramref name="steps"/> segments (clamped to half of each adjoining leg), so a car following it
+        /// turns rather than snapping round the corner. End points are kept.
+        /// </summary>
+        public static List<Vector3> Fillet(IReadOnlyList<Vector3> points, float radius, int steps = 6)
+        {
+            var result = new List<Vector3>();
+            if (points == null || points.Count == 0) return result;
+            result.Add(points[0]);
+            for (int i = 1; i < points.Count - 1; i++)
+            {
+                Vector3 a = points[i - 1], b = points[i], c = points[i + 1];
+                float r = Mathf.Min(radius, Vector3.Distance(a, b) * 0.5f, Vector3.Distance(b, c) * 0.5f);
+                if (r <= MinSegmentLength) { result.Add(b); continue; }
+                Vector3 p0 = b + (a - b).normalized * r;
+                Vector3 p2 = b + (c - b).normalized * r;
+                for (int k = 0; k <= steps; k++)
+                {
+                    float t = k / (float)steps;
+                    // Quadratic Bezier through the corner: tangent to both legs at its ends.
+                    result.Add((1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * b + t * t * p2);
+                }
+            }
+            if (points.Count > 1) result.Add(points[points.Count - 1]);
+            return result;
+        }
     }
 }
