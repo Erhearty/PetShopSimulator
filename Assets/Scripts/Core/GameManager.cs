@@ -119,23 +119,23 @@ namespace PetShop.Core
         }
 
         /// <summary>Called by GameBootstrapper once the room and player exist.</summary>
-        public void Begin()
+        public void Begin(bool skipTutorial = false)
         {
             Shop?.OnDeliveryArrived.AddListener(_floor.OnDeliveryArrived);
 
             LineageRegistry.Reset(); // statics survive scene reloads
             var save = SaveSystem.Load();
             if (save != null) _saveLoad.LoadGame(save);
-            else              StartNewGame();
+            else              StartNewGame(skipTutorial);
 
             Layout?.BakeNavMesh();
             StartDay();
         }
 
         /// <summary>A fresh, empty shop; -furnish (dev/test runs only) places the starter furniture.</summary>
-        private void StartNewGame()
+        private void StartNewGame(bool skipTutorial)
         {
-            _saveLoad.NewGame();
+            _saveLoad.NewGame(skipTutorial);
             if (PlaytestOptions.Furnish) Dev.DevFurnisher.Furnish(this, PlaytestOptions.Seed ?? Dev.DevFurnisher.DefaultSeed);
         }
 
@@ -287,6 +287,7 @@ namespace PetShop.Core
             var inspection = Progression?.RunInspectionIfDue(Shop.Day);
             DaySummary summary = Shop.CloseDay();
             CollectProgressionHeadlines(summary, inspection);
+            CollectQuestHeadlines(summary);
             return summary;
         }
 

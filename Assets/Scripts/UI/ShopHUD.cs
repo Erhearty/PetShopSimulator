@@ -47,6 +47,8 @@ namespace PetShop.UI
 
         public TMP_Text PromptLabel => _prompt;
 
+        /// <summary>The quest tracker under the balance; null until built.</summary>
+        public QuestTracker Tracker { get; private set; }
         public void Build(Transform canvas, ShopManager shop, GameManager game, BuildMode build)
         {
             _shop  = shop;
@@ -60,7 +62,7 @@ namespace PetShop.UI
             BuildBuildBar(canvas);
             BuildAlerts(canvas);
             BuildHelp(canvas);
-
+            (Tracker = gameObject.AddComponent<QuestTracker>()).Build(canvas, game);
             shop.OnBalanceChanged.AddListener(_ => RefreshStatus());
             shop.OnReputationChanged.AddListener(_ => RefreshStatus());
             shop.OnDayAdvanced.AddListener(_ => RefreshStatus());
@@ -221,7 +223,7 @@ namespace PetShop.UI
         {
             _helpPanel = UIFactory.Panel("Help", canvas, new Vector2(0f, 0f), new Vector2(0f, 0f),
                                          new Color(0.07f, 0.09f, 0.13f, 0.80f),
-                                         new Vector2(12f, 12f), new Vector2(268f, 264f));
+                                         new Vector2(12f, 12f), new Vector2(268f, 284f));
 
             _helpText = UIFactory.Label("HelpText", _helpPanel.transform, HotkeyHelp.Controls(),
                 new Vector2(0.06f, 0.04f), new Vector2(0.97f, 0.96f), 14.5f, UIFactory.InkMuted,

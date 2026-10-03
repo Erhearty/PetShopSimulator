@@ -35,6 +35,7 @@ namespace PetShop.Tests
             yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
             GameManager game = GameManager.Instance;
             Assert.IsFalse(DevFurnisher.IsFurnished(game), "A new game should start with an empty shop.");
+            Assert.AreEqual(0, game.StaffCount, "A new game should start with no staff.");
 
             Assert.AreEqual(ExpectedPieces, PlaytestHarness.Furnish(Seed), "pieces placed");
 
@@ -45,6 +46,8 @@ namespace PetShop.Tests
             foreach (var pen in game.Pens) Assert.AreEqual(ExpectedPetsPerPen, pen.Count, $"{pen.PenSpecies} pen");
             Assert.IsTrue(CustomerSpawner.CanTrade(game.Spawner.HasCounter, game.Shelves.Count, game.Pens.Count));
             Assert.IsTrue(game.Spawner.CanTradeNow);
+
+            Assert.AreEqual(1, game.StaffCount, "Furnish should hire one cashier for headless runs.");
 
             // The assistant stands at the staff station: furniture must not cut it out of the NavMesh.
             Vector3 station = game.StaffStation.position;

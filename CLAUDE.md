@@ -26,7 +26,7 @@ The shop, the yard, the street and every prop are ordinary GameObjects saved in
 prefab per `BuildCatalog` id in `Assets/Prefabs/Furniture/`. The meshes, materials and textures the
 scene and those prefabs use are assets under `Assets/Environment/Baked/`. A `ShopLayout` component in
 the scene holds the yard and room dimensions, the anchors (shop centre, door, forecourt, player
-start, pavement), the paddock rect, the lot stages and the NavMesh bake. The scene holds **no**
+start, pavement), the lot stages and the NavMesh bake. The scene holds **no**
 placeable furniture: a new game starts with an empty shop (see "New game — an empty shop" below).
 
 **Standing rule: never add runtime generators or build-time scene generators.** New world content
@@ -86,7 +86,7 @@ day loop. That is what `./build.sh smoke` relies on.
 `./build.sh look` writes `11_plan_yard`, `12_plan_block` and `13_plan_city`. Faults that are
 invisible at eye level are obvious there, and every layout problem so far was found that
 way: a city that was one thin strip of randomly-rotated towers, a yard that was a featureless
-green field, a paddock four times the size of the pens inside it.
+green field.
 
 **The yard is zoned, not scattered.** The zones are scene objects in MainScene: surfacing
 first, props on top:
@@ -94,13 +94,10 @@ first, props on top:
 | Zone | What it is |
 |---|---|
 | Forecourt | paving in front of the shop, `ShopFrontMargin` deep (7 m) |
-| Spine | paved path: gate → shop door → across to the paddock |
-| Paddock | `PaddockArea`, sanded and post-and-rail fenced; the pens the player places go inside it |
-| Garden | planted bed with kerb, tree and benches, filling the gap between shop and paddock |
-| Beds | hedging along the back and west walls |
+| Spine | paved path: gate → shop door |
 
-`ShopLayout.PaddockRect` must stay sized for a sensible number of pens, inside lot stage 0.
-If you change one, check the other.
+The yard holds no vegetation and no fixed pen zone: pens are ordinary placeable furniture and go
+anywhere in the unlocked lot (stage 0 is the shop footprint through the forecourt).
 
 **Asset traps found the hard way, both invisible in code review:**
 
@@ -143,7 +140,7 @@ furnishes it through the supply chain:
 at least one shelf or pen (`CustomerSpawner.CanTrade`). Until then the player is told once a day
 to place them. The counter count comes from the `GameManager` furniture registry.
 
-You still inherit one member of staff (a cashier) on a new game.
+A new game starts with **no staff**; hire from the staff board (the dev furnisher hires one cashier for headless smoke/soak runs only).
 
 **The street starts at `YardFrontZ`.** It is scene geometry, so if you resize the yard in
 `ShopLayout`, move the street objects to match. The old generator got this wrong once and left
@@ -215,6 +212,26 @@ How it works, and why each part is load-bearing:
 
 A player build also honours `-tour <dir>` and `-screenshot <path>`.
 
+The tour calls `TrafficDirector.Freeze()` before the first shot and `Unfreeze()` after the last, so
+cars sit in the same place every run. `street_traffic` (a World shot along the street over the cars)
+is appended after `city_oblique` so the HUD stays on shot 16.
+
+## Street traffic (authored, not generated)
+
+Traffic lives in `MainScene` under `Street/Traffic` (`Assets/Scripts/Traffic/`):
+
+- `TrafficLane` — one-way lane; its child Transforms, in order, are the waypoints. Has a speed limit.
+- `TrafficCar` — put on a car root and assign its `lane`; optional start distance, cruise speed, braking.
+- `CrosswalkZone` — trigger box over a crossing. Character-layer colliders inside make `IsOccupied`
+  true and cars brake to stop before `StopLinePosition`.
+- `TrafficDirector` — exactly one per scene; registers lanes/cars, jitters speeds from the playtest
+  seed and ticks the cars. `Pause`/`Resume` for gameplay, `Freeze`/`Unfreeze` for screenshots.
+
+**Add a car:** add `TrafficCar` to a car root in the editor and assign its lane. **Add a lane:**
+duplicate a `Lane` object and add or move its waypoint children (gizmos show the direction).
+**Add a crossing:** add `CrosswalkZone` (it makes its BoxCollider a trigger) over the crossing.
+Cover with `Assets/Tests/PlayMode/TrafficSceneTests.cs` and `TrafficCrossingTests.cs`.
+
 ## The world outside
 
 Everything beyond the shop window is scene geometry in MainScene. Its cross-section, running out
@@ -272,6 +289,20 @@ Two ways to get stock, and the difference between them is the planning game:
 `ShelfUnit.Restock` drains the stockroom first and returns a `RestockResult` (units, how many came
 from the stockroom, what was spent). Orders still in transit at close of business arrive overnight
 rather than being lost; the stockroom persists via `SaveData.Warehouse`.
+
+## Quest system
+
+`Assets/Scripts/Progression/Quests/`: `QuestCatalog` holds every `QuestDefinition` (id, chapter, title,
+instruction, reward, condition on a `QuestContext` snapshot, optional progress). Chapters: Tutorial (nine
+steps, strictly in order), Early, Mid, End (any order within a chapter; the next opens when the current is
+done). `QuestBook` is the pure state; `QuestDirector` (`GameManager.Quests`) snapshots the game every 0.5 s
+and at day close, pays rewards (not counted as sales) and announces them. One-shot UI actions raise a
+`QuestFlags` flag via `Quests.RaiseFlag`. UI: `QuestTracker` (`ShopHUD.Tracker`, on by default) and
+`QuestJournalPanel` (`GameUI.Journal`, key **J**). Saved as `QuestProgress` in save **v5**.
+
+**Adding a quest:** append a `QuestDefinition` to its chapter array in `QuestCatalog`; add a `QuestContext`
+field (fill it in `QuestDirector.BuildContext`) or a flag if the condition needs new state; add a test
+(`QuestTutorialTests` shows a played path). `./build.sh look` photographs `quest_tracker` and `quest_journal`.
 
 ## Breeding and staff
 
@@ -449,7 +480,7 @@ Assets/
     │
     └── Dev/
         ├── ScreenshotCapture.cs    ← -screenshot support
-        ├── CameraTour.cs           ← the 32-shot tour; HUD is fixed at shot 16
+        ├── CameraTour.cs           ← the 35-shot tour (incl. quest_tracker, quest_journal, street_traffic); HUD is fixed at shot 16; freezes traffic while shooting
         ├── NavProbe.cs             ← proves pavement → forecourt → door → till is walkable
         └── BreedProbe.cs           ← proves a locked pairing breeds; runs after the last frame
 ```

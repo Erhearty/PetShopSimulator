@@ -34,6 +34,10 @@ namespace PetShop.UI
         private const float ButtonRightX = 0.72f;
         private const float TextRightX   = 0.95f;
 
+        private const float SkipLeftX   = 0.76f;
+        private const float SkipMinFont = 10f;
+        private const string SkipPrefix = "Skip tutorial: ";
+
         private const float SlotFont    = 15f;
         private const float ButtonFont  = 17f;
         private const float HintFont    = 13f;
@@ -42,6 +46,9 @@ namespace PetShop.UI
         private Action<int, bool> _onStart;   // slot, true = continue that slot's save
         private TMP_Text _hint;
         private readonly List<Selectable[]> _navRows = new();
+
+        /// <summary>True when the player chose to skip the tutorial for a new game.</summary>
+        public bool SkipTutorial { get; private set; }
 
         /// <summary>True while the title screen is visible.</summary>
         public bool IsOpen => _root != null && _root.activeSelf;
@@ -53,6 +60,7 @@ namespace PetShop.UI
         public void Build(Transform canvas, Action<int, bool> onStart, Action onSettings = null)
         {
             _onStart = onStart;
+            SkipTutorial = false;
             _navRows.Clear();
 
             _root = UIFactory.Panel("TitleScreen", canvas, Vector2.zero, Vector2.one,
@@ -150,7 +158,27 @@ namespace PetShop.UI
             var settings = UIFactory.Button("Settings", slab, "Settings",
                 new Vector2(MidRightX, FooterBottom), new Vector2(ButtonRightX, FooterBottom + ButtonHeight), ButtonFont);
             settings.onClick.AddListener(() => onSettings?.Invoke());
-            _navRows.Add(new Selectable[] { quit, settings });
+            _navRows.Add(new Selectable[] { quit, settings, BuildSkipToggle(slab) });
+        }
+
+        /// <summary>The "Skip tutorial" toggle: applies to the next New shop.</summary>
+        private Button BuildSkipToggle(Transform slab)
+        {
+            var button = UIFactory.Button("SkipTutorial", slab, "",
+                new Vector2(SkipLeftX, FooterBottom), new Vector2(TextRightX, FooterBottom + ButtonHeight), ButtonFont);
+            var label = button.GetComponentInChildren<TMP_Text>();
+            label.enableAutoSizing = true;
+            label.fontSizeMin      = SkipMinFont;
+            label.fontSizeMax      = ButtonFont;
+            button.onClick.AddListener(() => { SkipTutorial = !SkipTutorial; RefreshSkip(button, label); });
+            RefreshSkip(button, label);
+            return button;
+        }
+
+        private void RefreshSkip(Button button, TMP_Text label)
+        {
+            label.text = SkipPrefix + (SkipTutorial ? "on" : "off");
+            button.targetGraphic.color = SkipTutorial ? UIFactory.ButtonOn : UIFactory.ButtonBg;
         }
 
         /// <summary>"Slot i — Day N · €balance · saved date", or "Slot i — empty".</summary>

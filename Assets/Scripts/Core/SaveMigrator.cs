@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using PetShop.Progression;
+using PetShop.Progression.Quests;
+using PetShop.Shop;
 
 namespace PetShop.Core
 {
@@ -59,6 +61,33 @@ namespace PetShop.Core
         private static void UpgradeToVersion5(SaveData data)
         {
             SeedFurnitureSupply(data);
+            SeedQuestProgress(data);
+        }
+
+        /// <summary>
+        /// Older saves had no quest book. A shop that already has a counter and a shelf placed is
+        /// past the tutorial, so every tutorial step starts complete (no rewards are paid).
+        /// </summary>
+        private static void SeedQuestProgress(SaveData data)
+        {
+            var progress = new QuestProgress();
+            if (HasPlaced(data, BuildCatalog.Counter) &&
+                (HasPlaced(data, BuildCatalog.ShelfSmall) || HasPlaced(data, BuildCatalog.ShelfLarge)))
+            {
+                foreach (var quest in QuestCatalog.InChapter(QuestChapter.Tutorial))
+                    progress.CompletedIds.Add(quest.Id);
+                progress.Chapter = QuestChapter.Early;
+            }
+            data.Quests = progress;
+        }
+
+        /// <summary>True when the save has a placed piece with catalogue id <paramref name="catalogId"/>.</summary>
+        private static bool HasPlaced(SaveData data, string catalogId)
+        {
+            if (data.PlacedObjects == null) return false;
+            foreach (var item in data.PlacedObjects)
+                if (item != null && item.catalogId == catalogId) return true;
+            return false;
         }
 
         /// <summary>

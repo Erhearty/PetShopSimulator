@@ -5,6 +5,7 @@ using System.IO;
 using UnityEngine;
 using PetShop.Core;
 using PetShop.Shop;
+using PetShop.Traffic;
 using PetShop.UI;
 
 namespace PetShop.Dev
@@ -75,6 +76,10 @@ namespace PetShop.Dev
             Debug.Log("[Tour] warmup done, capturing...");
             Debug.Log(NavProbe.Run());
 
+            // Frozen cars keep every screenshot deterministic.
+            var traffic = FindAnyObjectByType<TrafficDirector>();
+            if (traffic != null) traffic.Freeze();
+
             Directory.CreateDirectory(OutputDir);
 
             var shots = BuildShots();
@@ -130,6 +135,7 @@ namespace PetShop.Dev
 
             Destroy(cam.gameObject);
             rt.Release();
+            if (traffic != null) traffic.Unfreeze();
 
             // After the camera work: paths that cannot be photographed get checked instead.
             Debug.Log(BreedProbe.Run());
@@ -185,7 +191,7 @@ namespace PetShop.Dev
             float front   = shop.z + d * 0.5f;
             float yardEnd = gen != null ? gen.YardFrontZ : 17f;
 
-            Vector3 pens = PenCentre(out Vector3 firstPen);
+            Vector3 firstPen = FirstPenPosition();
 
             var shots = new List<Shot>
             {
@@ -198,15 +204,16 @@ namespace PetShop.Dev
                                             new Vector3(shop.x + 6f, 1.5f, shop.z - 6f), 60f),
                 World("yard_wide",          new Vector3(shop.x + 32f, 10f, shop.z - 18f),
                                             new Vector3(shop.x + 4f, 1f, shop.z - 2f), 62f),
-                World("garden",             new Vector3(shop.x + 12f, 3.2f, shop.z - 16f),
-                                            new Vector3(shop.x + 15f, 1.2f, shop.z - 11f), 55f),
-                World("paddock",            pens + new Vector3(-13f, 7f, -13f), pens + Vector3.up, 58f),
+                World("yard_back_corner",   new Vector3(shop.x + 26f, 4f, shop.z - 17f),
+                                            new Vector3(shop.x + 4f, 0.8f, shop.z - 4f), 58f),
+                World("yard_east",          new Vector3(shop.x + 30f, 5f, shop.z + 8f),
+                                            new Vector3(shop.x + 16f, 0.5f, shop.z - 6f), 58f),
                 // Offset diagonally: straight back from a pen puts the camera inside the
                 // sign of the pen behind it.
                 World("pen_close",          firstPen + new Vector3(-3.4f, 2.0f, -3.6f),
                                             firstPen + Vector3.up * 0.9f, 50f),
-                World("pergola",            pens + new Vector3(-9f, 2.2f, -11f),
-                                            pens + new Vector3(2f, 2.4f, 2f), 60f),
+                World("shop_rear",          new Vector3(shop.x, 3f, shop.z - d * 0.5f - 9f),
+                                            new Vector3(shop.x, 2f, shop.z - d * 0.5f), 60f),
                 World("interior_wide",      new Vector3(shop.x, h - 1.1f, shop.z + d * 0.5f - 1.4f),
                                             new Vector3(shop.x, 0.9f, shop.z - d * 0.35f), 68f),
                 World("interior_counter",   new Vector3(shop.x + 2.2f, 1.7f, shop.z - d * 0.10f),
@@ -269,6 +276,10 @@ namespace PetShop.Dev
             shots.Add(World("city_oblique", plot + new Vector3(-80f, 90f, -70f),
                             plot + new Vector3(10f, 0f, 40f), 55f));
 
+            // Appended, so the HUD stays on 16: along the street (x, z 24..34, y ~0.33) over the cars.
+            shots.Add(World("street_traffic", new Vector3(-26f, 3.2f, 22f),
+                            new Vector3(4f, 0.8f, 29f), 55f));
+
             // Appended rather than slotted in with the other panels, so the HUD stays on 16.
             if (ui != null && ui.Breeding != null)
                 shots.Add(Ui("breeding_panel", uiFrom, uiTo,
@@ -277,6 +288,12 @@ namespace PetShop.Dev
             if (ui != null && ui.StaffBoard != null)
                 shots.Add(Ui("staff_board", uiFrom, uiTo,
                              () => ui.StaffBoard.Show(), ui.StaffBoard.Hide));
+
+            // Quests: the tracker is on by default, so a plain HUD view shows it.
+            shots.Add(Ui("quest_tracker", uiFrom, uiTo, null, null));
+            if (ui != null && ui.Journal != null)
+                shots.Add(Ui("quest_journal", uiFrom, uiTo,
+                             () => ui.Journal.Show(), ui.Journal.Hide));
 
             // Deliveries: order a pallet and force it to land so the forecourt loop is on film.
             if (game != null && gen != null)
@@ -337,15 +354,10 @@ namespace PetShop.Dev
             cam.fieldOfView  = main.fieldOfView;
         }
 
-        private Vector3 PenCentre(out Vector3 firstPen)
+        private Vector3 FirstPenPosition()
         {
-            var pens = FindObjectsByType<PetShop.Pets.PetPen>(FindObjectsSortMode.None);
-            if (pens.Length == 0) { firstPen = Vector3.zero; return Vector3.zero; }
-
-            Vector3 centre = Vector3.zero;
-            foreach (var pen in pens) centre += pen.transform.position;
-            firstPen = pens[0].transform.position;
-            return centre / pens.Length;
+            var pen = FindAnyObjectByType<PetShop.Pets.PetPen>();
+            return pen != null ? pen.transform.position : Vector3.zero;
         }
 
         private string PenDescription()

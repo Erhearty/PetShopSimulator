@@ -119,6 +119,7 @@ namespace PetShop.Commerce
             if (!IsFurniture || supply == null) return false;
             bool collected = supply.Collect(FurnitureOrder);
             if (collected || !IsPending(supply, FurnitureOrder)) RemoveFromWorld();
+            if (collected) GameManager.Instance?.Quests?.RaiseFlag(PetShop.Progression.Quests.QuestFlags.CrateCollected);
             return collected;
         }
 

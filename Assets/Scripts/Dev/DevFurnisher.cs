@@ -30,8 +30,10 @@ namespace PetShop.Dev
         private const int QueueCellsInFrontOfTill = 3;
         /// <summary>Share of the room width each shelf sits from the shop centre.</summary>
         private const float ShelfSideShare = 0.3f;
-        /// <summary>Metres either side of the paddock centre the two pens sit.</summary>
+        /// <summary>Metres either side of the pen row's centre the two pens sit.</summary>
         private const float PenSpacing = 3f;
+        /// <summary>Share of the room depth, from the shop centre towards the front door, where the pens sit.</summary>
+        private const float PenRowOffsetShare = 0.1f;
         /// <summary>Pets put in each pen.</summary>
         private const int PetsPerPen = 2;
         /// <summary>Everything is placed unrotated, so catalogue footprints apply as-is.</summary>
@@ -55,12 +57,25 @@ namespace PetShop.Dev
             var saved = Random.state;
             Random.InitState(seed);
             int placed;
-            try { placed = PlaceAll(game); }
+            try { placed = PlaceAll(game); HireStarterCashier(game); }
             finally { Random.state = saved; }
 
             game.Layout.BakeNavMesh();
             Debug.Log($"[DevFurnisher] Placed {placed} pieces of starter furniture (seed {seed}).");
             return placed;
+        }
+
+        /// <summary>
+        /// A new game has no staff, but headless smoke/soak runs have no player to serve the till,
+        /// so the dev furnisher hires one free cashier (dev/test paths only, never in NewGame).
+        /// </summary>
+        private static void HireStarterCashier(GameManager game)
+        {
+            if (game.StaffCount > 0) return;
+            var cashier = StaffCandidate.Generate();
+            cashier.SignOnFee = 0f;
+            cashier.Role      = StaffRole.Cashier;
+            game.HireCandidate(cashier);
         }
 
         /// <summary>True when the shop already has a shelf, a pen or a counter.</summary>
@@ -81,7 +96,7 @@ namespace PetShop.Dev
             ShopLayout layout = game.Layout;
             Vector3 shop    = layout.ShopCentre;
             Vector3 till    = layout.TillPosition;
-            Vector3 paddock = PaddockCentre(layout.PaddockArea);
+            Vector3 penRow  = shop + Vector3.forward * (layout.RoomDepth * PenRowOffsetShare);
             Vector3 side    = Vector3.right * (layout.RoomWidth * ShelfSideShare);
             RectInt keepClear = TillLane(game.Build.GridManager.WorldToGrid(till));
 
@@ -89,8 +104,8 @@ namespace PetShop.Dev
             placed += Count(PlaceNear(game, BuildCatalog.Counter, null, till + Vector3.right * CounterBesideTill, keepClear));
             placed += Count(PlaceShelf(game, ProductCategory.Food, shop - side, keepClear));
             placed += Count(PlaceShelf(game, ProductCategory.Toy,  shop + side, keepClear));
-            placed += Count(PlacePen(game, Pet.Species.Dog, paddock + Vector3.left  * PenSpacing, keepClear));
-            placed += Count(PlacePen(game, Pet.Species.Cat, paddock + Vector3.right * PenSpacing, keepClear));
+            placed += Count(PlacePen(game, Pet.Species.Dog, penRow + Vector3.left  * PenSpacing, keepClear));
+            placed += Count(PlacePen(game, Pet.Species.Cat, penRow + Vector3.right * PenSpacing, keepClear));
             return placed;
         }
 
@@ -165,8 +180,6 @@ namespace PetShop.Dev
             }
             return bestDistance < float.MaxValue;
         }
-
-        private static Vector3 PaddockCentre(Rect paddock) => new(paddock.center.x, 0f, paddock.center.y);
 
         private static int Count(GameObject placed) => placed != null ? 1 : 0;
     }

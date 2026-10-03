@@ -27,6 +27,9 @@ namespace PetShop.UI
         public ShowcasePanel   Showcase  { get; private set; }
         public ReorderPanel    Reorder   { get; private set; }
 
+        /// <summary>The quest journal, opened with <see cref="QuestJournalPanel.OpenKey"/>.</summary>
+        public QuestJournalPanel Journal { get; private set; }
+
         /// <summary>The furniture catalogue: order furniture and pick owned pieces up to place.</summary>
         public FurnitureCatalogPanel Catalogue { get; private set; }
 
@@ -53,6 +56,7 @@ namespace PetShop.UI
             (Reorder != null && Reorder.IsOpen) ||
             (Catalogue != null && Catalogue.IsOpen) ||
             (Settings != null && Settings.IsOpen) ||
+            (Journal  != null && Journal.IsOpen)  ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -100,6 +104,7 @@ namespace PetShop.UI
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
+            Journal  = canvasGO.AddComponent<QuestJournalPanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
             Info.Build(canvasGO.transform);
@@ -114,6 +119,7 @@ namespace PetShop.UI
             Showcase.Build(canvasGO.transform, game);
             StaffBoard.Build(canvasGO.transform, game);
             Settings.Build(canvasGO.transform, game);
+            Journal.Build(canvasGO.transform, game);
             Pause.Build(canvasGO.transform, game, audio, Settings);
 
             return canvas;
@@ -134,8 +140,18 @@ namespace PetShop.UI
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
             if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
-                && !Reorder.IsOpen && !Catalogue.IsOpen)
+                && !Reorder.IsOpen && !Catalogue.IsOpen && !Journal.IsOpen)
                 Stats.Toggle();
+
+            if (Input.GetKeyDown(QuestJournalPanel.OpenKey)) ToggleJournal();
+        }
+
+        /// <summary>Closes the journal when open; opens it only when nothing else holds the keyboard.</summary>
+        private void ToggleJournal()
+        {
+            if (Journal == null) return;
+            if (Journal.IsOpen) { Journal.Hide(); return; }
+            if (!_game.IsGameOver && !_game.IsModalOpen) Journal.Show();
         }
 
         /// <summary>
@@ -146,6 +162,7 @@ namespace PetShop.UI
         {
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
             if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
+            if (Journal != null && Journal.IsOpen) { Journal.Hide(); return; }
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
             if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }

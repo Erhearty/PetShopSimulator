@@ -23,6 +23,18 @@ namespace PetShop.Progression
         /// <summary>Empty-shelf fraction to use when there are no shelves.</summary>
         private const float NoEmptyShelves = 0f;
 
+        /// <summary>Stands for "no inspection yet" in <see cref="BestInspectionGrade"/>.</summary>
+        public const char NoGrade = '\0';
+
+        /// <summary>The worst grade that still counts as a pass.</summary>
+        public const char PassingGrade = 'B';
+
+        /// <summary>Inspections graded A or B so far.</summary>
+        public int InspectionsPassed { get; private set; }
+
+        /// <summary>The best grade so far ('A' best, then 'B', 'C', 'F'); <see cref="NoGrade"/> before the first.</summary>
+        public char BestInspectionGrade { get; private set; } = NoGrade;
+
         /// <summary>The highest tier reached. Never falls, even if reputation does.</summary>
         public int Tier => _rules.HighestTier;
 
@@ -52,6 +64,13 @@ namespace PetShop.Progression
             ApplyLotStage();
         }
 
+        /// <summary>Restores the inspection counters from a save.</summary>
+        public void RestoreInspections(int passed, char bestGrade)
+        {
+            InspectionsPassed   = Mathf.Max(0, passed);
+            BestInspectionGrade = bestGrade;
+        }
+
         /// <summary>
         /// Raises the tier to whatever the current reputation earns. On a rise, applies the new
         /// lot stage, notifies the player and plays a sound. Headlines go to <see cref="LatestMilestones"/>.
@@ -79,6 +98,7 @@ namespace PetShop.Progression
             if (Shop == null || !InspectorGrader.IsInspectionDay(day)) return headlines;
 
             var result = InspectorGrader.Grade(AveragePetHealth(), AveragePenCare(), EmptyShelfFraction());
+            RecordGrade(result.Grade);
             Shop.ChangeReputation(result.ReputationDelta);
             if (result.CashDelta >= 0f) Shop.ChangeBalance(result.CashDelta, "Inspection grant");
             else                        Shop.ForceCharge(-result.CashDelta, "Inspection fine");
@@ -87,6 +107,13 @@ namespace PetShop.Progression
                       $"rep {result.ReputationDelta:+0;-0}, cash {result.CashDelta:+0;-0}");
             headlines.Add(result.Summary);
             return headlines;
+        }
+
+        /// <summary>Counts a pass (A or B) and keeps the best grade; letters earlier in the alphabet are better.</summary>
+        private void RecordGrade(char grade)
+        {
+            if (grade <= PassingGrade) InspectionsPassed++;
+            if (BestInspectionGrade == NoGrade || grade < BestInspectionGrade) BestInspectionGrade = grade;
         }
 
         private void ApplyLotStage()

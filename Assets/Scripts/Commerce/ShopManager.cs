@@ -8,7 +8,7 @@ namespace PetShop.Commerce
     /// <summary>
     /// Central shop state: balance, reputation, stock ledger and the daily sales log.
     /// </summary>
-    public class ShopManager : MonoBehaviour
+    public partial class ShopManager : MonoBehaviour
     {
         [Header("Starting values")]
         public float StartingBalance = 1000f;
@@ -234,6 +234,7 @@ namespace PetShop.Commerce
                 BuyerName = buyerName,
             };
             _dayLog.Add(record);
+            TrackSale(record);
             OnSaleCompleted.Invoke(record);
             return record;
         }
@@ -308,7 +309,7 @@ namespace PetShop.Commerce
                 ArrivalProgress = Mathf.Min(0.97f, dayProgressNow + UnityEngine.Random.Range(0.10f, 0.22f)),
             };
             _orders.Add(order);
-            OnOrderPlaced.Invoke(order);
+            NotifyOrderPlaced(order);
             return order;
         }
 
@@ -339,6 +340,7 @@ namespace PetShop.Commerce
             SetBalance(Balance - rent - wages);   // this can push you into the red — the fail state
 
             var summary = BuildSummary(rent, wages);
+            TrackDayProfit(summary);
 
             // Anything still on the van turns up overnight rather than vanishing.
             foreach (var order in _orders) AddToWarehouse(order.Category, order.Units);

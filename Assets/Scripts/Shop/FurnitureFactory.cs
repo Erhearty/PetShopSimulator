@@ -65,7 +65,7 @@ namespace PetShop.Shop
             },
 
             // Building pieces. All one cell and rotatable, so a run of them makes a partition,
-            // a room, or a paddock wherever the player wants one.
+            // a room, or an enclosure wherever the player wants one.
             [Wall] = new PlacedObjectData
             {
                 Id = Wall, DisplayName = "Wall", Type = "wall", Category = BuildCategory.Structure,
@@ -87,7 +87,7 @@ namespace PetShop.Shop
             [Fence] = new PlacedObjectData
             {
                 Id = Fence, DisplayName = "Fence", Type = "fence", Category = BuildCategory.Structure,
-                Description = "One cell of low fence, for paddocks and the yard.",
+                Description = "One cell of low fence, for enclosures and the yard.",
                 Size = new Vector2Int(1, 1), Cost = 20f, Tint = new Color(0.80f, 0.63f, 0.38f)
             },
 

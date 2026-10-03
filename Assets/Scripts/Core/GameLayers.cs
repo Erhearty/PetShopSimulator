@@ -32,7 +32,10 @@ namespace PetShop.Core
         /// <summary>Shelves, pens, the counter — what the interaction system looks for.</summary>
         public static int Furniture => Resolve(ref _furniture, "Furniture");
 
-        /// <summary>The street outside — walls, road, parked cars. Never interactable.</summary>
+        /// <summary>
+        /// The street outside — walls, road, parked cars. Never interactable. Also carries the road
+        /// surface that traffic cars raycast against to snap to the ground, and the traffic cars themselves.
+        /// </summary>
         public static int Scenery => Resolve(ref _scenery, "Scenery");
 
         /// <summary>

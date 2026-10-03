@@ -36,8 +36,8 @@ namespace PetShop.Tests
         [Test]
         public void LotStageCells_MatchDefaultDimensions()
         {
-            Assert.AreEqual(new RectInt(-15, -5, 28, 13), _layout.LotStageCells(ShopLayout.StarterLotStage));
-            Assert.AreEqual(new RectInt(-15, -8, 28, 16), _layout.LotStageCells(ShopLayout.BackStripLotStage));
+            Assert.AreEqual(new RectInt(-15, -1, 8, 9), _layout.LotStageCells(ShopLayout.StarterLotStage));
+            Assert.AreEqual(new RectInt(-15, -8, 8, 16), _layout.LotStageCells(ShopLayout.BackStripLotStage));
             Assert.AreEqual(new RectInt(-16, -8, 32, 16), _layout.LotStageCells(ShopLayout.FullYardLotStage));
         }
 

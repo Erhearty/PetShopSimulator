@@ -11,7 +11,7 @@ namespace PetShop.Core
     /// furniture together with its shelf stock or pen residents.
     /// </summary>
     [Serializable]
-    public class SaveData
+    public partial class SaveData
     {
         public int    Version = SaveMigrator.CurrentVersion;
         /// <summary>Permanent reputation tier reached (see ProgressionRules).</summary>

@@ -33,8 +33,6 @@ namespace PetShop.Shop
         public Transform PavementAnchor;
 
         [Header("Zones")]
-        [Tooltip("x, z, width, depth in world metres — where the pens go.")]
-        public Rect PaddockRect = new(2f, -9f, 24f, 17f);
         public float PavementSpread = 24f;
 
         [Header("Roots")]
@@ -91,8 +89,6 @@ namespace PetShop.Shop
         /// <summary>Runtime-only pavement position for layouts with no pavement anchor.</summary>
         public void SetPavementCentre(Vector3 centre) => _pavementOverride = centre;
 
-        public Rect PaddockArea => PaddockRect;
-
         /// <summary>The till spot customers queue at, inside the shop at the back wall.</summary>
         public Vector3 TillPosition => ShopCentre + new Vector3(0f, 0f, -RoomDepth * 0.5f + 2.6f);
 
@@ -133,11 +129,9 @@ namespace PetShop.Shop
             if (stage >= FullYardLotStage) return yard;
 
             Vector3 shop = ShopCentre;
-            Rect paddock = PaddockArea;
-            float xMin = Mathf.Min(shop.x - RoomWidth * 0.5f, paddock.xMin);
-            float xMax = Mathf.Max(shop.x + RoomWidth * 0.5f, paddock.xMax);
-            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f
-                       : Mathf.Min(shop.z - RoomDepth * 0.5f, paddock.yMin);
+            float xMin = shop.x - RoomWidth * 0.5f;
+            float xMax = shop.x + RoomWidth * 0.5f;
+            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f : shop.z - RoomDepth * 0.5f;
 
             int x0 = Mathf.Max(yard.xMin, Mathf.FloorToInt(xMin / cs));
             int x1 = Mathf.Min(yard.xMax, Mathf.CeilToInt(xMax / cs));
@@ -197,10 +191,6 @@ namespace PetShop.Shop
             DrawCells(LotStageCells(FullYardLotStage),  new Color(0.3f, 0.3f, 0.3f, 0.6f), cs);
             DrawCells(LotStageCells(BackStripLotStage), new Color(0.9f, 0.7f, 0.2f, 0.8f), cs);
             DrawCells(LotStageCells(StarterLotStage),   new Color(0.2f, 0.9f, 0.3f, 0.9f), cs);
-
-            Gizmos.color = new Color(0.3f, 0.6f, 1f, 0.9f);
-            Rect p = PaddockArea;
-            Gizmos.DrawWireCube(new Vector3(p.center.x, 0.05f, p.center.y), new Vector3(p.width, 0.1f, p.height));
 
             Vector2Int door = new(Mathf.FloorToInt(DoorPosition.x / cs), Mathf.FloorToInt(DoorPosition.z / cs));
             DrawCells(DoorwayCells(door), new Color(1f, 0.3f, 0.3f, 0.9f), cs);

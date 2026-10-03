@@ -82,7 +82,7 @@ namespace PetShop.Core
                     SaveSystem.ActiveSlot = slot;
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
-                    _game.Begin();
+                    _game.Begin(_ui.Title.SkipTutorial);
                 }, () => _ui.Settings.Show());
             }
 
@@ -273,6 +273,10 @@ namespace PetShop.Core
             var progression = _game.gameObject.AddComponent<ProgressionDirector>();
             progression.Init(_game, _layout, _build);
             _game.Progression = progression;
+
+            var quests = _game.gameObject.AddComponent<PetShop.Progression.Quests.QuestDirector>();
+            quests.Init(_game);
+            _game.Quests = quests;
         }
 
         /// <summary>

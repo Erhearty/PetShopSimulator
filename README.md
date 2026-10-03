@@ -39,6 +39,7 @@ Tests live in `Assets/Tests/EditMode` (assembly `PetShop.Tests.EditMode`) and re
 | `./build.sh spawnverify` | Spawns key pack models and checks their size and grounding. With no asset pack installed it reports SKIP; a partial install fails. |
 | `./build.sh soak` | Seeded headless run of the Linux player (`SEED`, default 1; `SOAK_DAYS`, default 15) that writes `Logs/build/soak.jsonl` and fails when any day leaves the soak bands. |
 | `./build.sh playtest` | All of the above plus `smoke`. Every stage runs even if an earlier one fails; exits 1 if any stage failed. Needs a Linux build (`./build.sh linux`). |
+| `./build.sh look` | Also photographs the quest UI: `quest_tracker` (the HUD with the tracker) and `quest_journal` (the journal open), and `street_traffic` (cars on the street, traffic frozen). 35 shots in all. |
 | `./build.sh look-diff` | `look`, then compares `Screenshots/` against the approved `Tests/Baselines/Screenshots/` and prints each image's difference; diff images go to `Logs/screenshot-diff/`. Never fails. |
 | `./build.sh look-approve` | Copies the current `Screenshots/` over the baselines. |
 
@@ -80,6 +81,7 @@ target runs, so on a machine without Unity run `bash Tools/fetch_kenney.sh .` di
 | `LMB` | Place · `R` rotate · middle-click or `Delete` remove (50% back) |
 | `RMB` | Leave build mode |
 | `Tab` | The ledger — shelves, animals, catalogue |
+| `J` | The quest journal |
 | `Esc` | Cancel / close / pause |
 | `Enter` | Close up early |
 | `H` | Toggle the controls panel |
@@ -124,7 +126,22 @@ mouse wheel rotate it, 45° for decor and 90° for everything else. Removing a p
 the inventory. Customers only start coming once there is a counter plus at least one shelf or pen.
 
 A `ShopLayout` component holds the yard and room dimensions, the door, forecourt and pavement
-anchors, the paddock and the lot stages that open up as the shop grows.
+anchors and the lot stages that open up as the shop grows.
+
+## Quest system
+
+Quests are data in `QuestCatalog`, grouped in chapters: **Tutorial** (nine steps, strictly in order, from
+opening the catalogue to closing the first day), then **Early**, **Mid** and **End** (any order within a
+chapter; the next chapter opens once every quest in the current one is done). Each quest pays a cash
+reward that does not count as sales. The **tracker** on the HUD shows the active quests; the
+**journal** (`J`) lists every chapter. Progress is saved in save version 5 as `QuestProgress`
+(chapter, completed ids, one-shot flags).
+
+To add a quest: add a `QuestDefinition` to the right chapter array in `QuestCatalog` (id, chapter, title,
+instruction, reward, condition, plus an optional progress function for a `n / target` display); add a field
+to `QuestContext` (filled in `QuestDirector.BuildContext`) or a `QuestFlags` flag if the condition needs new
+state; add a test (`Assets/Tests/EditMode` for the book, `Assets/Tests/PlayMode/QuestTutorialTests.cs` for a
+played path).
 
 ## What's outside
 
@@ -132,6 +149,12 @@ The shopfront is glazed, so the street is part of the game whether or not you st
 The scene holds the pavement, a two-lane road with a crossing at the door, the
 terrace of shops the pet shop belongs to, a block of buildings opposite, parked cars, street
 lights, trees and a skyline behind it all — about 140 objects.
+
+Traffic is authored too: `TrafficLane` objects (waypoint children) under `Street/Traffic`, `TrafficCar`
+components on the car roots, a `CrosswalkZone` over each crossing and a single `TrafficDirector` per scene.
+To add a car, add `TrafficCar` to a car root and assign its lane; to add a lane, duplicate a `Lane`
+object and add or move waypoint children; put a `CrosswalkZone` on any crossing so cars stop for
+people. `TrafficDirector.Freeze()` stops the cars for screenshots (the `look` tour does this).
 
 Only the near pavement is walkable. The road has no collider at all, which is what keeps
 customers on the pavement and the NavMesh bake small.

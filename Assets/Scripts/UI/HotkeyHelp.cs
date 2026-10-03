@@ -31,12 +31,13 @@ namespace PetShop.UI
             $"{L(GameAction.EndDay)}  close up early\n" +
             $"{L(GameAction.Interact)} at the counter  serve the queue\n" +
             $"{L(GameAction.Ledger)}  the ledger\n" +
+            $"{QuestJournalPanel.OpenKeyLabel}  quest journal\n" +
             $"Esc  pause  ·  {L(GameAction.QuickSave)} save\n" +
             $"{L(GameAction.Help)}  hide this panel";
 
         /// <summary>The one-line controls hint at the foot of the title screen.</summary>
         public static string TitleHint() =>
             $"{InputBindings.MoveLabel()} move  ·  RMB orbit  ·  {L(GameAction.Interact)} interact  ·  " +
-            $"{L(GameAction.BuildMode)} furniture catalogue  ·  {RotateKeys()} rotate  ·  {L(GameAction.Help)} help";
+            $"{L(GameAction.BuildMode)} furniture catalogue  ·  {RotateKeys()} rotate  ·  {QuestJournalPanel.OpenKeyLabel} journal  ·  {L(GameAction.Help)} help";
     }
 }

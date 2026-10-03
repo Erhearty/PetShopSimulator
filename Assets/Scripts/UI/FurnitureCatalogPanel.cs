@@ -98,6 +98,7 @@ namespace PetShop.UI
             Refresh();
             _root.SetActive(true);
             _game?.SetModalOpen(true);
+            _game?.Quests?.RaiseFlag(PetShop.Progression.Quests.QuestFlags.CatalogueOpened);
             SelectCurrentTab();
         }
 
