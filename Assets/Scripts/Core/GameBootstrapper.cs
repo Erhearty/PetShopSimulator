@@ -84,10 +84,10 @@ namespace PetShop.Core
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin(_ui.Title.SkipTutorial);
-                }, () => _ui.Settings.Show());
+                }, () => _ui.Settings.Show(), () => _ui.Guide.Show());
             }
 
-            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B build view, Tab ledger, Enter to close the day.");
+            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B build view, Tab Shop book, F1 guide, Enter to close the day.");
         }
 
         private void Update()

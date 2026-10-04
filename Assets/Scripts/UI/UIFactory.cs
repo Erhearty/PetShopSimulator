@@ -7,30 +7,122 @@ namespace PetShop.UI
     /// <summary>Small helpers for assembling the runtime canvas without prefabs.</summary>
     public static class UIFactory
     {
-        public static readonly Color Ink        = new(0.93f, 0.95f, 0.98f);
-        public static readonly Color InkMuted   = new(0.64f, 0.70f, 0.78f);
-        public static readonly Color Accent     = new(0.47f, 0.80f, 0.99f);
-        public static readonly Color Good       = new(0.46f, 0.88f, 0.62f);
-        public static readonly Color Bad        = new(0.97f, 0.47f, 0.44f);
-        public static readonly Color Warn       = new(0.98f, 0.80f, 0.40f);
-        public static readonly Color PanelBg    = new(0.07f, 0.09f, 0.13f, 0.94f);
-        public static readonly Color BarBg      = new(0.07f, 0.09f, 0.13f, 0.86f);
-        /// <summary>Floating HUD card fill: dark, slightly translucent.</summary>
-        public static readonly Color CardBg     = new(0.08f, 0.10f, 0.15f, 0.82f);
+        // ── Design tokens ───────────────────────────────────────────────────────
+        // Every UI colour lives here. Accent is reserved for selection, the primary action
+        // and keyboard focus; other panels must use these roles rather than literals.
+
+        /// <summary>Panel surface (#14303A).</summary>
+        public static readonly Color Surface     = Hex(0x14, 0x30, 0x3A);
+        /// <summary>Raised surface for controls and table rows (#1E4250).</summary>
+        public static readonly Color Raised      = Hex(0x1E, 0x42, 0x50);
+        /// <summary>Primary text (#F2F6F5).</summary>
+        public static readonly Color Ink         = Hex(0xF2, 0xF6, 0xF5);
+        /// <summary>Secondary text (#A9C2C4).</summary>
+        public static readonly Color InkMuted    = Hex(0xA9, 0xC2, 0xC4);
+        /// <summary>Selection, primary action and keyboard focus (#F5B935).</summary>
+        public static readonly Color Accent      = Hex(0xF5, 0xB9, 0x35);
+        /// <summary>Text drawn on an accent fill: the panel colour, for contrast.</summary>
+        public static readonly Color OnAccent    = Hex(0x14, 0x30, 0x3A);
+        /// <summary>Good news (#5CCB8A).</summary>
+        public static readonly Color Positive    = Hex(0x5C, 0xCB, 0x8A);
+        /// <summary>Needs attention soon (#F08A4B).</summary>
+        public static readonly Color Warning     = Hex(0xF0, 0x8A, 0x4B);
+        /// <summary>Bad news or irreversible actions (#E5555A).</summary>
+        public static readonly Color Destructive = Hex(0xE5, 0x55, 0x5A);
+        /// <summary>Hairlines and dividers (#2F5A68).</summary>
+        public static readonly Color Border      = Hex(0x2F, 0x5A, 0x68);
+        /// <summary>Full-screen dimmer behind modal panels.</summary>
+        public static readonly Color Dim         = new(0f, 0f, 0f, DimAlpha);
+        /// <summary>Outline colour around the keyboard-selected control.</summary>
+        public static readonly Color FocusRing   = Accent;
+
+        // ── Legacy names (aliases of the token roles, so older panels keep compiling) ──
+
+        /// <summary>Alias of <see cref="Positive"/>.</summary>
+        public static readonly Color Good       = Positive;
+        /// <summary>Alias of <see cref="Destructive"/>.</summary>
+        public static readonly Color Bad        = Destructive;
+        /// <summary>Alias of <see cref="Warning"/>.</summary>
+        public static readonly Color Warn       = Warning;
+        /// <summary>Alias of <see cref="Surface"/>.</summary>
+        public static readonly Color PanelBg    = Surface;
+        /// <summary>Alias of <see cref="Surface"/>, slightly translucent for bars over the world.</summary>
+        public static readonly Color BarBg      = WithAlpha(Surface, HudAlpha);
+        /// <summary>Floating HUD card fill: the panel surface, slightly translucent.</summary>
+        public static readonly Color CardBg     = WithAlpha(Surface, HudAlpha);
         /// <summary>Recessed track behind meters and progress bars.</summary>
-        public static readonly Color TrackBg    = new(1f, 1f, 1f, 0.12f);
+        public static readonly Color TrackBg    = Border;
+        /// <summary>Alias of <see cref="Raised"/>: the default button fill.</summary>
+        public static readonly Color ButtonBg   = Raised;
+        /// <summary>Alias of <see cref="Accent"/>: selected tab / primary button fill.</summary>
+        public static readonly Color ButtonOn   = Accent;
+
+        private const float DimAlpha = 0.62f;
+        private const float HudAlpha = 0.9f;
+
+        // ── Type, spacing, radius ───────────────────────────────────────────────
+
+        /// <summary>Type scale: small print, captions and table cells.</summary>
+        public const float TextSmall   = 14f;
+        /// <summary>Type scale: body text and buttons.</summary>
+        public const float TextBody    = 18f;
+        /// <summary>Type scale: page headings.</summary>
+        public const float TextHeading = 24f;
+        /// <summary>Type scale: panel titles.</summary>
+        public const float TextTitle   = 32f;
 
         /// <summary>HUD spacing unit (reference pixels): margins and gaps are multiples of this.</summary>
         public const float Gap = 8f;
 
-        private static Sprite _rounded;
+        /// <summary>Corner radius of panels (reference pixels).</summary>
+        public const int PanelRadius   = 14;
+        /// <summary>Corner radius of controls (reference pixels).</summary>
+        public const int ControlRadius = 8;
+        /// <summary>Width of the keyboard focus outline (reference pixels).</summary>
+        public const float FocusRingWidth = 2f;
 
-        /// <summary>A white 9-sliced rounded-rectangle sprite, generated once and tinted by Image.color.</summary>
-        public static Sprite RoundedSprite()
+        // Button state tints: multipliers on the button's own fill, so one fill serves every state.
+        private static readonly Color HoverTint    = new(1.15f, 1.15f, 1.15f, 1f);
+        private static readonly Color PressedTint  = new(0.85f, 0.85f, 0.85f, 1f);
+        private static readonly Color DisabledTint = new(0.6f, 0.6f, 0.6f, 0.5f);
+        private const float ButtonFadeSeconds = 0.08f;
+
+        private const int SpriteSize = 48;
+        private const float SpritePixelsPerUnit = 100f;
+
+        /// <summary>Resources path of the Nunito TMP SDF font asset (Assets/Resources/Fonts/Nunito SDF).</summary>
+        public const string FontResourcePath = "Fonts/Nunito SDF";
+
+        private static Sprite _rounded, _control;
+        private static TMP_FontAsset _font;
+        private static bool _fontLoaded;
+
+        private static Color Hex(byte r, byte g, byte b) => new Color32(r, g, b, 255);
+
+        /// <summary><paramref name="c"/> with its alpha replaced.</summary>
+        public static Color WithAlpha(Color c, float alpha) => new(c.r, c.g, c.b, alpha);
+
+        /// <summary>
+        /// The UI font: Nunito when its SDF asset is in Resources, otherwise null so TMP uses
+        /// its default font asset.
+        /// </summary>
+        public static TMP_FontAsset Font()
         {
-            if (_rounded != null) return _rounded;
+            if (_fontLoaded) return _font;
+            _fontLoaded = true;
+            _font = Resources.Load<TMP_FontAsset>(FontResourcePath);
+            return _font;
+        }
 
-            const int size = 48, radius = 14;
+        /// <summary>A white 9-sliced rounded-rectangle sprite (panel radius), generated once and tinted by Image.color.</summary>
+        public static Sprite RoundedSprite() => _rounded != null ? _rounded : _rounded = MakeRounded(PanelRadius);
+
+        /// <summary>A white 9-sliced rounded-rectangle sprite with the smaller control radius.</summary>
+        public static Sprite ControlSprite() => _control != null ? _control : _control = MakeRounded(ControlRadius);
+
+        private static Sprite MakeRounded(int radius)
+        {
+            const int size = SpriteSize;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Bilinear,
@@ -47,10 +139,10 @@ namespace PetShop.UI
             }
             tex.Apply();
 
-            _rounded = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
-                                     SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
-            _rounded.hideFlags = HideFlags.HideAndDontSave;
-            return _rounded;
+            var sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), SpritePixelsPerUnit, 0,
+                                       SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
         }
 
         /// <summary>A rounded, tinted panel — the building block of the floating HUD cards and chips.</summary>
@@ -65,9 +157,8 @@ namespace PetShop.UI
             img.raycastTarget = false;
             return go;
         }
-        public static readonly Color ButtonBg   = new(0.16f, 0.21f, 0.29f, 0.96f);
-        public static readonly Color ButtonOn   = new(0.22f, 0.50f, 0.80f, 0.98f);
 
+        /// <summary>The RectTransform of a UI object (adds one, with a warning, if it was built bare).</summary>
         public static RectTransform Rect(GameObject go)
         {
             var rt = go.GetComponent<RectTransform>();
@@ -79,6 +170,7 @@ namespace PetShop.UI
             return go.AddComponent<RectTransform>();
         }
 
+        /// <summary>An empty anchored UI object.</summary>
         public static GameObject Node(string name, Transform parent,
                                       Vector2 anchorMin, Vector2 anchorMax,
                                       Vector2 offsetMin = default, Vector2 offsetMax = default)
@@ -93,6 +185,7 @@ namespace PetShop.UI
             return go;
         }
 
+        /// <summary>An anchored, flat-filled UI object.</summary>
         public static GameObject Panel(string name, Transform parent,
                                        Vector2 anchorMin, Vector2 anchorMax, Color color,
                                        Vector2 offsetMin = default, Vector2 offsetMax = default)
@@ -102,13 +195,16 @@ namespace PetShop.UI
             return go;
         }
 
+        /// <summary>A TextMeshPro label in the UI font.</summary>
         public static TMP_Text Label(string name, Transform parent, string text,
                                      Vector2 anchorMin, Vector2 anchorMax,
-                                     float fontSize = 18f, Color? color = null,
+                                     float fontSize = TextBody, Color? color = null,
                                      TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft)
         {
             var go  = Node(name, parent, anchorMin, anchorMax);
             var tmp = go.AddComponent<TextMeshProUGUI>();
+            var font = Font();
+            if (font != null) tmp.font = font;
             tmp.text                 = text;
             tmp.fontSize             = fontSize;
             tmp.color                = color ?? Ink;
@@ -119,25 +215,59 @@ namespace PetShop.UI
             return tmp;
         }
 
+        /// <summary>
+        /// A rounded button with hover/pressed/selected/disabled states and an accent outline while
+        /// keyboard-selected. An accent fill gets panel-coloured text for contrast.
+        /// </summary>
         public static Button Button(string name, Transform parent, string text,
                                     Vector2 anchorMin, Vector2 anchorMax,
                                     float fontSize = 17f, Color? bg = null)
         {
-            var go    = Panel(name, parent, anchorMin, anchorMax, bg ?? ButtonBg);
+            Color fill = bg ?? ButtonBg;
+            var go    = Panel(name, parent, anchorMin, anchorMax, fill);
             var image = go.GetComponent<Image>();
+            image.sprite = ControlSprite();
+            image.type   = Image.Type.Sliced;
             var btn   = go.AddComponent<Button>();
             btn.targetGraphic = image;
-
-            var colors = btn.colors;
-            colors.normalColor      = Color.white;
-            colors.highlightedColor = new Color(1.18f, 1.18f, 1.18f, 1f);
-            colors.pressedColor     = new Color(0.82f, 0.82f, 0.82f, 1f);
-            colors.fadeDuration     = 0.08f;
-            btn.colors = colors;
+            btn.colors = ButtonStates();
+            go.AddComponent<FocusOutline>();
 
             Label($"{name}_Label", go.transform, text, Vector2.zero, Vector2.one,
-                  fontSize, Ink, TextAlignmentOptions.Center);
+                  fontSize, LabelColourOn(fill), TextAlignmentOptions.Center);
             return btn;
         }
+
+        /// <summary>The shared button state block (tints applied over the fill).</summary>
+        public static ColorBlock ButtonStates()
+        {
+            var colors = ColorBlock.defaultColorBlock;
+            colors.normalColor      = Color.white;
+            colors.highlightedColor = HoverTint;
+            colors.pressedColor     = PressedTint;
+            colors.selectedColor    = Color.white;
+            colors.disabledColor    = DisabledTint;
+            colors.colorMultiplier  = 1f;
+            colors.fadeDuration     = ButtonFadeSeconds;
+            return colors;
+        }
+
+        /// <summary>Marks a button selected (accent fill, panel text) or not (raised fill, ink text).</summary>
+        public static void SetSelected(Button button, bool selected)
+        {
+            if (button == null) return;
+            var image = button.GetComponent<Image>();
+            Color fill = selected ? Accent : Raised;
+            if (image != null) image.color = fill;
+            var label = button.GetComponentInChildren<TMP_Text>();
+            if (label != null) label.color = LabelColourOn(fill);
+        }
+
+        /// <summary>Wraps <paramref name="text"/> in a TMP rich-text colour tag for <paramref name="colour"/>.</summary>
+        public static string Tint(string text, Color colour) =>
+            $"<color=#{ColorUtility.ToHtmlStringRGB(colour)}>{text}</color>";
+
+        /// <summary>Text colour readable on <paramref name="fill"/>.</summary>
+        public static Color LabelColourOn(Color fill) => fill == Accent ? OnAccent : Ink;
     }
 }

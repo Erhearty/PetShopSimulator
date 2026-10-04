@@ -1,115 +1,158 @@
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
-using PetShop.Commerce;
 using PetShop.Core;
-using PetShop.Pets;
 using PetShop.Shop;
 
 namespace PetShop.UI
 {
     /// <summary>
-    /// The ledger (Tab): what is on the shelves, who lives in the pens, what the stock
-    /// catalogue costs, and the Build tab where furniture is ordered and picked up to place.
-    /// It answers "what should I do next?" at a glance.
+    /// The Shop book (Tab): a left-hand nav of pages - Overview, Stock, Animals, Staff, Build
+    /// and Guide - each a heading, a one-line purpose and its content. It answers "what should
+    /// I do next?" at a glance. Up/Down, Tab/Shift+Tab and the number keys switch pages.
     /// </summary>
     public partial class StatsPanel : MonoBehaviour
     {
-        private GameObject  _root;
-        private GameManager _game;
-        private TMP_Text    _shelvesText;
-        private TMP_Text    _pensText;
-        private TMP_Text    _catalogText;
-        private TMP_Text    _headerText;
-        private TMP_Text    _closeLabel;
+        /// <summary>Page index of Overview.</summary>
+        public const int OverviewTab = 0;
+        /// <summary>Page index of Stock.</summary>
+        public const int StockTab = 1;
+        /// <summary>Page index of Animals.</summary>
+        public const int AnimalsTab = 2;
+        /// <summary>Page index of Staff.</summary>
+        public const int StaffTab = 3;
+        /// <summary>Page index of Build.</summary>
+        public const int BuildTab = 4;
+        /// <summary>Page index of Guide.</summary>
+        public const int GuideTab = 5;
 
-        private readonly List<Button> _tabs = new();
-        private GameObject _shelvesPage, _pensPage, _catalogPage, _managePage;
-        private TMP_Text   _manageText;
-        private readonly List<GameObject> _manageControls = new();
-        private readonly List<GameObject> _orderControls  = new();
-        private readonly List<GameObject> _animalControls = new();
+        /// <summary>Key that cycles pages while the book is open (Shift reverses).</summary>
+        public const KeyCode CyclePagesKey = KeyCode.Tab;
 
         /// <summary>Units per wholesale order — one pallet.</summary>
-        private const int OrderSize = 12;
+        public const int OrderSize = 12;
 
+        // Layout, in reference pixels and panel fractions.
+        private const float PanelHalfWidth  = 560f;
+        private const float PanelHalfHeight = 340f;
+        private const float NavLeft   = 0.02f, NavRight = 0.2f;
+        private const float NavTop    = 0.84f, NavRowHeight = 0.075f, NavRowGap = 0.012f;
+        private const float BorderWidth = 1f;
+        private static readonly Vector2 ContentMin = new(0.23f, 0.03f);
+        private static readonly Vector2 ContentMax = new(0.97f, 0.96f);
+        // Within a page (fractions of the content area).
+        private const float HeadingBottom = 0.9f, PurposeBottom = 0.84f;
+        private const float BodyTop = 0.82f, BodyBottom = 0.2f, CloseLeft = 0.8f;
+        private const float NavTextIndent = UIFactory.Gap * 2f;
+
+        /// <summary>One page of the book: its root, body text and nav button.</summary>
+        private sealed class BookPage
+        {
+            public GameObject Root;
+            public TMP_Text   Body;
+            public Button     Nav;
+        }
+
+        private GameObject  _root;
+        private Transform   _panel;
+        private GameManager _game;
+        private ReorderPanel _reorder;
+        private readonly List<BookPage> _pages = new();
+        private int _current;
+        private int _openedFrame = -1;
+
+        /// <summary>True while the book is on screen.</summary>
         public bool IsOpen => _root != null && _root.activeSelf;
 
-        private ReorderPanel _reorder;
+        /// <summary>The page currently showing.</summary>
+        public int CurrentTab => _current;
+
+        /// <summary>Number of pages in the book.</summary>
+        public int TabCount => _pages.Count;
 
         /// <summary>
-        /// Builds the (hidden) ledger under <paramref name="canvas"/>. <paramref name="build"/> is
-        /// the build mode the Build tab places furniture with.
+        /// True while the book is open and the toggle key is <see cref="CyclePagesKey"/>: the
+        /// key then cycles pages instead of closing the book (Esc closes it).
+        /// </summary>
+        public bool CyclesWithLedgerKey => IsOpen && InputBindings.Get(GameAction.Ledger) == CyclePagesKey;
+
+        /// <summary>
+        /// Builds the (hidden) book under <paramref name="canvas"/>. <paramref name="build"/> is
+        /// the build mode the Build page places furniture with.
         /// </summary>
         public void Build(Transform canvas, GameManager game, ReorderPanel reorder = null, BuildMode build = null)
         {
             _game = game;
             _reorder = reorder;
 
-            _root = UIFactory.Panel("StatsDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
+            _root = UIFactory.Panel("StatsDim", canvas, Vector2.zero, Vector2.one, UIFactory.Dim);
+            _panel = UIFactory.Card("Stats", _root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                UIFactory.Surface, new Vector2(-PanelHalfWidth, -PanelHalfHeight),
+                new Vector2(PanelHalfWidth, PanelHalfHeight)).transform;
 
-            var panel = UIFactory.Panel("Stats", _root.transform,
-                                        new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                                        UIFactory.PanelBg,
-                                        new Vector2(-420f, -280f), new Vector2(420f, 280f));
-
-            UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                            UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
-
-            // Stops short of 0.78 so the Close button in the corner does not sit on the text.
-            _headerText = UIFactory.Label("Header", panel.transform, "The ledger",
-                new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f), 24f, UIFactory.Ink);
-
-            _shelvesPage = MakePage(panel.transform, out _shelvesText);
-            _pensPage    = MakePage(panel.transform, out _pensText);
-            _catalogPage = MakePage(panel.transform, out _catalogText);
-            _catalogText.fontSize = 13f;
-
-            _managePage = MakePage(panel.transform, out _manageText);
-
-            BuildBuildPage(panel.transform, build);
-
-            MakeTab(panel.transform, "Shelves",   0, TabCount, () => ShowPage(0));
-            MakeTab(panel.transform, "Animals",   1, TabCount, () => ShowPage(1));
-            MakeTab(panel.transform, "Catalogue", 2, TabCount, () => ShowPage(2));
-            MakeTab(panel.transform, "Manage",    3, TabCount, () => ShowPage(3));
-            MakeTab(panel.transform, "Build", BuildTab, TabCount, () => ShowPage(BuildTab));
-
-            BuildManageControls(panel.transform);
-            BuildOrderControls(panel.transform);
-            BuildAnimalControls(panel.transform);
-
-            var close = UIFactory.Button("Close", panel.transform, $"Close  ({InputBindings.Label(GameAction.Ledger)})",
-                new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
-            close.onClick.AddListener(Hide);
-            _closeLabel = close.GetComponentInChildren<TMP_Text>();
+            BuildChrome();
+            BuildOverviewPage();
+            BuildStockPage();
+            BuildAnimalsPage();
+            BuildStaffPage();
+            BuildBuildPage(build);
+            BuildGuidePage();
 
             _root.SetActive(false);
         }
 
-        private static GameObject MakePage(Transform parent, out TMP_Text body)
+        /// <summary>Title, divider, nav hint and the Close button.</summary>
+        private void BuildChrome()
         {
-            var page = UIFactory.Node("Page", parent, new Vector2(0.03f, 0.10f), new Vector2(0.97f, 0.80f));
-            body = UIFactory.Label("Body", page.transform, "",
-                Vector2.zero, Vector2.one, 16f, UIFactory.Ink, TextAlignmentOptions.TopLeft);
+            UIFactory.Label("Title", _panel, "Shop book", new Vector2(NavLeft, 0.89f),
+                new Vector2(NavRight, 0.97f), UIFactory.TextHeading, UIFactory.Ink);
+            UIFactory.Panel("Divider", _panel, new Vector2(NavRight + UIFactory.Gap / (2f * PanelHalfWidth), 0.03f),
+                new Vector2(NavRight + UIFactory.Gap / (2f * PanelHalfWidth), 0.97f), UIFactory.Border,
+                Vector2.zero, new Vector2(BorderWidth, 0f));
+            UIFactory.Label("NavHint", _panel, "Up/Down, Tab or 1–6 to switch pages. Esc closes.",
+                new Vector2(NavLeft, 0.03f), new Vector2(NavRight, 0.14f), UIFactory.TextSmall, UIFactory.InkMuted,
+                TextAlignmentOptions.BottomLeft);
+
+            var close = UIFactory.Button("Close", _panel, "Close  (Esc)",
+                new Vector2(ContentMin.x + (ContentMax.x - ContentMin.x) * CloseLeft, 0.9f),
+                new Vector2(ContentMax.x, 0.96f), UIFactory.TextSmall);
+            close.onClick.AddListener(Hide);
+        }
+
+        /// <summary>Adds a page with its heading, purpose line, body text and nav button.</summary>
+        private BookPage AddPage(string title, string purpose, float bodySize)
+        {
+            int index = _pages.Count;
+            var root = UIFactory.Node($"Page_{title}", _panel, ContentMin, ContentMax);
+            UIFactory.Label("Heading", root.transform, title, new Vector2(0f, HeadingBottom),
+                new Vector2(CloseLeft, 1f), UIFactory.TextHeading, UIFactory.Ink);
+            UIFactory.Label("Purpose", root.transform, purpose, new Vector2(0f, PurposeBottom),
+                new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
+            var body = UIFactory.Label("Body", root.transform, "", new Vector2(0f, BodyBottom),
+                new Vector2(1f, BodyTop), bodySize, UIFactory.Ink, TextAlignmentOptions.TopLeft);
             body.richText = true;
+
+            var page = new BookPage { Root = root, Body = body, Nav = MakeNav(title, index) };
+            _pages.Add(page);
             return page;
         }
 
-        private void MakeTab(Transform parent, string label, int index, int count, UnityEngine.Events.UnityAction onClick)
+        private Button MakeNav(string title, int index)
         {
-            float w = 0.9f / count;
-            float x = 0.03f + index * w;
-            var btn = UIFactory.Button($"Tab_{label}", parent, label,
-                new Vector2(x, 0.815f), new Vector2(x + w - 0.01f, 0.875f), 16f);
-            btn.onClick.AddListener(onClick);
-            _tabs.Add(btn);
+            float top = NavTop - index * (NavRowHeight + NavRowGap);
+            var btn = UIFactory.Button($"Tab_{title}", _panel, title, new Vector2(NavLeft, top - NavRowHeight),
+                new Vector2(NavRight, top), UIFactory.TextBody);
+            btn.navigation = new Navigation { mode = Navigation.Mode.None };   // the book drives the keys
+            var label = btn.GetComponentInChildren<TMP_Text>();
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.margin    = new Vector4(NavTextIndent, 0f, 0f, 0f);
+            btn.onClick.AddListener(() => ShowPage(index));
+            return btn;
         }
 
-        /// <summary>Select a tab by index. Used by the screenshot tour.</summary>
+        /// <summary>Select a page by index. Used by the screenshot tour.</summary>
         public void ShowTab(int index)
         {
             Refresh();
@@ -118,104 +161,30 @@ namespace PetShop.UI
 
         private void ShowPage(int index)
         {
-            _shelvesPage.SetActive(index == 0);
-            _pensPage.SetActive(index == 1);
-            _catalogPage.SetActive(index == 2);
-            _managePage.SetActive(index == 3);
-            ShowBuildPage(index == BuildTab);
-            foreach (var control in _manageControls) control.SetActive(index == 3);
-            foreach (var control in _orderControls)  control.SetActive(index == 2);
-            foreach (var control in _animalControls) control.SetActive(index == 1);
-
-            for (int i = 0; i < _tabs.Count; i++)
+            if (_pages.Count == 0) return;
+            _current = Mathf.Clamp(index, 0, _pages.Count - 1);
+            for (int i = 0; i < _pages.Count; i++)
             {
-                var image = _tabs[i].GetComponent<Image>();
-                if (image != null) image.color = i == index ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+                _pages[i].Root.SetActive(i == _current);
+                UIFactory.SetSelected(_pages[i].Nav, i == _current);
             }
+            ShowBuildPage(_current == BuildTab);
+            if (IsOpen && EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(_pages[_current].Nav.gameObject);
         }
 
-        /// <summary>Way through to the breeding planner from the animals list.</summary>
-        private void BuildAnimalControls(Transform panel)
-        {
-            var breed = UIFactory.Button("PlanBreeding", panel, "Plan tonight's breeding",
-                new Vector2(0.05f, 0.015f), new Vector2(0.38f, 0.075f), 15f, UIFactory.ButtonOn);
-            breed.onClick.AddListener(() =>
-            {
-                // Every panel is a component on the canvas object, so no manager lookup.
-                var planner = GetComponent<BreedingPanel>();
-                Hide();
-                planner?.Show();
-            });
-            _animalControls.Add(breed.gameObject);
-        }
-
-        /// <summary>
-        /// One order button per aisle. Ordering ahead is the cheap way to get stock; walking
-        /// up to a shelf and pressing E is the expensive way, so this is where the planning
-        /// happens.
-        /// </summary>
-        private void BuildOrderControls(Transform panel)
-        {
-            var categories = (ProductCategory[])System.Enum.GetValues(typeof(ProductCategory));
-            float w = 0.9f / (categories.Length + 1);
-
-            for (int i = 0; i < categories.Length; i++)
-            {
-                ProductCategory category = categories[i];
-                float x = 0.05f + i * w;
-
-                var btn = UIFactory.Button($"Order_{category}", panel,
-                    $"Order {OrderSize} {category}", new Vector2(x, 0.015f),
-                    new Vector2(x + w - 0.012f, 0.075f), 14f);
-                btn.onClick.AddListener(() =>
-                {
-                    _game.OrderStock(category, OrderSize);
-                    Refresh();
-                });
-                _orderControls.Add(btn.gameObject);
-            }
-            _orderControls.Add(ReorderPanel.OpenButton(panel, 0.05f + categories.Length * w, w - 0.012f,
-                () => { Hide(); _reorder?.Show(); }));
-        }
-
-        /// <summary>Price and staffing controls — the two levers the player actually pulls.</summary>
-        private void BuildManageControls(Transform panel)
-        {
-            var cheaper = UIFactory.Button("PriceDown", panel, "Prices  −10%",
-                new Vector2(0.05f, 0.11f), new Vector2(0.27f, 0.18f), 15f);
-            cheaper.onClick.AddListener(() => { _game.AdjustPrices(-0.1f); Refresh(); });
-
-            var dearer = UIFactory.Button("PriceUp", panel, "Prices  +10%",
-                new Vector2(0.28f, 0.11f), new Vector2(0.50f, 0.18f), 15f);
-            dearer.onClick.AddListener(() => { _game.AdjustPrices(0.1f); Refresh(); });
-
-            // Hiring is a choice between named applicants now, so it gets its own board
-            // rather than a nameless "hire" button.
-            var staff = UIFactory.Button("StaffBoard", panel, "Staff board  —  hire and fire",
-                new Vector2(0.52f, 0.11f), new Vector2(0.95f, 0.18f), 15f, UIFactory.ButtonOn);
-            staff.onClick.AddListener(() =>
-            {
-                var board = GetComponent<StaffPanel>();
-                Hide();
-                board?.Show();
-            });
-
-            _manageControls.AddRange(new[]
-            {
-                cheaper.gameObject, dearer.gameObject, staff.gameObject
-            });
-        }
-
+        /// <summary>Opens the book on the Overview page and pauses the clock.</summary>
         public void Show()
         {
             if (_root == null) return;
-            if (_closeLabel != null) _closeLabel.text = $"Close  ({InputBindings.Label(GameAction.Ledger)})";
             Refresh();
             _root.SetActive(true);
-            ShowPage(0);
+            _openedFrame = Time.frameCount;
+            ShowPage(OverviewTab);
             _game?.SetModalOpen(true);
         }
 
+        /// <summary>Closes the book and restarts the clock.</summary>
         public void Hide()
         {
             if (_root == null) return;
@@ -223,145 +192,52 @@ namespace PetShop.UI
             _game?.SetModalOpen(false);
         }
 
+        /// <summary>Opens the book when closed, closes it when open.</summary>
         public void Toggle()
         {
             if (IsOpen) Hide(); else Show();
         }
 
+        /// <summary>Closes the book, then runs <paramref name="open"/> (another panel).</summary>
+        private void HandOff(System.Action open)
+        {
+            Hide();
+            open?.Invoke();
+        }
+
+        private void Update()
+        {
+            // The key that opened the book this frame must not also turn its page; the guide
+            // open over the book takes the arrow keys.
+            if (!IsOpen || Time.frameCount == _openedFrame || GuideIsOpen) return;
+            int next = PageFromKeys();
+            if (next != _current) ShowPage(next);
+        }
+
+        /// <summary>The page the keyboard asks for this frame (the current page if none).</summary>
+        private int PageFromKeys()
+        {
+            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool cycle = Input.GetKeyDown(CyclePagesKey);
+            if (Input.GetKeyDown(KeyCode.DownArrow) || (cycle && !shift)) return Wrap(_current + 1);
+            if (Input.GetKeyDown(KeyCode.UpArrow)   || (cycle && shift))  return Wrap(_current - 1);
+            for (int i = 0; i < _pages.Count; i++)
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i)) return i;
+            return _current;
+        }
+
+        private int Wrap(int index) => (index % _pages.Count + _pages.Count) % _pages.Count;
+
         // ── Content ─────────────────────────────────────────────────────────────
 
         private void Refresh()
         {
-            var shop = _game.Shop;
-            // The details run smaller than the title so the whole line fits beside the Close button
-            // (at full size it was cut off after "reputation").
-            _headerText.text = $"The ledger    <size=68%><color=#9FB2C4>Day {shop.Day}  ·  € {shop.Balance:N2}  ·  " +
-                               $"reputation {shop.Reputation:0}/100  ·  rent tonight € {shop.DailyRent:N0}</color></size>";
-
-            BuildShelvesPage();
-            BuildPensPage();
-            BuildCatalogPage();
-            BuildManagePage();
+            RefreshGuidePage();
+            if (_game == null || _game.Shop == null) return;
+            RefreshOverview();
+            RefreshStock();
+            RefreshAnimals();
+            RefreshStaff();
         }
-
-        private void BuildManagePage()
-        {
-            var shop = _game.Shop;
-            var sb   = new StringBuilder();
-
-            sb.AppendLine("<b>Pricing</b>");
-            sb.AppendLine($"  Shelf prices are at <b>{shop.PriceMultiplier * 100f:0}%</b> of list.");
-            sb.AppendLine($"  Shoppers are <b>{shop.DemandFactor * 100f:0}%</b> as likely to buy as at list price.");
-            sb.AppendLine(shop.PriceMultiplier > 1.25f
-                ? "  <color=#E8C468>Steep. Expect people to leave empty-handed.</color>"
-                : shop.PriceMultiplier < 0.9f
-                    ? "  <color=#9FB2C4>Undercutting: busier, but thinner margins.</color>"
-                    : "  <color=#73DB95>About right.</color>");
-            sb.AppendLine();
-
-            sb.AppendLine("<b>Staff</b>");
-            sb.AppendLine($"  {_game.StaffCount} assistant(s) on the payroll " +
-                          $"= <b>€ {shop.DailyWages:N0}</b> tonight.");
-            foreach (var member in _game.Staff)
-                if (member != null)
-                    sb.AppendLine($"    {member.StaffName,-18}€ {member.DailyWage,-8:N0}" +
-                                  $"one customer every {member.ServiceSeconds:0.#} s");
-            sb.AppendLine("  Assistants work the till on their own, slower than you do.");
-            sb.AppendLine(_game.StaffCount == 0
-                ? "  <color=#F27370>Nobody on the till — you must serve every customer yourself.</color>"
-                : "  <color=#9FB2C4>You can still serve the queue yourself to clear it faster.</color>");
-            sb.AppendLine();
-
-            sb.AppendLine("<b>Tonight's bill</b>");
-            sb.AppendLine($"  Rent   € {shop.DailyRent:N2}");
-            sb.AppendLine($"  Wages  € {shop.DailyWages:N2}");
-            sb.AppendLine($"  <b>Total € {shop.DailyOutgoings:N2}</b>   against € {shop.Balance:N2} in hand");
-
-            _manageText.text = sb.ToString();
-        }
-
-        private void BuildShelvesPage()
-        {
-            var shelves = _game.Shelves;
-            var sb = new StringBuilder();
-
-            if (shelves.Count == 0)
-            {
-                sb.AppendLine("No shelves yet. Press <b>1</b> or <b>2</b> to build one.");
-            }
-            else
-            {
-                int empty = 0, totalUnits = 0;
-                float restockBill = 0f;
-
-                sb.AppendLine($"<color=#9FB2C4>{"Shelf",-16}{"Stock",-10}{"Value on shelf",-18}Refill cost</color>");
-                foreach (var shelf in shelves)
-                {
-                    if (shelf == null) continue;
-                    if (shelf.IsEmpty) empty++;
-                    totalUnits += shelf.TotalUnits;
-
-                    float value = 0f;
-                    foreach (var line in shelf.Lines)
-                        if (line.Product != null) value += line.Units * line.Product.basePrice;
-
-                    float refill = shelf.RestockCost();
-                    restockBill += refill;
-
-                    string colour = shelf.IsEmpty ? "#F27370" : shelf.TotalUnits < 4 ? "#E8C468" : "#73DB95";
-                    sb.AppendLine($"<color={colour}>{shelf.Category,-16}</color>" +
-                                  $"{shelf.TotalUnits + " units",-10}{"€ " + value.ToString("N2"),-18}€ {refill:N2}");
-                }
-                sb.AppendLine();
-                sb.AppendLine($"{shelves.Count} shelves · {totalUnits} units on display · {empty} empty");
-                sb.AppendLine($"Refilling everything would cost <b>€ {restockBill:N2}</b>.");
-                sb.AppendLine();
-                sb.AppendLine($"<color=#9FB2C4>Walk up to a shelf and press {InputBindings.Label(GameAction.Interact)} to refill it.</color>");
-            }
-            _shelvesText.text = sb.ToString();
-        }
-
-        private void BuildPensPage()
-        {
-            var pens = _game.Pens;
-            var sb = new StringBuilder();
-
-            if (pens.Count == 0)
-            {
-                sb.AppendLine("No pens yet. Press <b>3</b> to build one.");
-            }
-            else
-            {
-                foreach (var pen in pens)
-                {
-                    if (pen == null) continue;
-                    sb.AppendLine($"<b>{pen.PenSpecies} pen</b>  <color=#9FB2C4>({pen.Count}/{pen.Capacity})" +
-                                  $"  ·  a new one costs € {Pet.WholesalePrice(pen.PenSpecies):N0}</color>");
-
-                    if (pen.Count == 0)
-                    {
-                        sb.AppendLine($"   <color=#F27370>empty — press {InputBindings.Label(GameAction.Interact)} at the pen to buy one</color>");
-                    }
-                    else
-                    {
-                        foreach (var pet in pen.Residents)
-                            sb.AppendLine($"   {pet.DisplayName(),-38}{pet.Condition,-11}€ {pet.SellPrice():N2}");
-
-                        string careColour = pen.NeedsService ? "#F27370" : "#73DB95";
-                    sb.AppendLine($"   <color={careColour}>feed {pen.FoodLevel * 100f:0}%  ·  " +
-                                  $"bedding {pen.Cleanliness * 100f:0}%</color>" +
-                                  (pen.NeedsService ? $"  — servicing costs € {pen.ServiceCost:N2}" : ""));
-
-                    if (pen.AdultCount >= 2 && pen.HasSpace)
-                            sb.AppendLine("   <color=#73DB95>two adults and room to spare — they may breed tonight</color>");
-                        else if (pen.AdultCount < 2)
-                            sb.AppendLine("   <color=#E8C468>needs two adults to breed</color>");
-                    }
-                    sb.AppendLine();
-                }
-            }
-            _pensText.text = sb.ToString();
-        }
-
     }
 }

@@ -35,13 +35,14 @@ namespace PetShop.UI
             $"{K(BuildToolbar.RemoveKey)} remove tool · RMB orbit\n" +
             $"{L(GameAction.EndDay)}  close up early\n" +
             $"{L(GameAction.Interact)} at the counter  serve the queue\n" +
-            $"{L(GameAction.Ledger)}  ledger & build\n" +
+            $"{L(GameAction.Ledger)}  Shop book\n" +
             $"{QuestJournalPanel.OpenKeyLabel}  quest journal\n" +
+            $"{L(GameAction.Guide)}  guide\n" +
             $"Esc  pause  ·  {L(GameAction.QuickSave)} save";
 
         /// <summary>The one-line controls hint at the foot of the title screen.</summary>
         public static string TitleHint() =>
             $"{InputBindings.MoveLabel()} move  ·  RMB orbit  ·  {L(GameAction.Interact)} interact  ·  " +
-            $"{L(GameAction.Ledger)} ledger & build  ·  {L(GameAction.BuildMode)} build view  ·  {RotateKeys()} rotate  ·  {QuestJournalPanel.OpenKeyLabel} journal";
+            $"{L(GameAction.Ledger)} Shop book  ·  {L(GameAction.BuildMode)} build view  ·  {RotateKeys()} rotate  ·  {QuestJournalPanel.OpenKeyLabel} journal";
     }
 }

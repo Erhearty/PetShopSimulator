@@ -68,6 +68,9 @@ namespace PetShop.UI
             _root.SetActive(false);
         }
 
+        /// <summary>When it returns true (the guide is open over the journal) the journal ignores the keyboard.</summary>
+        public Func<bool> InputBlocked { get; set; }
+
         /// <summary>Opens the journal on the current chapter and selects its button.</summary>
         public void Show()
         {
@@ -168,7 +171,7 @@ namespace PetShop.UI
 
         private void Update()
         {
-            if (!IsOpen) return;
+            if (!IsOpen || (InputBlocked != null && InputBlocked())) return;
             FollowSelection();
             if (Input.GetKeyDown(KeyCode.PageDown)) Scroll(-PageStep);
             if (Input.GetKeyDown(KeyCode.PageUp))   Scroll(PageStep);
@@ -193,7 +196,7 @@ namespace PetShop.UI
             _body.text = QuestTextFormatter.ChapterBody(Book(), Chapters[index], QuestTracker.Snapshot(_game));
             _scroll.verticalNormalizedPosition = 1f;
             for (int i = 0; i < _chapterButtons.Count; i++)
-                _chapterButtons[i].targetGraphic.color = i == index ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+                UIFactory.SetSelected(_chapterButtons[i], i == index);
         }
 
         private void RefreshChapterLabels()

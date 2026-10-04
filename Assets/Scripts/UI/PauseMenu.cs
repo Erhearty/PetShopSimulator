@@ -12,32 +12,41 @@ namespace PetShop.UI
         private GameManager _game;
         private AudioManager _audio;
         private SettingsPanel _settings;
+        private GuidePanel  _guide;
         private TMP_Text    _musicLabel;
         private TMP_Text    _status;
 
         // Button column: row i spans [RowTop - i*RowStep - RowHeight, RowTop - i*RowStep].
         private const float RowTop    = 0.74f;
-        private const float RowStep   = 0.10f;
-        private const float RowHeight = 0.085f;
+        private const float RowStep   = 0.09f;
+        private const float RowHeight = 0.075f;
+
+        private const float PanelHalfWidth  = 190f;
+        private const float PanelHalfHeight = 250f;
         private const float RowLeft   = 0.10f;
         private const float RowRight  = 0.90f;
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
-        /// <summary>Builds the hidden menu; <paramref name="settings"/> is opened by its Settings button.</summary>
-        public void Build(Transform canvas, GameManager game, AudioManager audio, SettingsPanel settings = null)
+        /// <summary>
+        /// Builds the hidden menu; <paramref name="settings"/> is opened by its Settings button and
+        /// <paramref name="guide"/> by its Guide button.
+        /// </summary>
+        public void Build(Transform canvas, GameManager game, AudioManager audio, SettingsPanel settings = null,
+                          GuidePanel guide = null)
         {
             _game     = game;
             _audio    = audio;
             _settings = settings;
+            _guide    = guide;
 
-            _root = UIFactory.Panel("PauseDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.72f));
+            _root = UIFactory.Panel("PauseDim", canvas, Vector2.zero, Vector2.one, UIFactory.Dim);
 
             var panel = UIFactory.Panel("Pause", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
-                                        new Vector2(-190f, -215f), new Vector2(190f, 215f));
+                                        new Vector2(-PanelHalfWidth, -PanelHalfHeight),
+                                        new Vector2(PanelHalfWidth, PanelHalfHeight));
 
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
@@ -69,12 +78,16 @@ namespace PetShop.UI
                 RowMin(3), RowMax(3), 17f);
             settingsButton.onClick.AddListener(() => _settings?.Show());
 
+            var guideButton = UIFactory.Button("Guide", panel.transform, "Guide",
+                RowMin(4), RowMax(4), 17f);
+            guideButton.onClick.AddListener(() => _guide?.Show());
+
             var restart = UIFactory.Button("Restart", panel.transform, "Abandon shop & restart",
-                RowMin(4), RowMax(4), 16f);
+                RowMin(5), RowMax(5), 16f);
             restart.onClick.AddListener(() => { Close(); _game.RestartGame(); });
 
             var quit = UIFactory.Button("Quit", panel.transform, "Save & quit",
-                RowMin(5), RowMax(5), 17f);
+                RowMin(6), RowMax(6), 17f);
             quit.onClick.AddListener(() =>
             {
                 if (_game.SaveGame()) { Application.Quit(); return; }

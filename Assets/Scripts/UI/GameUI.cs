@@ -33,7 +33,7 @@ namespace PetShop.UI
         /// <summary>The quest journal, opened with <see cref="QuestJournalPanel.OpenKey"/>.</summary>
         public QuestJournalPanel Journal { get; private set; }
 
-        /// <summary>The furniture catalogue on the ledger's Build tab: order furniture and pick owned pieces up to place.</summary>
+        /// <summary>The furniture catalogue on the Shop book's Build page: order furniture and pick owned pieces up to place.</summary>
         public FurnitureCatalogPanel Catalogue { get; private set; }
 
         /// <summary>The build view's Wall / Window wall / Doorway / Fence / Remove tool strip.</summary>
@@ -41,6 +41,9 @@ namespace PetShop.UI
 
         /// <summary>The top-down build view; Esc leaves it once nothing more transient is open.</summary>
         public BuildCamera BuildView { get; set; }
+
+        /// <summary>The in-game guide: opened from the Shop book, pause menu, title screen or <see cref="GameAction.Guide"/>.</summary>
+        public GuidePanel      Guide     { get; private set; }
 
         /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
         public SettingsPanel   Settings  { get; private set; }
@@ -65,6 +68,7 @@ namespace PetShop.UI
             (Reorder != null && Reorder.IsOpen) ||
             (Settings != null && Settings.IsOpen) ||
             (Journal  != null && Journal.IsOpen)  ||
+            (Guide    != null && Guide.IsOpen)    ||
             (Title    != null && Title.IsOpen);
 
         public Canvas Build(GameManager game, ShopManager shop, BuildMode build, AudioManager audio)
@@ -114,6 +118,7 @@ namespace PetShop.UI
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
             Journal  = canvasGO.AddComponent<QuestJournalPanel>();
+            Guide    = canvasGO.AddComponent<GuidePanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
             Info.Build(canvasGO.transform);
@@ -125,42 +130,79 @@ namespace PetShop.UI
             HUD.Catalogue = Catalogue;
             Inventory.Build(canvasGO.transform, game.Furniture, shop, build, () => AnyModalOpen || game.IsGameOver);
             Toolbar.Build(canvasGO.transform, game, shop, build, () => BuildView, () => AnyModalOpen || game.IsGameOver);
+            Stats.BuildView = () => BuildView;
+            Stats.Toolbar   = Toolbar;
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
             StaffBoard.Build(canvasGO.transform, game);
             Settings.Build(canvasGO.transform, game);
             Journal.Build(canvasGO.transform, game);
-            Pause.Build(canvasGO.transform, game, audio, Settings);
+            Guide.Build(canvasGO.transform, game);
+            Stats.OpenGuide = Guide.Show;
+            Stats.GuideOpen = () => Guide.IsOpen;
+            Journal.InputBlocked = () => Guide.IsOpen;
+            Pause.Build(canvasGO.transform, game, audio, Settings, Guide);
 
             return canvas;
         }
 
         /// <summary>Wires just the pieces the Escape routing needs, without building the panels. Test seam.</summary>
-        internal void WireForTests(GameManager game, BuildMode build, FurnitureCatalogPanel catalogue)
+        internal void WireForTests(GameManager game, BuildMode build, FurnitureCatalogPanel catalogue,
+                                   StatsPanel stats = null, GuidePanel guide = null)
         {
             _game     = game;
             _build    = build;
             Catalogue = catalogue;
+            Stats     = stats;
+            Guide     = guide;
         }
 
         private void Update()
         {
-            if (_game == null || Title == null || Title.IsOpen) return;
+            if (_game == null || Title == null) return;
+            if (Title.IsOpen)
+            {
+                // Over the title screen only the guide (opened from it) answers Esc.
+                if (Guide != null && Guide.IsOpen && Input.GetKeyDown(KeyCode.Escape)) Guide.Hide();
+                return;
+            }
 
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
-            if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
-                && !Reorder.IsOpen && !Journal.IsOpen)
-                Stats.Toggle();
-
+            if (InputBindings.GetKeyDown(GameAction.Guide)) HandleGuideKey();
+            if (InputBindings.GetKeyDown(GameAction.Ledger)) HandleLedgerKey();
             if (Input.GetKeyDown(QuestJournalPanel.OpenKey)) ToggleJournal();
         }
+
+        /// <summary>The guide key: toggles the guide (over the book too) unless the day is over or a rebind is listening.</summary>
+        internal void HandleGuideKey()
+        {
+            if (Guide == null || _game.IsGameOver) return;
+            if ((Results != null && Results.IsOpen) || (Settings != null && Settings.IsCapturing)) return;
+            Guide.Toggle();
+        }
+
+        /// <summary>The ledger key: opens or closes the Shop book unless another panel holds the keyboard.</summary>
+        internal void HandleLedgerKey()
+        {
+            // While the book is open a Tab binding turns its pages instead; Esc closes it.
+            if (Stats == null || Stats.CyclesWithLedgerKey || _game.IsGameOver || LedgerBlocked()) return;
+            Stats.Toggle();
+        }
+
+        /// <summary>True while a panel the book must not open over (or close under) is showing.</summary>
+        private bool LedgerBlocked() =>
+            (Guide   != null && Guide.IsOpen)   ||
+            (Pause   != null && Pause.IsOpen)   ||
+            (Results != null && Results.IsOpen) ||
+            (Reorder != null && Reorder.IsOpen) ||
+            (Journal != null && Journal.IsOpen);
 
         /// <summary>Closes the journal when open; opens it only when nothing else holds the keyboard.</summary>
         private void ToggleJournal()
         {
-            if (Journal == null) return;
+            if (Journal == null || (Guide != null && Guide.IsOpen)) return;
             if (Journal.IsOpen) { Journal.Hide(); return; }
             if (!_game.IsGameOver && !_game.IsModalOpen) Journal.Show();
         }
@@ -173,6 +215,7 @@ namespace PetShop.UI
         {
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
             if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
+            if (Guide != null && Guide.IsOpen) { Guide.Hide(); return; }
             if (Journal != null && Journal.IsOpen) { Journal.Hide(); return; }
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
             if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }

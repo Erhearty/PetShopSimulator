@@ -13,9 +13,9 @@ namespace PetShop.Tests
 {
     /// <summary>
     /// PlayMode tests for the furniture supply chain as wired through <see cref="GameManager"/>
-    /// and the <see cref="FurnitureCatalogPanel"/> hosted on the ledger's Build tab: ordering charges
+    /// and the <see cref="FurnitureCatalogPanel"/> hosted on the Shop book's Build page: ordering charges
     /// and queues, arrival drops a crate, unpacking it fills the inventory, and Place picks an owned
-    /// unit up and closes the ledger.
+    /// unit up and closes the book.
     /// </summary>
     public class FurnitureCatalogPlayTests
     {
@@ -160,6 +160,38 @@ namespace PetShop.Tests
             _stats.Hide();
             Assert.IsFalse(_panel.IsOpen);
             Assert.IsFalse(_game.IsModalOpen);
+        }
+
+        [Test]
+        public void ShopBook_HasSixPages_AndOpensOnOverview()
+        {
+            Assert.AreEqual(6, _stats.TabCount);
+            _stats.ShowTab(StatsPanel.GuideTab);
+
+            _stats.Show();
+            Assert.AreEqual(StatsPanel.OverviewTab, _stats.CurrentTab);
+            Assert.IsTrue(_game.IsModalOpen);
+        }
+
+        [Test]
+        public void ShopBook_EmptyShop_HasNothingUrgent()
+        {
+            var todos = _stats.Todos();
+
+            Assert.AreEqual(1, todos.Count);
+            Assert.AreEqual(StatsPanel.NothingUrgent, todos[0]);
+        }
+
+        [Test]
+        public void ShopBook_BillMoreThanBalance_IsAToDo()
+        {
+            _shop.SetBalance(PoorBalance);
+            if (_shop.DailyOutgoings <= PoorBalance) Assert.Ignore("No outgoings in this fixture.");
+
+            var todos = _stats.Todos();
+
+            Assert.LessOrEqual(todos.Count, StatsPanel.MaxTodos);
+            StringAssert.Contains("Tonight's bill", todos[0]);
         }
 
         [Test]

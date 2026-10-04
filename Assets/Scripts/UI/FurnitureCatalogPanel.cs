@@ -50,6 +50,9 @@ namespace PetShop.UI
         /// <summary>True while the catalogue is on screen (its host is open on its page).</summary>
         public bool IsOpen => _root != null && _root.activeInHierarchy;
 
+        /// <summary>When it returns true (the guide is open over the book) the page keys are ignored.</summary>
+        public System.Func<bool> InputBlocked { get; set; }
+
         /// <summary>The category tab being shown.</summary>
         public BuildCategory Tab { get; private set; }
 
@@ -243,7 +246,7 @@ namespace PetShop.UI
 
         private void Update()
         {
-            if (!IsOpen) return;
+            if (!IsOpen || (InputBlocked != null && InputBlocked())) return;
             if (Input.GetKeyDown(NextPageKey)) ChangePage(1);
             if (Input.GetKeyDown(PrevPageKey)) ChangePage(-1);
         }
@@ -265,7 +268,7 @@ namespace PetShop.UI
                 FillRow(_rows[i], index < items.Count ? items[index] : null);
             }
             for (int i = 0; i < _tabButtons.Count; i++)
-                _tabButtons[i].targetGraphic.color = Tabs[i] == Tab ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+                UIFactory.SetSelected(_tabButtons[i], Tabs[i] == Tab);
 
             _pageLabel.text  = $"Page {Page + 1} / {PageCount}";
             _prev.interactable = Page > 0;

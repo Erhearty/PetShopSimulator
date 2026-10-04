@@ -237,10 +237,10 @@ namespace PetShop.Dev
 
             if (ui != null && ui.Stats != null)
             {
-                shots.Add(Ui("ledger_shelves",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(0); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_animals",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(1); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_catalogue", uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(2); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_manage",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(3); }, ui.Stats.Hide));
+                shots.Add(Ui("book_overview", uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.OverviewTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_stock",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.StockTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_animals",  uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.AnimalsTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_staff",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.StaffTab); }, ui.Stats.Hide));
             }
 
             if (ui != null && ui.Info != null)

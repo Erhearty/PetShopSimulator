@@ -90,6 +90,34 @@ namespace PetShop.Tests
             Assert.IsTrue(build.RightClickCancels, "RMB should still cancel in first person.");
         }
 
+        /// <summary>The selected tool's accent button gets the dark on-accent label; the others keep ink.</summary>
+        [UnityTest]
+        public IEnumerator SelectedTool_LabelUsesOnAccent()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var ui = Object.FindAnyObjectByType<GameUI>();
+            PlaytestHarness.Game.Shop.SetBalance(RichBalance);
+            ui.BuildView.Enter();
+            yield return null;
+
+            Assert.IsTrue(ui.Toolbar.SelectPiece(BuildCatalog.Wall));
+            yield return null;   // the strip relights its buttons in Update
+
+            Assert.AreEqual(UIFactory.OnAccent, ToolLabel(ui, BuildCatalog.Wall).color, "selected tool label");
+            Assert.AreEqual(UIFactory.Ink, ToolLabel(ui, BuildCatalog.Fence).color, "unselected tool label");
+            ui.HandleEscape();
+            ui.BuildView.Exit();
+        }
+
+        /// <summary>The label of the strip button for <paramref name="id"/>.</summary>
+        private static TMPro.TMP_Text ToolLabel(GameUI ui, string id)
+        {
+            foreach (var button in ui.CanvasRoot.GetComponentsInChildren<UnityEngine.UI.Button>())
+                if (button.name == $"Tool_{id}") return button.GetComponentInChildren<TMPro.TMP_Text>();
+            Assert.Fail($"No toolbar button for {id}.");
+            return null;
+        }
+
         /// <summary>A free, buildable cell inside the shop room.</summary>
         private static Vector2Int FreeRoomCell(GameManager game)
         {

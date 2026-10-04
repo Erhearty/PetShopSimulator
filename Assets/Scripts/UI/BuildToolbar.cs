@@ -171,7 +171,7 @@ namespace PetShop.UI
                 bool selected = _build != null && _build.IsActive &&
                                 (tool.Id == null ? _build.IsRemoving
                                                  : !_build.IsHolding && _build.CurrentItem?.Id == tool.Id);
-                tool.Image.color = selected ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+                UIFactory.SetSelected(tool.Button, selected);
                 var def = BuildCatalog.Get(tool.Id);
                 tool.Button.interactable = def == null || _shop == null || _shop.Balance >= def.Cost;
             }

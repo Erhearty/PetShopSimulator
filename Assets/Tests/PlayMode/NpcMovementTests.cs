@@ -286,7 +286,28 @@ namespace PetShop.Tests
             if (t.Stuck || now - t.StuckSince < StuckWindow) return;
 
             t.Stuck = true;
-            Stuck.Add($"{t.Name} at {pos} ({ai.State})");
+            Stuck.Add($"{t.Name} at {pos} ({ai.State}) [{Diagnose(ai, pos)}]");
+        }
+
+        /// <summary>What the stuck agent wants and what surrounds it, so a failure explains itself.</summary>
+        private static string Diagnose(CustomerAI ai, Vector3 pos)
+        {
+            var agent = ai.GetComponent<NavMeshAgent>();
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"dest {agent.destination} {agent.pathStatus} corners {agent.path.corners.Length}");
+            sb.Append($" rem {agent.remainingDistance:F2} vel {agent.velocity} desired {agent.desiredVelocity}");
+            if (NavMesh.FindClosestEdge(pos, out var edge, NavMesh.AllAreas))
+                sb.Append($" edge {edge.distance:F2} at {edge.position}");
+            foreach (var c in Physics.OverlapSphere(pos + Vector3.up * 0.5f, 1.2f))
+                sb.Append($"; col {c.name}/{(c.attachedRigidbody != null ? c.attachedRigidbody.name : c.transform.root.name)} {c.bounds.center} {c.bounds.size} trig={c.isTrigger}");
+            foreach (var other in Object.FindObjectsByType<NavMeshAgent>(FindObjectsSortMode.None))
+            {
+                if (other == agent) continue;
+                float d = Vector3.Distance(other.transform.position, pos);
+                if (d < 1.5f)
+                    sb.Append($"; agent {other.name} {d:F2} m prio {other.avoidancePriority} vel {other.velocity} dest {other.destination}");
+            }
+            return sb.ToString();
         }
 
         /// <summary>Walking state with a path still well beyond the agent's stopping distance.</summary>

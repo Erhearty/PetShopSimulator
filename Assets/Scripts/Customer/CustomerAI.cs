@@ -220,7 +220,12 @@ namespace PetShop.Customer
             State = CustomerState.Leaving;
             // Off the queue line first: it runs from the till towards the door, and walking back
             // down it through the people still waiting deadlocked the agents (walk timeouts).
-            if (queued) yield return NavigateTo(StepAsideFromTill());
+            if (queued)
+            {
+                // Still holding priority over the line (see WaitToBeServed) until clear of it.
+                yield return NavigateTo(StepAsideFromTill());
+                _agent.avoidancePriority = _walkingPriority;
+            }
             if (EntryPoint != null) yield return NavigateTo(EntryPoint.position);
             Vector3 exit = ExitPoint != null ? ExitPoint.position : transform.position + Vector3.forward * 10f;
             exit.x += Random.Range(-14f, 14f);
@@ -250,7 +255,7 @@ namespace PetShop.Customer
             Queue.Join(this, Profile.PatienceMultiplier);
             SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
             // People standing in line hold their ground; shoppers walking past steer round them.
-            int walkingPriority = _agent.avoidancePriority;
+            _walkingPriority = _agent.avoidancePriority;
             _agent.avoidancePriority = QueueAvoidancePriority;
             int lastPlace = -1;
 
@@ -276,7 +281,12 @@ namespace PetShop.Customer
             }
 
             Queue.Leave(this);
-            _agent.avoidancePriority = walkingPriority;
+            // The next in line moves up onto this spot at once, while this shopper is still standing
+            // on it. Given way to (QueueAvoidancePriority) it shoved them off the line, often onto the
+            // side away from the door, boxed in between the counter and the queue with no way round:
+            // stuck. Outranking the line until RunBehaviour has stepped aside keeps them where they
+            // are and lets them cut across in front of it to the door side.
+            _agent.avoidancePriority = ClearingTillAvoidancePriority;
 
             if (_served)
             {
@@ -299,6 +309,15 @@ namespace PetShop.Customer
 
         /// <summary>Avoidance priority while standing in line: lower numbers are given way to.</summary>
         private const int QueueAvoidancePriority = 10;
+
+        /// <summary>
+        /// Avoidance priority from leaving the line until stepped aside off it: below
+        /// QueueAvoidancePriority, so the people moving up give way instead of shoving.
+        /// </summary>
+        private const int ClearingTillAvoidancePriority = 5;
+
+        /// <summary>Avoidance priority to walk with, saved on joining the line and restored once off it.</summary>
+        private int _walkingPriority;
 
         /// <summary>How far beside the queue line a served shopper steps before heading out.</summary>
         private const float StepAsideDistance = 1.8f;
