@@ -121,6 +121,7 @@ namespace PetShop.Shop
             _grid.FillFloorRect(area.position, area.size);
             ClearDoorway();
             EnsureRoomWallFloor();
+            EnsureRoomWallCorners();
         }
 
         /// <summary>Grid cells covered by a lot stage, clamped to the yard.</summary>
@@ -209,7 +210,8 @@ namespace PetShop.Shop
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
-                if (!unlocked.Contains(check) && !grid.TryGetObject(check, out _)) grid.SetFloor(check, false);
+                if (unlocked.Contains(check) || IsRoomWallCell(check) || grid.TryGetObject(check, out _)) continue;
+                grid.SetFloor(check, false);
             }
         }
 

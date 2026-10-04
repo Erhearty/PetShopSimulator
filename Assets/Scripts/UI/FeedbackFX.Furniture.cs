@@ -110,7 +110,10 @@ namespace PetShop.UI
             for (int i = _furnitureCount - 1; i >= 0; i--) FinishFurniture(i);
         }
 
-        /// <summary>Enabled mesh renderers under <paramref name="source"/> with a mesh, excluding text.</summary>
+        /// <summary>
+        /// Enabled mesh renderers under <paramref name="source"/> with a mesh, excluding text and anything
+        /// under a <see cref="WorldLabel"/> (it re-enables its own renderers every pre-cull).
+        /// </summary>
         private static MeshRenderer[] VisibleMeshRenderers(GameObject source)
         {
             source.GetComponentsInChildren(false, RendererBuffer);
@@ -124,6 +127,7 @@ namespace PetShop.UI
         private static bool IsCloneable(MeshRenderer renderer)
         {
             if (!renderer.enabled || renderer.GetComponent<TMP_Text>() != null) return false;
+            if (renderer.GetComponentInParent<WorldLabel>() != null) return false;
             var filter = renderer.GetComponent<MeshFilter>();
             return filter != null && filter.sharedMesh != null;
         }

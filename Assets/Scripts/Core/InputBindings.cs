@@ -213,16 +213,23 @@ namespace PetShop.Core
         private const KeyCode FirstBuildHotkey = KeyCode.Alpha1;
         private const KeyCode LastBuildHotkey  = KeyCode.Alpha9;
 
+        /// <summary>Fixed build-toolbar tool hotkeys (Wall, Window wall, Doorway, Fence, Remove).</summary>
+        private static readonly KeyCode[] BuildToolKeys =
+        {
+            KeyCode.Z, KeyCode.X, KeyCode.C, KeyCode.V, KeyCode.G,
+        };
+
         /// <summary>
         /// Whether a key may be bound. None, Escape (reserved for menus), mouse buttons
         /// (reserved for camera and placement), the fixed alternates (Num Enter, arrows) and
-        /// the build hotkeys 1-9 are rejected.
+        /// the build hotkeys 1-9 and the build-toolbar keys Z/X/C/V/G are rejected.
         /// </summary>
         public static bool IsBindable(KeyCode key)
         {
             if (key == KeyCode.None || key == KeyCode.Escape) return false;
             if (Array.IndexOf(FixedAlternateKeys, key) >= 0) return false;
             if (key >= FirstBuildHotkey && key <= LastBuildHotkey) return false;
+            if (Array.IndexOf(BuildToolKeys, key) >= 0) return false;
             return key < KeyCode.Mouse0 || key > KeyCode.Mouse6;
         }
 

@@ -97,6 +97,23 @@ namespace PetShop.Tests
         }
 
         [Test]
+        public void BuildKey_WhileGuideOverCatalogue_LeavesCatalogueAndPause()
+        {
+            var catalogue = _stats.Catalogue;
+            catalogue.Show();
+            _ui.HandleGuideKey();
+            Assert.IsTrue(_guide.IsOpen, "the guide opens over the catalogue");
+
+            Assert.IsTrue(GameBootstrapper.RouteCatalogueInput(catalogue, true, _guide.IsOpen));
+            Assert.IsTrue(catalogue.IsOpen, "the build key must not close the catalogue under the guide");
+
+            _ui.HandleEscape();
+            Assert.IsFalse(_guide.IsOpen);
+            Assert.IsTrue(catalogue.IsOpen, "the catalogue is still showing");
+            Assert.IsTrue(_game.IsModalOpen, "the clock stays paused under the catalogue");
+        }
+
+        [Test]
         public void Show_ClearsSelection_AndHideRestoresIt()
         {
             var behind = UIFactory.Button("Behind", _canvas.transform, "Behind", Vector2.zero, Vector2.one);

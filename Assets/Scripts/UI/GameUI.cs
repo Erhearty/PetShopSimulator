@@ -214,8 +214,9 @@ namespace PetShop.UI
         internal void HandleEscape()
         {
             if (Settings != null && Settings.IsCapturing) return;   // Esc cancels the rebind only
-            if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
+            // The guide can open over Settings, so it closes first.
             if (Guide != null && Guide.IsOpen) { Guide.Hide(); return; }
+            if (Settings != null && Settings.IsOpen) { Settings.Hide(); return; }
             if (Journal != null && Journal.IsOpen) { Journal.Hide(); return; }
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
             if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using PetShop.Core;
 
 namespace PetShop.Shop
 {
@@ -19,6 +20,16 @@ namespace PetShop.Shop
         /// scene walls stood — and the whole room interior stays usable floor.
         /// </summary>
         private const int WallRingOffset = 1;
+
+        /// <summary>Name of each static corner-return filler built by <see cref="EnsureRoomWallCorners"/>.</summary>
+        public const string RoomWallCornerName = "RoomWallCorner";
+        /// <summary>Height of a corner filler, matching a wall piece.</summary>
+        private const float CornerFillerHeight = 3.2f;
+        /// <summary>Thickness of a corner filler, matching a wall piece.</summary>
+        private const float CornerFillerThickness = 0.24f;
+
+        /// <summary>Parent of the four corner fillers; null until <see cref="EnsureRoomWallCorners"/> runs.</summary>
+        private Transform _wallCorners;
 
         /// <summary>
         /// Lays the room's walls on every free cell of the wall ring (<see cref="RoomWallCells"/>) through
@@ -125,6 +136,34 @@ namespace PetShop.Shop
             {
                 var cell = new Vector2Int(x, y);
                 if (IsRoomWallCell(cell) && !_grid.HasFloor(cell)) _grid.SetFloor(cell, true);
+            }
+        }
+
+        /// <summary>
+        /// Builds, once, a static wall box at each corner of the wall ring that closes the strip between the
+        /// corner piece (a side wall, centred in its cell) and the first piece of the back or front row, which
+        /// starts at the cell edge. Not grid entries, so they stay whatever walls the player removes or re-places;
+        /// they sit under the NavMesh root on the non-interactable layer, so bakes treat them as walls.
+        /// </summary>
+        private void EnsureRoomWallCorners()
+        {
+            if (_wallCorners != null) return;
+            _wallCorners = new GameObject("RoomWallCorners").transform;
+            _wallCorners.SetParent(ShopRoot != null ? ShopRoot : transform, false);
+
+            RectInt ring = RoomWallCells();
+            float cs = GridManager.CellSize;
+            foreach (int x in new[] { ring.xMin, ring.xMax - 1 })
+            foreach (int y in new[] { ring.yMin, ring.yMax - 1 })
+            {
+                float inward = x == ring.xMin ? 1f : -1f;   // towards the row's first piece
+                var centre = new Vector3((x + 0.5f + inward * 0.25f) * cs, CornerFillerHeight * 0.5f, (y + 0.5f) * cs);
+                var filler = MeshBuilder.CreateBox(cs * 0.5f, CornerFillerHeight, CornerFillerThickness,
+                                                   MaterialFactory.Wall, RoomWallCornerName);
+                filler.transform.SetParent(_wallCorners, false);
+                filler.transform.SetPositionAndRotation(centre, Quaternion.Euler(0f, AlongXWallYaw, 0f));
+                filler.isStatic = true;
+                MeshBuilder.SetLayerRecursive(filler, FurnitureFactory.DecorationLayer);
             }
         }
 

@@ -160,6 +160,52 @@ namespace PetShop.Tests
             AssertNoUnexpectedErrors();
         }
 
+        /// <summary>
+        /// Each wall-ring corner is closed along the back/front row line by a static filler, even with the
+        /// corner piece removed, and the fillers are built once across reloads, re-seeding and lot-stage changes.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RoomWallCorners_ClosedOnBothRows_AndBuiltOnce()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game = PlaytestHarness.Game;
+            StartWatchingLogs();
+            AssertCornersClosed(game);
+
+            RectInt ring = game.Layout.RoomWallCells();
+            game.Build.RemoveAtWorldPos(game.Grid.GridToWorld(new Vector2Int(ring.xMin, ring.yMin)));
+            Reload(game, SaveAndRead(game));
+            game.Layout.SeedRoomWalls(game.Build);
+            game.Layout.ApplyLotStage(ShopLayout.StarterLotStage);
+            AssertCornersClosed(game);
+
+            int fillers = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None)
+                                .Count(t => t.name == ShopLayout.RoomWallCornerName);
+            Assert.AreEqual(4, fillers, "The corner fillers should exist exactly once each.");
+            AssertNoUnexpectedErrors();
+        }
+
+        /// <summary>
+        /// Asserts a collider fills the strip between each corner cell's piece (centred, 0.24 m thick) and
+        /// the cell edge where the adjacent row's first piece starts.
+        /// </summary>
+        private static void AssertCornersClosed(GameManager game)
+        {
+            Physics.SyncTransforms();
+            RectInt ring = game.Layout.RoomWallCells();
+            float cs = GridManager.CellSize;
+            foreach (int x in new[] { ring.xMin, ring.xMax - 1 })
+            foreach (int y in new[] { ring.yMin, ring.yMax - 1 })
+            {
+                Vector3 centre = game.Grid.GridToWorld(new Vector2Int(x, y));
+                float inward = x == ring.xMin ? 1f : -1f;
+                var gap = new Vector3(centre.x + inward * (0.12f + (cs * 0.5f - 0.12f) * 0.5f), 1f, centre.z);
+                bool hit = Physics.CheckBox(gap, new Vector3(0.3f, 0.5f, 0.05f), Quaternion.identity,
+                                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                Assert.IsTrue(hit, $"The wall corner at cell ({x},{y}) is open at {gap}.");
+            }
+        }
+
         /// <summary>The doorway piece on the room's wall ring.</summary>
         private static Vector2Int DoorwayWallCell(GameManager game)
         {

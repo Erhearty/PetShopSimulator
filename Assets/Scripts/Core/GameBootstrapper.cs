@@ -93,8 +93,9 @@ namespace PetShop.Core
         private void Update()
         {
             if (_game == null || _game.IsGameOver) return;
+            bool guideOpen = _ui != null && _ui.Guide != null && _ui.Guide.IsOpen;
             if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
-                                    InputBindings.GetKeyDown(GameAction.BuildMode))) return;
+                                    InputBindings.GetKeyDown(GameAction.BuildMode), guideOpen)) return;
             if (_ui != null && _ui.AnyModalOpen) return;
             // Number keys 1-9 belong to the inventory bar (place an owned piece); the build key
             // toggles the top-down build view.
@@ -117,12 +118,14 @@ namespace PetShop.Core
         /// <summary>
         /// While the catalogue is open it owns the keyboard: the build key toggles it shut. This is
         /// its only owner, so one press cannot close and reopen it in the same frame. True when the
-        /// catalogue was open and the frame's input is consumed.
+        /// catalogue was open and the frame's input is consumed. While the guide is open over it
+        /// (<paramref name="guideOpen"/>) the key is swallowed instead, so the guide closes back onto it.
         /// </summary>
-        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown)
+        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown,
+                                                 bool guideOpen = false)
         {
             if (catalogue == null || !catalogue.IsOpen) return false;
-            if (buildKeyDown) catalogue.Hide();
+            if (buildKeyDown && !guideOpen) catalogue.Hide();
             return true;
         }
 
