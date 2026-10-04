@@ -41,8 +41,8 @@ namespace PetShop.Shop
         public UnityEvent<GameObject>                   OnFurnitureDespawning   = new();
 
         /// <summary>
-        /// Pen species the player may pick with Q, as pen variant strings. Null or empty
-        /// leaves new pens on the factory default (Rabbit).
+        /// Pen species the player may pick with Q for the legacy <c>pet_pen</c>, as pen variant
+        /// strings. Per-species pens ignore it. Null or empty leaves the factory default (Rabbit).
         /// </summary>
         public Func<IReadOnlyList<string>> PenVariantSource;
 
@@ -92,7 +92,7 @@ namespace PetShop.Shop
             _rotation   = 0f;
             CreateGhost();
             OnBuildModeEntered.Invoke(item);
-            if (item.Type == PenType && _heldVariant == null) AnnouncePenVariant();
+            if (IsLegacyPen(item) && _heldVariant == null) AnnouncePenVariant();
         }
 
         /// <summary>Closes build mode; a held item goes back into the furniture inventory.</summary>
@@ -136,24 +136,25 @@ namespace PetShop.Shop
             var cell = GridManager.WorldToGrid(worldPos);
             if (IsHolding) { PlaceHeld(cell); return; }
 
-            if (!GridManager.CanPlace(cell, CurrentItem.Size))
-            {
-                OnBuildMessage.Invoke("Can't build there.");
-                return;
-            }
+            if (RefusePlacement(CurrentItem, cell, CurrentItem.Size)) return;
             if (Shop != null && Shop.Balance < CurrentItem.Cost)
             {
                 OnBuildMessage.Invoke($"Not enough money — {CurrentItem.DisplayName} costs €{CurrentItem.Cost:N0}.");
                 return;
             }
 
-            string variant = CurrentItem.Type == PenType ? CurrentPenVariant() : null;
-            Place(cell, CurrentItem, variant, _rotation, charge: true);
+            PrepareFloor(CurrentItem, cell, CurrentItem.Size);
+            string variant = IsLegacyPen(CurrentItem) ? CurrentPenVariant() : null;
+            AddStarterPair(Place(cell, CurrentItem, variant, _rotation, charge: true), CurrentItem);
         }
 
-        /// <summary>The species the next pen will hold, or null for the factory default.</summary>
+        /// <summary>
+        /// The species the next legacy pen will hold, or null for the factory default. Per-species
+        /// pens take their species from their id and save no variant.
+        /// </summary>
         private string CurrentPenVariant()
         {
+            if (!IsLegacyPen(CurrentItem)) return null;
             var options = PenVariantSource?.Invoke();
             if (options == null || options.Count == 0) return null;
             return options[_penVariantIndex % options.Count];
@@ -162,7 +163,7 @@ namespace PetShop.Shop
         /// <summary>Q: step to the next unlocked pen species and announce it.</summary>
         private void CyclePenVariant()
         {
-            if (CurrentItem == null || CurrentItem.Type != PenType) return;
+            if (!IsLegacyPen(CurrentItem)) return;
             var options = PenVariantSource?.Invoke();
             if (options == null || options.Count == 0) return;
 
@@ -232,6 +233,7 @@ namespace PetShop.Shop
             var def  = entry.Data;
             if (Supply != null) ReturnShelfStock(entry.Instance);
             if (!GridManager.RemoveObject(cell)) return;
+            ReleaseFloor(def, root, entry.Size);
 
             DespawnNode(root);
             string message = SettleRemoval(def);
@@ -254,7 +256,8 @@ namespace PetShop.Shop
             if (def == null) return "Removed.";
             if (Supply != null)
             {
-                Supply.AddOwned(def.Id);
+                if (def.Type == PenType) Supply.AddPacked(def.Id);
+                else                     Supply.AddOwned(def.Id);
                 return $"Packed {def.DisplayName} back into your furniture inventory.";
             }
             float refund = def.Cost * SellBackShare;
@@ -302,7 +305,9 @@ namespace PetShop.Shop
             worldPos = ray.origin + ray.direction * t;
 
             // Keep placement within arm's reach-ish, so looking at the horizon does not put
-            // furniture on the far side of the map.
+            // furniture on the far side of the map. The overhead build view aims with a free
+            // cursor at whatever is on screen, so it is not limited.
+            if (Cursor.lockState != CursorLockMode.Locked) return true;
             Vector3 from = _cam.transform.position; from.y = 0f;
             Vector3 flat = worldPos;                flat.y = 0f;
             if (Vector3.Distance(from, flat) > MaxPlacementDistance)

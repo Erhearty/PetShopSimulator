@@ -4,17 +4,15 @@ using PetShop.Shop;
 
 namespace PetShop.UI
 {
-    /// <summary>Construction of the catalogue's frame, tabs, item rows and footer.</summary>
+    /// <summary>Construction of the catalogue's balance line, tabs, item rows and footer.</summary>
     public partial class FurnitureCatalogPanel
     {
-        private static readonly Vector2 Centre   = new(0.5f, 0.5f);
-        private static readonly Vector2 HalfSize = new(480f, 320f);
-        private static readonly Color   DimColour = new(0.03f, 0.05f, 0.08f, 0.62f);
         /// <summary>Row backing: a shade lighter than the panel so rows read as separate.</summary>
         private static readonly Color   RowColour = new(0.11f, 0.14f, 0.19f, 0.96f);
 
-        private const float AccentHeight = 4f;
-        private const float HeaderFont   = 24f;
+        private const float BalanceLeft   = 0.60f;
+        private const float BalanceBottom = 0.88f;
+        private const float BalanceTop    = 0.98f;
         private const float NameFont     = 17f;
         private const float BodyFont     = 13f;
         private const float ButtonFont   = 15f;
@@ -31,21 +29,11 @@ namespace PetShop.UI
         private const float FooterBottom = 0.03f;
         private const float FooterTop    = 0.09f;
 
-        /// <summary>The dimmed backdrop, the panel and its header; returns the panel.</summary>
-        private Transform BuildFrame(Transform canvas)
+        /// <summary>The balance line above the category tabs; the host owns the header and Close.</summary>
+        private void BuildBalance(Transform page)
         {
-            _root = UIFactory.Panel("CatalogueDim", canvas, Vector2.zero, Vector2.one, DimColour);
-            var panel = UIFactory.Panel("Catalogue", _root.transform, Centre, Centre, UIFactory.PanelBg,
-                                        -HalfSize, HalfSize).transform;
-            UIFactory.Panel("Accent", panel, new Vector2(0f, 1f), Vector2.one, UIFactory.Accent,
-                            new Vector2(0f, -AccentHeight), Vector2.zero);
-            UIFactory.Label("Header", panel, "Furniture catalogue",
-                new Vector2(Left, 0.89f), new Vector2(0.52f, 0.97f), HeaderFont, UIFactory.Ink);
-            _balance = UIFactory.Label("Balance", panel, "", new Vector2(0.52f, 0.89f),
-                new Vector2(0.78f, 0.97f), ButtonFont, UIFactory.InkMuted, TextAlignmentOptions.Right);
-            UIFactory.Button("Close", panel, "Close", new Vector2(0.80f, 0.895f),
-                new Vector2(Right, 0.965f), ButtonFont).onClick.AddListener(Hide);
-            return panel;
+            _balance = UIFactory.Label("Balance", page, "", new Vector2(BalanceLeft, BalanceBottom),
+                new Vector2(Right, BalanceTop), ButtonFont, UIFactory.InkMuted, TextAlignmentOptions.Right);
         }
 
         private void BuildTabs(Transform panel)

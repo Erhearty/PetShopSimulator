@@ -53,6 +53,50 @@ namespace PetShop.Tests
         }
 
         [Test]
+        public void CanPlacePen_YardBesideShop_IsAllowedAtStarterStage()
+        {
+            _layout.FillFloorGrid(_grid);
+            var cell = new Vector2Int(-4, 0);
+            Assert.IsFalse(_grid.HasFloor(cell));
+            Assert.IsTrue(_layout.CanPlacePen(_grid, cell, new Vector2Int(2, 2)));
+        }
+
+        [Test]
+        public void CanPlacePen_RoomDoorwayOrOutsideYard_IsRefused()
+        {
+            Assert.IsFalse(_layout.CanPlacePen(_grid, new Vector2Int(-14, 0), new Vector2Int(2, 2)), "room");
+            Assert.IsFalse(_layout.CanPlacePen(_grid, new Vector2Int(-12, 5), Vector2Int.one), "doorway");
+            Assert.IsFalse(_layout.CanPlacePen(_grid, new Vector2Int(15, 0), new Vector2Int(2, 2)), "east edge");
+            Assert.IsFalse(_layout.CanPlacePen(_grid, new Vector2Int(0, -9), Vector2Int.one), "behind yard");
+        }
+
+        [Test]
+        public void CanPlacePen_OccupiedCell_IsRefused()
+        {
+            var cell = new Vector2Int(2, 2);
+            _grid.EnsureFloor(cell, Vector2Int.one);
+            Assert.IsTrue(_grid.PlaceObject(cell, new PlacedObjectData { Id = "x" }, Vector2Int.one));
+            Assert.IsFalse(_layout.CanPlacePen(_grid, new Vector2Int(1, 1), new Vector2Int(2, 2)));
+            Assert.IsTrue(_layout.CanPlacePen(_grid, new Vector2Int(3, 3), new Vector2Int(2, 2)));
+        }
+
+        [Test]
+        public void ReleasePenFloor_DropsFloorOutsideUnlockedLot_KeepsLotFloor()
+        {
+            _layout.FillFloorGrid(_grid);
+            var yardCell = new Vector2Int(-4, 0);
+            var lotCell  = new Vector2Int(-10, 0);
+            _grid.EnsureFloor(yardCell, new Vector2Int(2, 2));
+
+            _layout.ReleasePenFloor(_grid, yardCell, new Vector2Int(2, 2));
+            _layout.ReleasePenFloor(_grid, lotCell, Vector2Int.one);
+
+            Assert.IsFalse(_grid.HasFloor(yardCell), "yard cell outside the starter lot");
+            Assert.IsFalse(_grid.CanPlace(yardCell, Vector2Int.one), "no other furniture there");
+            Assert.IsTrue(_grid.HasFloor(lotCell), "starter lot keeps its floor");
+        }
+
+        [Test]
         public void ApplyLotStage_OnlyGrows()
         {
             _layout.FillFloorGrid(_grid);

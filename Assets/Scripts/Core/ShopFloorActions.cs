@@ -224,7 +224,7 @@ namespace PetShop.Core
 
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
-        /// it just opens the books.
+        /// it does nothing.
         /// </summary>
         public void UseCounter()
         {
@@ -234,53 +234,18 @@ namespace PetShop.Core
                 _game.Notify("The next customer is still on their way to the till.");
                 return;
             }
-            if (queue != null && queue.AnyWaiting)
-            {
-                var shopper = queue.NextReady;
-                float value = shopper.BasketValue;
-                int   items = shopper.BasketCount;
+            if (queue == null || !queue.AnyWaiting) return;
 
-                queue.ServeFront();
-                _game.Audio?.PlaySfx("sale");
-                _game.Notify($"Served {shopper.ShopperName} — {items} item(s), €{value:N2}");
+            var shopper = queue.NextReady;
+            float value = shopper.BasketValue;
+            int   items = shopper.BasketCount;
 
-                if (queue.AnyWaiting)
-                    _game.Notify($"{queue.Length} still waiting (€{queue.WaitingValue:N0}).");
-                return;
-            }
+            queue.ServeFront();
+            _game.Audio?.PlaySfx("sale");
+            _game.Notify($"Served {shopper.ShopperName} — {items} item(s), €{value:N2}");
 
-            OpenShopSummary();
-        }
-
-        public void OpenShopSummary()
-        {
-            var shop = _game.Shop;
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Day {shop.Day}   ·   Balance €{shop.Balance:N2}   ·   Rep {shop.Reputation:0}/100");
-            sb.AppendLine($"Rent due tonight: €{shop.DailyRent:N2}");
-            sb.AppendLine($"Prices at {shop.PriceMultiplier * 100f:0}% — demand {shop.DemandFactor * 100f:0}%");
-            sb.AppendLine($"Shelves: {_game.Shelves.Count}   Pens: {_game.Pens.Count}");
-            sb.AppendLine();
-
-            if (shop.TodaysSales.Count == 0)
-            {
-                sb.AppendLine("No sales yet today.");
-            }
-            else
-            {
-                sb.AppendLine("Today's sales:");
-                float total = 0f;
-                int shown = 0;
-                foreach (var s in shop.TodaysSales)
-                {
-                    total += s.Revenue;
-                    if (shown++ < 8) sb.AppendLine($"  {s.Label}  €{s.Revenue:0.00}");
-                }
-                if (shop.TodaysSales.Count > 8) sb.AppendLine($"  ... and {shop.TodaysSales.Count - 8} more");
-                sb.AppendLine($"  Total: €{total:N2}");
-            }
-            _game.OnInfoPanel.Invoke(sb.ToString().TrimEnd());
-            _game.Audio?.PlaySfx("click");
+            if (queue.AnyWaiting)
+                _game.Notify($"{queue.Length} still waiting (€{queue.WaitingValue:N0}).");
         }
     }
 }

@@ -42,6 +42,7 @@ namespace PetShop.Pets
         private readonly List<PetVisual>  _visuals   = new();
         private Transform  _visualRoot;
         private Transform  _upkeepRoot;
+        private Transform  _stallRoot;
         private WorldLabel _signLabel;
         private Transform  _foodBar;
         private Transform  _cleanBar;
@@ -301,9 +302,11 @@ namespace PetShop.Pets
             _visuals.Clear();
 
             RefreshUpkeepVisuals();
+            RefreshStalls();
             RefreshLabel();
 
-            float inner = PenSize * 0.5f - 0.35f;
+            float stall = PenSize / StallCols;
+            float inner = stall;
             for (int i = 0; i < _residents.Count; i++)
             {
                 Pet pet    = _residents[i];
@@ -316,7 +319,8 @@ namespace PetShop.Pets
                 MeshBuilder.SetLayerRecursive(go, gameObject.layer);
 
                 var wander = go.AddComponent<PetVisual>();
-                wander.Init(SlotPos(i, inner), inner, 0.25f + pet.energyLevel * 0.6f);
+                // Each pet roams only its own stall, so the pen reads as individual enclosures.
+                wander.Init(SlotPos(i, PenSize), stall * 0.5f, 0.25f + pet.energyLevel * 0.6f);
                 _visuals.Add(wander);
 
                 // Animated species get their walk cycle driven from the wander speed.
@@ -432,11 +436,70 @@ namespace PetShop.Pets
             return paths.ToArray();
         }
 
-        private static Vector3 SlotPos(int i, float inner)
+        private const int StallCols = 2;
+
+        /// <summary>Centre of stall <paramref name="i"/>: a grid of equal cells across the pen.</summary>
+        private static Vector3 SlotPos(int i, float penSize)
         {
-            const int cols = 2;
-            float step = inner;
-            return new Vector3(((i % cols) - 0.5f) * step, 0.03f, ((i / cols) - 0.5f) * step);
+            float step = penSize / StallCols;
+            return new Vector3(((i % StallCols) - (StallCols - 1) * 0.5f) * step, 0.03f,
+                               ((i / StallCols) - (StallCols - 1) * 0.5f) * step);
+        }
+
+        /// <summary>
+        /// Low dividers split the pen into one stall per slot, each with its own straw bed; an
+        /// occupied stall also carries a small name plaque. Rebuilt whenever the pen changes.
+        /// </summary>
+        private void RefreshStalls()
+        {
+            if (_stallRoot == null)
+            {
+                _stallRoot = new GameObject("Stalls").transform;
+                _stallRoot.SetParent(transform, false);
+            }
+            for (int i = _stallRoot.childCount - 1; i >= 0; i--)
+            {
+                var child = _stallRoot.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
+            }
+
+            const float dividerH = 0.3f, dividerT = 0.05f;
+            var fence = MaterialFactory.PenFence;
+            var straw = MaterialFactory.Get("pen_straw", new Color(0.86f, 0.74f, 0.42f), 0f, 0.1f);
+            float stall = PenSize / StallCols;
+
+            for (int c = 1; c < StallCols; c++)
+            {
+                float off = -PenSize * 0.5f + stall * c;
+                var vert = MeshBuilder.CreateBox(dividerT, dividerH, PenSize, fence, "StallDividerX");
+                vert.transform.SetParent(_stallRoot, false);
+                vert.transform.localPosition = new Vector3(off, dividerH * 0.5f, 0f);
+                MeshBuilder.StripColliders(vert);
+
+                var horiz = MeshBuilder.CreateBox(PenSize, dividerH, dividerT, fence, "StallDividerZ");
+                horiz.transform.SetParent(_stallRoot, false);
+                horiz.transform.localPosition = new Vector3(0f, dividerH * 0.5f, off);
+                MeshBuilder.StripColliders(horiz);
+            }
+
+            for (int i = 0; i < Capacity; i++)
+            {
+                Vector3 centre = SlotPos(i, PenSize);
+                var bed = MeshBuilder.CreateBox(stall * 0.82f, 0.02f, stall * 0.82f, straw, "StallBed");
+                bed.transform.SetParent(_stallRoot, false);
+                bed.transform.localPosition = new Vector3(centre.x, 0.05f, centre.z);
+                MeshBuilder.StripColliders(bed);
+
+                if (i < _residents.Count)
+                {
+                    var pet = _residents[i];
+                    var plaque = WorldLabel.Create(_stallRoot, new Vector3(centre.x, 0.62f, centre.z),
+                                                   pet.DisplayName(), 0.055f, UIFactory.Ink, width: stall);
+                    plaque.SetColour(RarityColour(pet.rarity));
+                }
+            }
+            MeshBuilder.SetLayerRecursive(_stallRoot.gameObject, gameObject.layer);
         }
     }
 

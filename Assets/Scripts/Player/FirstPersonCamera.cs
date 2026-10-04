@@ -38,7 +38,8 @@ namespace PetShop.Player
 
         private static bool CursorFree =>
             GameManager.Instance != null &&
-            (GameManager.Instance.IsModalOpen || GameManager.Instance.IsGameOver);
+            (GameManager.Instance.IsModalOpen || GameManager.Instance.IsBuildViewActive ||
+             GameManager.Instance.IsGameOver);
 
         private void Start()
         {
@@ -51,6 +52,9 @@ namespace PetShop.Player
             _targetYaw = Yaw = Body.eulerAngles.y;
             ApplyCursor();
         }
+
+        /// <summary>Back from the build view: hide the body from the eyes again.</summary>
+        private void OnEnable() => SetBodyVisible(false);
 
         private void OnDisable()
         {

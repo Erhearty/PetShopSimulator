@@ -34,15 +34,4 @@ Projected from `schema` widgets on the architecture canvas.
 | `EventSeed` | int |  | Seed for deterministic daily event rolls |
 | `ActiveEventId` | string |  | None\|SupplierSale\|Heatwave\|StreetFestival |
 | `EventDaysLeft` | int |  | Days remaining for the active event |
-| `CurrentVersion` | int | - | = 5 (SaveMigrator.cs). SaveMigrator.Migrate upgrades older saves 0->5 in memory via a step chain; they are not discarded |
-| `FurnitureInventory` | List<StockEntry> | - | Owned unplaced furniture |
-| `PendingFurnitureOrders` | List<FurnitureOrderSave> | - | catalogId, arrivalProgress, arrived |
-| `Quests` | QuestProgress | - | CompletedIds, Chapter, Flags |
-| `LifetimeRevenue / BestDayProfit` | number | - | Lifetime stats |
-| `SpeciesSold / PetsBred / InspectionsPassed / BestInspectionGrade` | stats | - | Lifetime stats |
-| `PlacedItem.footprintRotated` | bool | - | Furniture footprint rotation |
-| `PetSaveData (pet fields)` | object | - | species, petName, growthStage, rarity, coat_r/g/b, temperament, energyLevel, friendliness, ageDays, daysToMature, basePrice |
-| `Lineage` | List<LineageEntrySave> | - | Corrects earlier type |
-| `AutoReorder` | List<ReorderRuleSave> | - | Corrects earlier type |
-| `ActiveEventId` | string | - | Defaults to "None"; values come from ShopEventKind |
 <!-- generated:end comp:local-save-file -->

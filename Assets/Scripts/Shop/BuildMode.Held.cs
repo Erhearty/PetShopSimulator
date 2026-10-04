@@ -67,7 +67,7 @@ namespace PetShop.Shop
             if (Supply.OwnedCount(catalogId) + heldSame <= 0) return false;
 
             ReturnHeld();
-            if (!Supply.TakeOwned(catalogId)) return false;
+            if (!Supply.TakeOwned(catalogId, out _heldPacked)) return false;
             IsHolding    = true;
             _heldVariant = variant;
             BeginMode(def);
@@ -84,14 +84,13 @@ namespace PetShop.Shop
             if (!IsHolding || CurrentItem == null) return null;
             var  def     = CurrentItem;
             bool swapped = SwapsFootprint(_rotation);
-            if (!GridManager.CanPlace(cell, FootprintSize(def, swapped)))
-            {
-                OnBuildMessage.Invoke("Can't build there.");
-                return null;
-            }
+            Vector2Int size = FootprintSize(def, swapped);
+            if (RefusePlacement(def, cell, size)) return null;
+            PrepareFloor(def, cell, size);
 
             var go = Place(cell, def, HeldVariant(), _rotation, charge: false, footprintRotated: swapped);
             if (go == null && !GridManager.TryGetObject(cell, out _)) return null;
+            if (!_heldPacked) AddStarterPair(go, def);
             IsHolding = false;
             TakeNextOrExit(def);
             return go;
@@ -144,14 +143,20 @@ namespace PetShop.Shop
         private Vector2Int ActiveFootprint =>
             IsHolding ? FootprintSize(CurrentItem, SwapsFootprint(_rotation)) : CurrentItem.Size;
 
-        /// <summary>The variant a held item is placed with: the one chosen, else the Q pen pick.</summary>
-        private string HeldVariant() =>
-            _heldVariant ?? (CurrentItem.Type == PenType ? CurrentPenVariant() : null);
+        /// <summary>
+        /// The variant a held item is placed with: the one chosen, else the Q pick for the legacy
+        /// pen. Per-species pens carry no variant.
+        /// </summary>
+        private string HeldVariant()
+        {
+            if (CurrentItem.Type != PenType) return _heldVariant;
+            return IsLegacyPen(CurrentItem) ? _heldVariant ?? CurrentPenVariant() : null;
+        }
 
         /// <summary>Takes the next unit of the same id into the hand, or closes build mode.</summary>
         private void TakeNextOrExit(PlacedObjectData def)
         {
-            if (Supply != null && Supply.TakeOwned(def.Id))
+            if (Supply != null && Supply.TakeOwned(def.Id, out _heldPacked))
             {
                 IsHolding = true;
                 ShowHeldView();
@@ -167,7 +172,12 @@ namespace PetShop.Shop
         {
             if (!IsHolding) return;
             IsHolding = false;
-            if (Supply != null && CurrentItem != null) Supply.AddOwned(CurrentItem.Id);
+            if (Supply != null && CurrentItem != null)
+            {
+                if (_heldPacked) Supply.AddPacked(CurrentItem.Id);
+                else             Supply.AddOwned(CurrentItem.Id);
+            }
+            _heldPacked  = false;
             _heldVariant = null;
             HideHeldView();
         }

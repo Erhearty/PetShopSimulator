@@ -50,27 +50,27 @@ namespace PetShop.Progression.Quests
         private static readonly string Ledger   = QuestDefinition.KeyToken(GameAction.Ledger);
         private static readonly string EndDay   = QuestDefinition.KeyToken(GameAction.EndDay);
 
-        private static readonly string OpenCatalogue = $"press {Build} (or 1-{BuildCatalog.HotkeyOrder.Length})";
+        private static readonly string OpenCatalogue = $"press {Ledger}";
 
         private static readonly QuestDefinition[] Tutorial =
         {
-            new("tut_open_catalogue", QuestChapter.Tutorial, "Open the furniture catalogue",
-                $"Your shop is empty. Press {Build} (or a number key 1-{BuildCatalog.HotkeyOrder.Length}) to open the furniture catalogue.",
+            new("tut_open_catalogue", QuestChapter.Tutorial, "Open the Build tab",
+                $"Your shop is empty. Press {Ledger} to open the ledger and click its Build tab to see the furniture.",
                 TutorialStepReward, c => c.CatalogueOpened),
             new("tut_order_counter", QuestChapter.Tutorial, "Order a counter",
-                "In the catalogue, find the Counter row and click Order. It arrives as a crate on the forecourt.",
+                "In the Build tab, find the Counter row and click Order. It arrives as a crate on the forecourt.",
                 TutorialStepReward, c => c.Acquired(BuildCatalog.Counter) >= One),
             new("tut_collect_crate", QuestChapter.Tutorial, "Collect the crate",
                 $"Walk to the delivery crate on the forecourt and press {Interact} to unpack it.",
                 TutorialStepReward, c => c.CrateCollected),
             new("tut_place_counter", QuestChapter.Tutorial, "Place the counter",
-                $"Open the catalogue ({OpenCatalogue}), click Place on the Counter row, then left-click the floor to set it down. {Rotate} rotates.",
+                $"Open the ledger's Build tab ({OpenCatalogue}), click Place on the Counter row, then left-click the floor to set it down. {Rotate} rotates; {Build} leaves the build view.",
                 TutorialStepReward, c => c.Placed(BuildCatalog.Counter) >= One),
             new("tut_order_shelf", QuestChapter.Tutorial, "Order a shelf",
-                $"Open the catalogue ({OpenCatalogue}) and click Order on the Small Shelf row.",
+                $"Open the ledger's Build tab ({OpenCatalogue}) and click Order on the Small Shelf row.",
                 TutorialStepReward, c => c.Acquired(BuildCatalog.ShelfSmall) + c.Acquired(BuildCatalog.ShelfLarge) >= One),
             new("tut_place_shelf", QuestChapter.Tutorial, "Place the shelf",
-                $"Unpack the shelf's crate with {Interact}, then open the catalogue ({OpenCatalogue}), click Place on the shelf row and left-click the floor.",
+                $"Unpack the shelf's crate with {Interact}, then open the ledger's Build tab ({OpenCatalogue}), click Place on the shelf row and left-click the floor.",
                 TutorialStepReward, c => c.PlacedOfType(ShelfType) >= One),
             new("tut_order_stock", QuestChapter.Tutorial, "Order stock",
                 $"Press {Ledger} to open the ledger, open its Catalogue tab and click one of the Order buttons. Restock a shelf with {Interact}.",
@@ -86,12 +86,12 @@ namespace PetShop.Progression.Quests
         private static readonly QuestDefinition[] Early =
         {
             new("early_three_shelves", QuestChapter.Early, $"Own {EarlyShelfTarget} shelves",
-                $"Order shelves in the catalogue ({OpenCatalogue}), unpack each crate with {Interact} and place them.",
+                $"Order shelves in the ledger's Build tab ({OpenCatalogue}), unpack each crate with {Interact} and place them.",
                 EarlyReward, c => c.PlacedOfType(ShelfType) >= EarlyShelfTarget,
                 c => (c.PlacedOfType(ShelfType), EarlyShelfTarget)),
             new("early_first_pen", QuestChapter.Early, "Open a pet corner",
-                $"Order a Pet Pen in the catalogue ({OpenCatalogue}), unpack it with {Interact} and place it. Press Q while placing to pick the species.",
-                EarlyReward, c => c.Placed(BuildCatalog.PetPen) >= One),
+                $"Order a pen in the ledger's Build tab ({OpenCatalogue}) — each species has its own — unpack it with {Interact} and place it in the yard. It comes with a breeding pair.",
+                EarlyReward, c => c.PlacedOfType(BuildCatalog.PenType) >= One),
             new("early_first_pet_sale", QuestChapter.Early, "Sell a pet",
                 $"Walk up to a pen and press {Interact} to buy an animal for it. Customers will buy it from the pen.",
                 EarlyReward, c => c.SpeciesSoldCount >= One),
@@ -113,7 +113,7 @@ namespace PetShop.Progression.Quests
         private static readonly QuestDefinition[] Mid =
         {
             new("mid_back_strip", QuestChapter.Mid, "Build on the back strip",
-                $"Open the catalogue ({OpenCatalogue}) and place any furniture on the newly opened strip behind the shop.",
+                $"Open the ledger's Build tab ({OpenCatalogue}) and place any furniture on the newly opened strip behind the shop.",
                 MidReward, c => c.HighestPlacedLotStage >= ProgressionRules.BackStripLotStage),
             new("mid_pass_inspection", QuestChapter.Mid, "Pass an inspection",
                 $"The inspector calls every {InspectorGrader.InspectionIntervalDays} days. Feed and clean pens ({Interact} at a pen) and keep shelves stocked to earn an A or B.",
@@ -122,7 +122,7 @@ namespace PetShop.Progression.Quests
                 $"Press {Ledger}, open the Animals tab, click 'Plan tonight's breeding' to pair two animals, then close the day ({EndDay}).",
                 MidReward, c => c.PetsBred >= One),
             new("mid_species", QuestChapter.Mid, $"Sell {MidSpeciesTarget} different species",
-                $"Place pens for different species (Q while placing picks the species) and stock them with {Interact}.",
+                $"Place pens for different species (each has its own pen in the Build tab) and stock them with {Interact}.",
                 MidReward, c => c.SpeciesSoldCount >= MidSpeciesTarget,
                 c => (c.SpeciesSoldCount, MidSpeciesTarget)),
             new("mid_staff", QuestChapter.Mid, $"Employ {MidStaffTarget} staff",
@@ -141,7 +141,7 @@ namespace PetShop.Progression.Quests
         private static readonly QuestDefinition[] End =
         {
             new("end_sell_horse", QuestChapter.End, "Sell a horse",
-                $"Place a Pet Pen ({OpenCatalogue}), press Q while placing to pick Horse, then buy a horse for it with {Interact}.",
+                $"Order a horse pen in the ledger's Build tab ({OpenCatalogue}), place it in the yard and sell one of its horses.",
                 EndReward, c => c.HasSold(Pet.Species.Horse)),
             new("end_grade_a", QuestChapter.End, "Earn an A from the inspector",
                 $"Before an inspection day, feed and clean every pen ({Interact}) and fill every shelf.",
@@ -154,10 +154,10 @@ namespace PetShop.Progression.Quests
                 $"Raise reputation to {ProgressionRules.TownLandmarkReputation:0}. Check it in the ledger ({Ledger}).",
                 EndReward, c => c.Tier >= ProgressionRules.TownLandmarkTier),
             new("end_full_yard", QuestChapter.End, "Build in the yard",
-                $"Open the catalogue ({OpenCatalogue}) and place furniture in the whole yard, unlocked at {ProgressionRules.TownLandmarkName}.",
+                $"Open the ledger's Build tab ({OpenCatalogue}) and place furniture in the whole yard, unlocked at {ProgressionRules.TownLandmarkName}.",
                 EndReward, c => c.HighestPlacedLotStage >= ProgressionRules.FullYardLotStage),
             new("end_sell_tiger", QuestChapter.End, "Sell a tiger",
-                $"Place a Pet Pen ({OpenCatalogue}), press Q while placing to pick Tiger, then buy a tiger for it with {Interact}.",
+                $"Order a tiger pen in the ledger's Build tab ({OpenCatalogue}), place it in the yard and sell one of its tigers.",
                 EndReward, c => c.HasSold(Pet.Species.Tiger)),
         };
 

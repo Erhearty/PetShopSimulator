@@ -24,8 +24,8 @@ namespace PetShop.UI
         private const float FontMin = 10f;
 
         private static readonly Vector2 TopLeft     = new(0f, 1f);
-        /// <summary>Height of the full-width status bar built by ShopHUD.BuildStatusBar (offset y -54).</summary>
-        private const float StatusBarHeight = 54f;
+        /// <summary>Height of the full-width status bar built by ShopHUD.BuildStatusBar (floating cards, bottom edge at y -86).</summary>
+        private const float StatusBarHeight = 88f;
         private const float BelowBarMargin  = 6f;
         private const float PanelHeight     = 128f;
         private const float PanelTop        = -(StatusBarHeight + BelowBarMargin);

@@ -26,14 +26,15 @@ namespace PetShop.Shop
     /// </summary>
     public sealed class FurnitureSupply
     {
-        /// <summary>Earliest delivery, as a fraction of a trading day after ordering.</summary>
-        public const float MinDeliveryDelay = 0.10f;
-        /// <summary>Latest delivery, as a fraction of a trading day after ordering.</summary>
-        public const float MaxDeliveryDelay = 0.22f;
+        /// <summary>Real seconds from ordering until the crate is on the forecourt.</summary>
+        public const float DeliverySeconds = 15f;
+        /// <summary>Day length assumed when no GameManager exists.</summary>
+        public const float FallbackDayLengthSeconds = 540f;
         /// <summary>Last point in the day a van can still arrive; later orders land just before close.</summary>
         public const float LatestArrival = 0.97f;
 
         private readonly Dictionary<string, int> _owned   = new();
+        private readonly Dictionary<string, int> _packed  = new();
         private readonly List<FurnitureOrder>    _pending = new();
 
         /// <summary>Raised when an order's crate lands on the forecourt.</summary>
@@ -50,6 +51,12 @@ namespace PetShop.Shop
         public int OwnedCount(string id) => id != null && _owned.TryGetValue(id, out int n) ? n : 0;
 
         /// <summary>
+        /// How many of the owned <paramref name="id"/> were packed away after being placed, rather
+        /// than delivered fresh. Never more than <see cref="OwnedCount"/>.
+        /// </summary>
+        public int PackedCount(string id) => id != null && _packed.TryGetValue(id, out int n) ? n : 0;
+
+        /// <summary>
         /// Orders one <paramref name="id"/>, charging its catalogue price now. Null when the id is
         /// unknown or the shop cannot afford it.
         /// </summary>
@@ -62,12 +69,28 @@ namespace PetShop.Shop
             var order = new FurnitureOrder
             {
                 CatalogId       = id,
-                ArrivalProgress = Mathf.Min(LatestArrival,
-                    dayProgressNow + UnityEngine.Random.Range(MinDeliveryDelay, MaxDeliveryDelay)),
+                ArrivalProgress = ArrivalProgressFor(dayProgressNow),
             };
             _pending.Add(order);
             OnChanged?.Invoke();
             return order;
+        }
+
+        /// <summary>Real seconds in a trading day right now.</summary>
+        public static float CurrentDayLengthSeconds()
+        {
+            var game = GameManager.Instance;
+            return game != null && game.DayLengthSeconds > 0f ? game.DayLengthSeconds : FallbackDayLengthSeconds;
+        }
+
+        /// <summary>
+        /// Day progress at which the arrival event should fire for an order placed at <paramref name="dayProgressNow"/>:
+        /// <see cref="DeliverySeconds"/> later, less the truck's estimated drive so the crate lands on time.
+        /// </summary>
+        public static float ArrivalProgressFor(float dayProgressNow)
+        {
+            float lead = Mathf.Max(0f, DeliverySeconds - PetShop.Traffic.DeliveryTruck.EstimatedDriveSeconds);
+            return Mathf.Min(LatestArrival, dayProgressNow + lead / CurrentDayLengthSeconds());
         }
 
         /// <summary>Lands every in-transit order whose arrival time has passed.</summary>
@@ -115,14 +138,42 @@ namespace PetShop.Shop
             OnChanged?.Invoke();
         }
 
-        /// <summary>Takes one <paramref name="id"/> out of the inventory. False when none is owned.</summary>
-        public bool TakeOwned(string id)
+        /// <summary>
+        /// Puts one placed <paramref name="id"/> that was packed away back into the inventory,
+        /// remembered as packed so re-placing it ships nothing new with it.
+        /// </summary>
+        public void AddPacked(string id)
         {
+            if (string.IsNullOrEmpty(id)) return;
+            _packed[id] = PackedCount(id) + 1;
+            AddOwned(id);
+        }
+
+        /// <summary>Takes one <paramref name="id"/> out of the inventory. False when none is owned.</summary>
+        public bool TakeOwned(string id) => TakeOwned(id, out _);
+
+        /// <summary>
+        /// Takes one <paramref name="id"/> out of the inventory, a packed-away unit first when there
+        /// is one; <paramref name="packed"/> says which kind it was. False when none is owned.
+        /// </summary>
+        public bool TakeOwned(string id, out bool packed)
+        {
+            packed = false;
             int n = OwnedCount(id);
             if (n <= 0) return false;
             if (n == 1) _owned.Remove(id);
             else        _owned[id] = n - 1;
+            packed = Decrement(_packed, id);
             OnChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>Lowers <paramref name="id"/>'s count in <paramref name="counts"/> by one; false when it had none.</summary>
+        private static bool Decrement(Dictionary<string, int> counts, string id)
+        {
+            if (!counts.TryGetValue(id, out int n) || n <= 0) return false;
+            if (n == 1) counts.Remove(id);
+            else        counts[id] = n - 1;
             return true;
         }
 
@@ -130,6 +181,7 @@ namespace PetShop.Shop
         public void Clear()
         {
             _owned.Clear();
+            _packed.Clear();
             _pending.Clear();
             OnChanged?.Invoke();
         }
@@ -142,6 +194,11 @@ namespace PetShop.Shop
             data.FurnitureInventory.Clear();
             foreach (var kvp in _owned)
                 data.FurnitureInventory.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
+
+            data.PackedFurniture ??= new List<SaveData.StockEntry>();
+            data.PackedFurniture.Clear();
+            foreach (var kvp in _packed)
+                data.PackedFurniture.Add(new SaveData.StockEntry { id = kvp.Key, qty = kvp.Value });
 
             data.PendingFurnitureOrders.Clear();
             foreach (var o in _pending)
@@ -157,15 +214,32 @@ namespace PetShop.Shop
         public void Restore(SaveData data)
         {
             _owned.Clear();
+            _packed.Clear();
             _pending.Clear();
             foreach (var e in data.FurnitureInventory ?? new List<SaveData.StockEntry>())
                 if (e != null && IsKnown(e.id) && e.qty > 0) _owned[e.id] = OwnedCount(e.id) + e.qty;
+            RestorePacked(data.PackedFurniture);
 
             foreach (var o in data.PendingFurnitureOrders ?? new List<SaveData.FurnitureOrderSave>())
                 if (o != null && IsKnown(o.catalogId))
                     _pending.Add(new FurnitureOrder
                         { CatalogId = o.catalogId, ArrivalProgress = o.arrivalProgress, Arrived = o.arrived });
             OnChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Restores the packed-away counts, each capped at what is owned. A save from before packed
+        /// counts existed has none, so everything it owns counts as fresh.
+        /// </summary>
+        private void RestorePacked(List<SaveData.StockEntry> packed)
+        {
+            if (packed == null) return;
+            foreach (var e in packed)
+            {
+                if (e == null || e.qty <= 0) continue;
+                int n = Mathf.Min(OwnedCount(e.id), PackedCount(e.id) + e.qty);
+                if (n > 0) _packed[e.id] = n;
+            }
         }
 
         /// <summary>True when <paramref name="id"/> is in the catalogue; warns about a dropped save entry otherwise.</summary>

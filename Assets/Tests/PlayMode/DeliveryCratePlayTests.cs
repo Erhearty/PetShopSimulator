@@ -38,6 +38,49 @@ namespace PetShop.Tests
         }
 
         [UnityTest]
+        public IEnumerator SpawnedCrates_AreOnInteractLayer_AndHitBySphereCast()
+        {
+            var stock = DeliveryCrate.Spawn(new Vector3(0f, 0f, 3f), Category, Units);
+            var furn  = DeliveryCrate.SpawnFurniture(new Vector3(10f, 0f, 3f),
+                new FurnitureOrder { CatalogId = BuildCatalog.Counter, Arrived = true });
+            yield return null;
+            Physics.SyncTransforms();
+
+            foreach (var c in new[] { stock, furn })
+            {
+                foreach (var t in c.GetComponentsInChildren<Transform>())
+                    Assert.AreEqual(GameLayers.Furniture, t.gameObject.layer);
+
+                Vector3 origin = c.transform.position + new Vector3(0f, 0.3f, -3f);
+                Assert.IsTrue(Physics.SphereCast(origin, 0.5f, Vector3.forward, out var hit, 2.6f,
+                                  GameLayers.InteractMask, QueryTriggerInteraction.Ignore));
+                Assert.AreSame(c, hit.collider.GetComponentInParent<DeliveryCrate>());
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator InteractionSystem_TryInteract_CollectsStockPallet()
+        {
+            var game = new GameObject("GameManager").AddComponent<GameManager>();
+            game.Shop = _shop;
+            var player = new GameObject("player").AddComponent<PetShop.Player.InteractionSystem>();
+            player.EyeHeight = 0.3f;
+            var crate = DeliveryCrate.Spawn(new Vector3(0f, 0f, 2f), Category, Units);
+            yield return null;
+            Physics.SyncTransforms();
+
+            int before = _shop.Warehouse(Category);
+            player.TryInteract();
+            yield return null;
+
+            Assert.AreEqual(before + Units, _shop.Warehouse(Category));
+            Assert.IsTrue(crate == null, "the pallet is collected");
+
+            Object.DestroyImmediate(player.gameObject);
+            Object.DestroyImmediate(game.gameObject);
+        }
+
+        [UnityTest]
         public IEnumerator StockPallet_Collect_AddsUnitsToStockroom()
         {
             int before = _shop.Warehouse(Category);

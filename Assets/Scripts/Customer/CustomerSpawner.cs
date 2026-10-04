@@ -27,7 +27,6 @@ namespace PetShop.Customer
         [Header("Tuning")]
         public float FirstCustomerDelay  = 2f;
         public float BaseIntervalSeconds = 11f;
-        public float MinIntervalSeconds  = 3.5f;
         public int   MaxCustomersPerDay  = 18;
         public int   MinCustomersPerDay  = 3;
         public int   MaxConcurrent       = 8;
@@ -43,6 +42,13 @@ namespace PetShop.Customer
         [Min(0f)] public float RareCollectorPerReputation = CustomerProfile.DefaultRareCollectorReputationBonus;
         [Tooltip("Relative weight of parents bringing a child.")]
         [Min(0f)] public float ParentWithChildWeight = CustomerProfile.DefaultParentWithChildWeight;
+
+        /// <summary>Fewest in-game minutes between two customers arriving.</summary>
+        public const float GameMinutesBetweenCustomers = 30f;
+        /// <summary>In-game minutes in one trading day (09:00 to 18:00).</summary>
+        private const float GameMinutesPerDay = 540f;
+        /// <summary>Day length used when there is no GameManager, in real seconds.</summary>
+        private const float FallbackDayLengthSeconds = 540f;
 
         /// <summary>A child is drawn at this fraction of adult height.</summary>
         private const float ChildHeightScale = 0.6f;
@@ -83,6 +89,18 @@ namespace PetShop.Customer
         public static bool CanTrade(bool hasCounter, int shelfCount, int penCount) =>
             hasCounter && (shelfCount > 0 || penCount > 0);
 
+        /// <summary>
+        /// Real seconds between customers at the minimum gap of
+        /// <see cref="GameMinutesBetweenCustomers"/> game minutes, for a day lasting
+        /// <paramref name="dayLengthSeconds"/> real seconds.
+        /// </summary>
+        public static float MinGapSeconds(float dayLengthSeconds) =>
+            dayLengthSeconds * GameMinutesBetweenCustomers / GameMinutesPerDay;
+
+        /// <summary>The current day length, or the 540 s default without a GameManager.</summary>
+        private static float CurrentDayLengthSeconds() =>
+            GameManager.Instance != null ? GameManager.Instance.DayLengthSeconds : FallbackDayLengthSeconds;
+
         /// <summary>Whether the furniture currently placed lets the shop trade.</summary>
         public bool CanTradeNow => CanTrade(HasCounter, Shelves.Count, PetPens.Count);
 
@@ -117,7 +135,8 @@ namespace PetShop.Customer
 
             if (LiveCustomers >= MaxConcurrent) return;
 
-            float interval = Mathf.Max(MinIntervalSeconds,
+            // The minimum gap is a floor applied after the event multiplier.
+            float interval = Mathf.Max(MinGapSeconds(CurrentDayLengthSeconds()),
                                        BaseIntervalSeconds * (1f - ShopManager.Reputation / 160f) * IntervalMultiplier);
 
             _timer += Time.deltaTime;

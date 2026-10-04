@@ -114,6 +114,7 @@ namespace PetShop.Shop
         public void ApplyLotStage(int stage)
         {
             if (_grid == null) return;
+            _lotStage = Mathf.Max(_lotStage, stage);
             RectInt area = LotStageCells(stage);
             _grid.FillFloorRect(area.position, area.size);
             ClearDoorway();
@@ -140,6 +141,25 @@ namespace PetShop.Shop
             return new RectInt(x0, z0, Mathf.Max(0, x1 - x0), Mathf.Max(0, z1 - z0));
         }
 
+        /// <summary>
+        /// Grid cells of the shop room's interior: every cell the room's floor plan
+        /// (<see cref="ShopCentre"/> ± <see cref="RoomWidth"/>/2, <see cref="RoomDepth"/>/2) covers.
+        /// </summary>
+        public RectInt RoomCells()
+        {
+            float cs = GridManager.CellSize;
+            Vector3 shop = ShopCentre;
+            int x0 = Mathf.FloorToInt((shop.x - RoomWidth * 0.5f) / cs);
+            int x1 = Mathf.CeilToInt ((shop.x + RoomWidth * 0.5f) / cs);
+            int z0 = Mathf.FloorToInt((shop.z - RoomDepth * 0.5f) / cs);
+            int z1 = Mathf.CeilToInt ((shop.z + RoomDepth * 0.5f) / cs);
+            return new RectInt(x0, z0, x1 - x0, z1 - z0);
+        }
+
+        /// <summary>True when a footprint of <paramref name="size"/> rooted at <paramref name="cell"/> overlaps the shop room.</summary>
+        public bool IsInsideShop(Vector2Int cell, Vector2Int size) =>
+            RoomCells().Overlaps(new RectInt(cell, size));
+
         private const int DoorwayBehind = -1;
         private const int DoorwayAhead  = 2;
         private const int DoorwayLeft   = -1;
@@ -149,6 +169,46 @@ namespace PetShop.Shop
         public static RectInt DoorwayCells(Vector2Int door) => new(
             door.x + DoorwayLeft, door.y + DoorwayBehind,
             DoorwayRight - DoorwayLeft + 1, DoorwayAhead - DoorwayBehind + 1);
+
+        /// <summary>
+        /// True when a pen of <paramref name="size"/> rooted at <paramref name="cell"/> may stand in the
+        /// yard: every footprint cell lies inside the full yard, outside the shop room and the doorway,
+        /// and is free on <paramref name="grid"/>. Ignores the unlocked lot stage — pens go anywhere in the yard.
+        /// </summary>
+        public bool CanPlacePen(GridManager grid, Vector2Int cell, Vector2Int size)
+        {
+            if (grid == null) return false;
+            var footprint = new RectInt(cell, size);
+            RectInt yard  = LotStageCells(FullYardLotStage);
+            if (IsInsideShop(cell, size) || DoorwayCells(grid.WorldToGrid(DoorPosition)).Overlaps(footprint))
+                return false;
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            {
+                var check = cell + new Vector2Int(x, y);
+                if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Highest lot stage applied so far; its cells are buildable floor.</summary>
+        private int _lotStage = StarterLotStage;
+
+        /// <summary>
+        /// Takes back the floor a removed pen laid outside the unlocked lot, so the cells it stood on
+        /// do not become buildable for other furniture. Cells inside the unlocked lot keep their floor.
+        /// </summary>
+        public void ReleasePenFloor(GridManager grid, Vector2Int cell, Vector2Int size)
+        {
+            if (grid == null) return;
+            RectInt unlocked = LotStageCells(_lotStage);
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            {
+                var check = cell + new Vector2Int(x, y);
+                if (!unlocked.Contains(check) && !grid.TryGetObject(check, out _)) grid.SetFloor(check, false);
+            }
+        }
 
         private void ClearDoorway()
         {

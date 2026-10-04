@@ -77,7 +77,7 @@ namespace PetShop.Tests
         public void ResetAll_AfterChanges_RestoresDefaults()
         {
             InputBindings.Set(GameAction.Jump, KeyCode.E);
-            InputBindings.Set(GameAction.Help, KeyCode.J);
+            InputBindings.Set(GameAction.Ledger, KeyCode.J);
 
             InputBindings.ResetAll();
 
@@ -91,12 +91,12 @@ namespace PetShop.Tests
         {
             _store.Values[InputBindings.KeyPrefix + "Jump"] = "NotAKey";
             _store.Values[InputBindings.KeyPrefix + "Interact"] = "99999";
-            _store.Values[InputBindings.KeyPrefix + "Help"] = "J";
+            _store.Values[InputBindings.KeyPrefix + "Ledger"] = "J";
             InputBindings.Store = _store;   // drop the cache so values reload
 
             Assert.AreEqual(KeyCode.Space, InputBindings.Get(GameAction.Jump));
             Assert.AreEqual(KeyCode.E, InputBindings.Get(GameAction.Interact));
-            Assert.AreEqual(KeyCode.J, InputBindings.Get(GameAction.Help));
+            Assert.AreEqual(KeyCode.J, InputBindings.Get(GameAction.Ledger));
         }
 
         [Test]
@@ -116,6 +116,7 @@ namespace PetShop.Tests
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.UpArrow));
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha1));
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha8));
+            Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha9));
             Assert.IsTrue(InputBindings.IsBindable(KeyCode.Space));
             Assert.IsTrue(InputBindings.IsBindable(KeyCode.Return));
         }

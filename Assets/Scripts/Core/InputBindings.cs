@@ -8,7 +8,7 @@ namespace PetShop.Core
     public enum GameAction
     {
         MoveForward, MoveBack, MoveLeft, MoveRight,
-        Jump, Interact, EndDay, QuickSave, Ledger, Help,
+        Jump, Interact, EndDay, QuickSave, Ledger,
         BuildMode, BuildRotate, BuildRemove
     }
 
@@ -82,7 +82,6 @@ namespace PetShop.Core
             GameAction.EndDay      => KeyCode.Return,
             GameAction.QuickSave   => KeyCode.F5,
             GameAction.Ledger      => KeyCode.Tab,
-            GameAction.Help        => KeyCode.H,
             GameAction.BuildMode   => KeyCode.B,
             GameAction.BuildRotate => KeyCode.R,
             GameAction.BuildRemove => KeyCode.Delete,
@@ -208,14 +207,14 @@ namespace PetShop.Core
             KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow,
         };
 
-        /// <summary>First and last of the fixed build hotkeys (1-8).</summary>
+        /// <summary>First and last of the fixed build hotkeys (1-9).</summary>
         private const KeyCode FirstBuildHotkey = KeyCode.Alpha1;
-        private const KeyCode LastBuildHotkey  = KeyCode.Alpha8;
+        private const KeyCode LastBuildHotkey  = KeyCode.Alpha9;
 
         /// <summary>
         /// Whether a key may be bound. None, Escape (reserved for menus), mouse buttons
         /// (reserved for camera and placement), the fixed alternates (Num Enter, arrows) and
-        /// the build hotkeys 1-8 are rejected.
+        /// the build hotkeys 1-9 are rejected.
         /// </summary>
         public static bool IsBindable(KeyCode key)
         {

@@ -27,11 +27,17 @@ namespace PetShop.UI
         public ShowcasePanel   Showcase  { get; private set; }
         public ReorderPanel    Reorder   { get; private set; }
 
+        /// <summary>The bottom inventory bar: owned furniture slots and stockroom counts.</summary>
+        public InventoryBar    Inventory { get; private set; }
+
         /// <summary>The quest journal, opened with <see cref="QuestJournalPanel.OpenKey"/>.</summary>
         public QuestJournalPanel Journal { get; private set; }
 
-        /// <summary>The furniture catalogue: order furniture and pick owned pieces up to place.</summary>
+        /// <summary>The furniture catalogue on the ledger's Build tab: order furniture and pick owned pieces up to place.</summary>
         public FurnitureCatalogPanel Catalogue { get; private set; }
+
+        /// <summary>The top-down build view; Esc leaves it once nothing more transient is open.</summary>
+        public BuildCamera BuildView { get; set; }
 
         /// <summary>Controls rebinding and general options; opened from the pause menu or title screen.</summary>
         public SettingsPanel   Settings  { get; private set; }
@@ -54,7 +60,6 @@ namespace PetShop.UI
             (Breeding != null && Breeding.IsOpen) ||
             (StaffBoard != null && StaffBoard.IsOpen) ||
             (Reorder != null && Reorder.IsOpen) ||
-            (Catalogue != null && Catalogue.IsOpen) ||
             (Settings != null && Settings.IsOpen) ||
             (Journal  != null && Journal.IsOpen)  ||
             (Title    != null && Title.IsOpen);
@@ -100,7 +105,7 @@ namespace PetShop.UI
             FamilyTree = canvasGO.AddComponent<FamilyTreePanel>();
             Showcase   = canvasGO.AddComponent<ShowcasePanel>();
             Reorder    = canvasGO.AddComponent<ReorderPanel>();
-            Catalogue  = canvasGO.AddComponent<FurnitureCatalogPanel>();
+            Inventory  = canvasGO.AddComponent<InventoryBar>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
@@ -110,10 +115,11 @@ namespace PetShop.UI
             Info.Build(canvasGO.transform);
             Results.Build(canvasGO.transform, game);
             GameOver.Build(canvasGO.transform, game);
-            Stats.Build(canvasGO.transform, game, Reorder);
+            Stats.Build(canvasGO.transform, game, Reorder, build);
+            Catalogue = Stats.Catalogue;
             Reorder.Build(canvasGO.transform, game);
-            Catalogue.Build(canvasGO.transform, game, build);
             HUD.Catalogue = Catalogue;
+            Inventory.Build(canvasGO.transform, game.Furniture, shop, build, () => AnyModalOpen || game.IsGameOver);
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
@@ -140,7 +146,7 @@ namespace PetShop.UI
             if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 
             if (InputBindings.GetKeyDown(GameAction.Ledger) && !_game.IsGameOver && !Pause.IsOpen && !Results.IsOpen
-                && !Reorder.IsOpen && !Catalogue.IsOpen && !Journal.IsOpen)
+                && !Reorder.IsOpen && !Journal.IsOpen)
                 Stats.Toggle();
 
             if (Input.GetKeyDown(QuestJournalPanel.OpenKey)) ToggleJournal();
@@ -156,7 +162,7 @@ namespace PetShop.UI
 
         /// <summary>
         /// Escape, most-transient first: cancel a placement, close a popup, close the ledger,
-        /// otherwise open or close the pause menu.
+        /// leave the build view once no panel is open, otherwise open or close the pause menu.
         /// </summary>
         internal void HandleEscape()
         {
@@ -173,6 +179,8 @@ namespace PetShop.UI
             if (StaffBoard != null && StaffBoard.IsOpen) { StaffBoard.Hide();   return; }
             if (Stats != null && Stats.IsOpen)     { Stats.Hide();           return; }
             if (Results != null && Results.IsOpen) return;   // must be dismissed with the button
+            // Only once no panel is open, so Esc never leaves the view with a panel still showing.
+            if (BuildView != null && BuildView.IsActive) { BuildView.Exit(); return; }
             if (_game.IsGameOver) return;
 
             Pause.Toggle();

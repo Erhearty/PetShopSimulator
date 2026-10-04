@@ -76,11 +76,12 @@ target runs, so on a machine without Unity run `bash Tools/fetch_kenney.sh .` di
 | Mouse | Look |
 | `Space` | Jump |
 | `Space` | Jump |
-| `E` | Interact — restock a shelf, buy a pet, check the books |
-| `1`–`8` / `B` | Build: shelf, large shelf, pen, counter, wall, window wall, doorway, fence |
+| `E` | Interact — restock a shelf, buy a pet, serve the customer at the counter (with nobody waiting it does nothing) |
+| `B` | Top-down build view |
+| `1`–`8` | Build: shelf, large shelf, pen, counter, wall, window wall, doorway, fence |
 | `LMB` | Place · `R` rotate · middle-click or `Delete` remove (50% back) |
 | `RMB` | Leave build mode |
-| `Tab` | The ledger — shelves, animals, catalogue |
+| `Tab` | The ledger — shelves, animals, catalogue, and a Build tab to order and place furniture |
 | `J` | The quest journal |
 | `Esc` | Cancel / close / pause |
 | `Enter` | Close up early |

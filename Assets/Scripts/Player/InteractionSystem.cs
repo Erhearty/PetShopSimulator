@@ -39,7 +39,8 @@ namespace PetShop.Player
         {
             if (PromptText == null) return;
 
-            if (_game != null && (_game.IsBuildModeActive || _game.IsModalOpen || _game.IsGameOver))
+            if (_game != null && (_game.IsBuildModeActive || _game.IsModalOpen ||
+                                  _game.IsBuildViewActive || _game.IsGameOver))
             {
                 PromptText.enabled = false;
                 return;
@@ -95,7 +96,7 @@ namespace PetShop.Player
                 if (pen.NeedsService)
                     return $"[{Key}]  Feed & clean the {pen.PenSpecies} pen  (€{pen.ServiceCost:N0})";
                 return pen.HasSpace
-                    ? $"[{Key}]  Buy a {pen.PenSpecies}  (€{Pet.WholesalePrice(pen.PenSpecies):N0})   ·  {pen.Count}/{pen.Capacity} in the pen"
+                    ? $"[{Key}]  Buy a {pen.PenSpecies}  (€{Pet.WholesalePrice(pen.PenSpecies):N0})   ·  {pen.Count}/{pen.Capacity} stalls filled"
                     : $"[{Key}]  {pen.PenSpecies} pen — full ({pen.Count}/{pen.Capacity})";
             }
 
@@ -105,7 +106,7 @@ namespace PetShop.Player
                 if (queue != null && queue.AnyWaiting)
                     return $"[{Key}]  Serve {queue.Front.ShopperName}  —  {queue.Front.BasketCount} item(s), " +
                            $"€{queue.Front.BasketValue:N2}   ({queue.Length} waiting)";
-                return $"[{Key}]  Check the books";
+                return null;
             }
 
             return null;
@@ -119,6 +120,6 @@ namespace PetShop.Player
         }
     }
 
-    /// <summary>Marker for the shop counter — interacting opens the day's books.</summary>
+    /// <summary>Marker for the shop counter — interacting serves the next waiting customer.</summary>
     public class CounterInteractable : MonoBehaviour { }
 }

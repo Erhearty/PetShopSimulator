@@ -22,13 +22,16 @@ namespace PetShop.Shop
 
         public List<Entry> Entries = new();
 
-        /// <summary>The prefab for a catalogue id, or null when none is assigned.</summary>
+        /// <summary>
+        /// The prefab for a catalogue id, or null when none is assigned. Per-species pens
+        /// without their own entry share the <see cref="BuildCatalog.PetPen"/> prefab.
+        /// </summary>
         public GameObject Get(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
             foreach (var e in Entries)
                 if (e.Id == id) return e.Prefab;
-            return null;
+            return id.StartsWith(BuildCatalog.SpeciesPenPrefix) ? Get(BuildCatalog.PetPen) : null;
         }
     }
 }

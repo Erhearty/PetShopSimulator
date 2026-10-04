@@ -63,6 +63,7 @@ namespace PetShop.Commerce
             }
 
             crate.AttachLabel();
+            SetLayerRecursive(root, GameLayers.Furniture);
             return crate;
         }
 
@@ -85,7 +86,22 @@ namespace PetShop.Commerce
             box.transform.SetParent(root.transform, false);
 
             crate.AttachLabel();
+            SetLayerRecursive(root, GameLayers.Furniture);
             return crate;
+        }
+
+        /// <summary>
+        /// Puts the crate on the Furniture layer (what <see cref="GameLayers.InteractMask"/> casts against)
+        /// and makes sure every box has a collider.
+        /// </summary>
+        private static void SetLayerRecursive(GameObject root, int layer)
+        {
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                t.gameObject.layer = layer;
+                if (t.gameObject != root && t.GetComponent<MeshFilter>() != null && t.GetComponent<Collider>() == null)
+                    t.gameObject.AddComponent<BoxCollider>();
+            }
         }
 
         private void AttachLabel()
@@ -142,3 +158,4 @@ namespace PetShop.Commerce
             : $"[{InputBindings.Label(GameAction.Interact)}]  Collect {Units} {Category} units from the delivery";
     }
 }
+

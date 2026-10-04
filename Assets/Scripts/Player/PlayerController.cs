@@ -38,7 +38,9 @@ namespace PetShop.Player
         public bool SteerTowardsMovement = false;
 
         private static bool Blocked =>
-            GameManager.Instance != null && (GameManager.Instance.IsModalOpen || GameManager.Instance.IsGameOver);
+            GameManager.Instance != null && (GameManager.Instance.IsModalOpen ||
+                                             GameManager.Instance.IsBuildViewActive ||
+                                             GameManager.Instance.IsGameOver);
 
         private void Awake()
         {

@@ -328,7 +328,6 @@ namespace PetShop.UI
         {
             RefreshKeys();
             if (_ui == null) _ui = FindAnyObjectByType<GameUI>();
-            if (_ui != null && _ui.HUD != null) _ui.HUD.RefreshHelp();
             if (_ui != null && _ui.Title != null) _ui.Title.RefreshKeyHints();
         }
 

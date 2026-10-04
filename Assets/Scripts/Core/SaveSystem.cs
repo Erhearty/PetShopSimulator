@@ -56,6 +56,11 @@ namespace PetShop.Core
         public List<StockEntry> FurnitureInventory = new();
         /// <summary>Furniture paid for but not yet collected from the forecourt (save version 5+).</summary>
         public List<FurnitureOrderSave> PendingFurnitureOrders = new();
+        /// <summary>
+        /// How many of each inventory id were packed away after being placed rather than delivered
+        /// fresh; a subset of <see cref="FurnitureInventory"/>. Absent (empty) in older saves.
+        /// </summary>
+        public List<StockEntry> PackedFurniture = new();
 
         /// <summary>One furniture order as saved: what it is, when it lands, and whether it has.</summary>
         [Serializable]

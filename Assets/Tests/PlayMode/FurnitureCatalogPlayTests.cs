@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Pets;
+using PetShop.Progression;
 using PetShop.Shop;
 using PetShop.UI;
 
@@ -11,8 +13,9 @@ namespace PetShop.Tests
 {
     /// <summary>
     /// PlayMode tests for the furniture supply chain as wired through <see cref="GameManager"/>
-    /// and the <see cref="FurnitureCatalogPanel"/>: ordering charges and queues, arrival drops a
-    /// crate, unpacking it fills the inventory, and Place picks an owned unit up.
+    /// and the <see cref="FurnitureCatalogPanel"/> hosted on the ledger's Build tab: ordering charges
+    /// and queues, arrival drops a crate, unpacking it fills the inventory, and Place picks an owned
+    /// unit up and closes the ledger.
     /// </summary>
     public class FurnitureCatalogPlayTests
     {
@@ -23,6 +26,9 @@ namespace PetShop.Tests
         /// <summary>Furthest a crate may land from the forecourt centre (the origin with no layout), in metres.</summary>
         private const float  ForecourtReach = 3f;
         private static readonly Vector2Int FloorSize = new(6, 6);
+        private const int WallsPlaced = 2;
+        private static readonly Vector2Int WallCell  = new(1, 1);
+        private static readonly Vector2Int NextWallCell = new(2, 1);
 
         private FurniturePrefabs      _saved;
         private GameObject            _root, _canvas;
@@ -30,6 +36,7 @@ namespace PetShop.Tests
         private ShopManager           _shop;
         private BuildMode             _build;
         private FurnitureCatalogPanel _panel;
+        private StatsPanel            _stats;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -50,8 +57,9 @@ namespace PetShop.Tests
             _game.Grid = grid; _game.Shop = _shop; _game.Build = _build;
 
             _canvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
-            _panel  = _canvas.AddComponent<FurnitureCatalogPanel>();
-            _panel.Build(_canvas.transform, _game, _build);
+            _stats  = _canvas.AddComponent<StatsPanel>();
+            _stats.Build(_canvas.transform, _game, null, _build);
+            _panel  = _stats.Catalogue;
             yield return null;   // let Start run before fixing the balance
             _shop.SetBalance(RichBalance);
         }
@@ -129,8 +137,65 @@ namespace PetShop.Tests
 
             Assert.IsTrue(_build.IsHolding);
             Assert.IsFalse(_panel.IsOpen);
+            Assert.IsFalse(_stats.IsOpen, "picking an item closes the ledger");
             Assert.IsFalse(_game.IsModalOpen);
             Assert.AreEqual(0, _game.Furniture.OwnedCount(BuildCatalog.ShelfSmall));
+        }
+
+        [Test]
+        public void Show_OpensLedgerOnBuildTab_AndOtherTabsHideIt()
+        {
+            _panel.Show();
+            Assert.IsTrue(_stats.IsOpen);
+            Assert.IsTrue(_panel.IsOpen);
+            Assert.IsTrue(_game.IsModalOpen);
+
+            _stats.ShowTab(0);
+            Assert.IsTrue(_stats.IsOpen);
+            Assert.IsFalse(_panel.IsOpen, "the Shelves tab hides the catalogue");
+
+            _stats.ShowTab(StatsPanel.BuildTab);
+            Assert.IsTrue(_panel.IsOpen);
+
+            _stats.Hide();
+            Assert.IsFalse(_panel.IsOpen);
+            Assert.IsFalse(_game.IsModalOpen);
+        }
+
+        [Test]
+        public void Order_Wall_CreatesNoDeliveryAndChargesOnPlace()
+        {
+            if (FurnitureFactory.Prefabs == null) Assert.Ignore("Furniture prefabs are only loadable in the editor.");
+            var wall = BuildCatalog.Get(BuildCatalog.Wall);
+            _panel.Show();
+
+            Assert.IsTrue(_panel.Order(BuildCatalog.Wall));
+            Assert.AreEqual(0, _game.Furniture.Pending.Count, "walls are not delivered");
+            Assert.AreEqual(RichBalance, _shop.Balance, Tolerance, "nothing is charged up front");
+            Assert.IsFalse(_panel.IsOpen);
+            Assert.IsFalse(_stats.IsOpen);
+            Assert.IsTrue(_build.IsActive);
+            Assert.IsFalse(_build.IsHolding, "paid placement, not from the inventory");
+            Assert.AreSame(wall, _build.CurrentItem);
+
+            Assert.IsNotNull(_build.Place(WallCell, wall, null, 0f, charge: true));
+            Assert.IsNotNull(_build.Place(NextWallCell, wall, null, 0f, charge: true));
+
+            Assert.AreEqual(RichBalance - WallsPlaced * wall.Cost, _shop.Balance, Tolerance);
+            Assert.IsTrue(_build.IsActive, "still placing walls");
+        }
+
+        [Test]
+        public void Order_LockedPen_IsRefused()
+        {
+            string tigerPen = BuildCatalog.PenIdFor(Pet.Species.Tiger);
+            Assert.IsFalse(ProgressionRules.IsPenUnlocked(tigerPen, ProgressionRules.CornerShopTier));
+
+            Assert.IsFalse(_panel.Order(tigerPen));
+
+            Assert.AreEqual(0, _game.Furniture.Pending.Count);
+            Assert.AreEqual(RichBalance, _shop.Balance, Tolerance);
+            StringAssert.Contains(ProgressionRules.TierName(ProgressionRules.TigerTier), _panel.Status);
         }
 
         [Test]

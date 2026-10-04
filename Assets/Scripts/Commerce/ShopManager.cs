@@ -306,7 +306,7 @@ namespace PetShop.Commerce
                 Category        = category,
                 Units           = units,
                 Cost            = cost,
-                ArrivalProgress = Mathf.Min(0.97f, dayProgressNow + UnityEngine.Random.Range(0.10f, 0.22f)),
+                ArrivalProgress = PetShop.Shop.FurnitureSupply.ArrivalProgressFor(dayProgressNow),
             };
             _orders.Add(order);
             NotifyOrderPlaced(order);

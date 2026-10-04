@@ -16,6 +16,9 @@ namespace PetShop.Traffic
     /// </summary>
     public class DeliveryTruck : MonoBehaviour
     {
+        /// <summary>Rough seconds from dispatch to pulling up outside the shop; deliveries are timed to subtract it.</summary>
+        public const float EstimatedDriveSeconds = 8f;
+
         private const float TruckLength     = 6.5f;
         private const float CruiseSpeed     = 7f;
         private const float EntryClearance  = 14f;

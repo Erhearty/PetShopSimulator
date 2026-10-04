@@ -42,7 +42,8 @@ namespace PetShop.Tests
             Assert.AreEqual(RichBalance - BuildCatalog.Get(BuildCatalog.Counter).Cost, _shop.Balance, Tolerance);
             Assert.AreEqual(1, _supply.Pending.Count);
             Assert.IsFalse(order.Arrived);
-            Assert.GreaterOrEqual(order.ArrivalProgress, MorningProgress + FurnitureSupply.MinDeliveryDelay - Tolerance);
+            Assert.AreEqual(FurnitureSupply.ArrivalProgressFor(MorningProgress), order.ArrivalProgress, Tolerance);
+            Assert.Greater(order.ArrivalProgress, MorningProgress);
             Assert.LessOrEqual(order.ArrivalProgress, FurnitureSupply.LatestArrival);
         }
 
@@ -138,6 +139,48 @@ namespace PetShop.Tests
             Assert.IsTrue(restored.Pending[0].Arrived);
             Assert.AreEqual(landed.ArrivalProgress, restored.Pending[0].ArrivalProgress, Tolerance);
             Assert.IsFalse(restored.Pending[1].Arrived);
+        }
+
+        [Test]
+        public void TakeOwned_UsesPackedUnitFirst()
+        {
+            _supply.AddOwned(BuildCatalog.PetPen);
+            _supply.AddPacked(BuildCatalog.PetPen);
+
+            Assert.IsTrue(_supply.TakeOwned(BuildCatalog.PetPen, out bool first));
+            Assert.IsTrue(_supply.TakeOwned(BuildCatalog.PetPen, out bool second));
+
+            Assert.IsTrue(first);
+            Assert.IsFalse(second);
+            Assert.AreEqual(0, _supply.PackedCount(BuildCatalog.PetPen));
+        }
+
+        [Test]
+        public void CaptureRestore_RoundTripsPackedCount()
+        {
+            _supply.AddOwned(BuildCatalog.PetPen);
+            _supply.AddPacked(BuildCatalog.PetPen);
+
+            var data = new SaveData();
+            _supply.Capture(data);
+            var restored = new FurnitureSupply();
+            restored.Restore(SaveMigrator.Migrate(JsonUtility.ToJson(data)));
+
+            Assert.AreEqual(2, restored.OwnedCount(BuildCatalog.PetPen));
+            Assert.AreEqual(1, restored.PackedCount(BuildCatalog.PetPen));
+        }
+
+        [Test]
+        public void Restore_OldSaveWithoutPackedField_LoadsZeroPacked()
+        {
+            var data = new SaveData();
+            data.FurnitureInventory.Add(new SaveData.StockEntry { id = BuildCatalog.PetPen, qty = 2 });
+            data.PackedFurniture = null;
+
+            _supply.Restore(data);
+
+            Assert.AreEqual(2, _supply.OwnedCount(BuildCatalog.PetPen));
+            Assert.AreEqual(0, _supply.PackedCount(BuildCatalog.PetPen));
         }
 
         [Test]

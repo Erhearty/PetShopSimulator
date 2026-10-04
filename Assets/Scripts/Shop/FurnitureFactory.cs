@@ -4,6 +4,7 @@ using PetShop.Core;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Player;
+using PetShop.Progression;
 
 namespace PetShop.Shop
 {
@@ -37,6 +38,31 @@ namespace PetShop.Shop
         /// <summary><see cref="PlacedObjectData.Type"/> shared by every decoration entry.</summary>
         public const string DecorationType = "decoration";
 
+        /// <summary><see cref="PlacedObjectData.Type"/> shared by the legacy and per-species pens.</summary>
+        public const string PenType = "pen";
+
+        /// <summary>Id prefix of the per-species pens: <c>pet_pen_&lt;species lowercase&gt;</c>.</summary>
+        public const string SpeciesPenPrefix = PetPen + "_";
+
+        /// <summary>Price of the bare pen, before the breeding pair it ships with.</summary>
+        public const float PenBaseCost = 350f;
+
+        /// <summary>Adults delivered with every new per-species pen.</summary>
+        public const int PenStarterPairSize = 2;
+
+        /// <summary>Bedding colour of each species' pen, so every pen reads differently at a glance.</summary>
+        private static readonly Dictionary<Pet.Species, Color> PenBeddingTints = new()
+        {
+            [Pet.Species.Dog]     = new Color(0.62f, 0.45f, 0.28f),
+            [Pet.Species.Cat]     = new Color(0.72f, 0.42f, 0.55f),
+            [Pet.Species.Fox]     = new Color(0.85f, 0.48f, 0.20f),
+            [Pet.Species.Chicken] = new Color(0.90f, 0.80f, 0.42f),
+            [Pet.Species.Penguin] = new Color(0.78f, 0.88f, 0.95f),
+            [Pet.Species.Deer]    = new Color(0.40f, 0.58f, 0.30f),
+            [Pet.Species.Horse]   = new Color(0.55f, 0.36f, 0.22f),
+            [Pet.Species.Tiger]   = new Color(0.30f, 0.42f, 0.20f),
+        };
+
         public static readonly Dictionary<string, PlacedObjectData> Items = new()
         {
             [ShelfSmall] = new PlacedObjectData
@@ -51,11 +77,12 @@ namespace PetShop.Shop
                 Description = "A wide shelf with room for more stock per line.",
                 Size = new Vector2Int(2, 1), Cost = 210f, Tint = new Color(0.50f, 0.35f, 0.18f)
             },
+            // Legacy species-picked pen: still loadable from old saves, no longer sold.
             [PetPen] = new PlacedObjectData
             {
-                Id = PetPen, DisplayName = "Pet Pen", Type = "pen",
-                Description = "Houses up to four pets of one species.",
-                Size = new Vector2Int(2, 2), Cost = 350f, Tint = new Color(0.18f, 0.55f, 0.35f)
+                Id = PetPen, DisplayName = "Pet Pen", Type = PenType, Hidden = true,
+                Description = "Four individual stalls, one per pet, all of one species.",
+                Size = new Vector2Int(2, 2), Cost = PenBaseCost, Tint = new Color(0.18f, 0.55f, 0.35f)
             },
             [Counter] = new PlacedObjectData
             {
@@ -104,6 +131,28 @@ namespace PetShop.Shop
             [DecorFishTank]    = Decor(DecorFishTank,    "Fish Tank",    "An aquarium on a stand.",                2, 1, 120f),
             [DecorNoticeBoard] = Decor(DecorNoticeBoard, "Notice Board", "A board of community notices.",          1, 1,  45f),
             [DecorLeadRail]    = Decor(DecorLeadRail,    "Lead Rail",    "A rail of dog leads on display.",        1, 1,  70f),
+        };
+
+        /// <summary>Adds one per-species pen entry for every species a pen can ever hold.</summary>
+        static BuildCatalog()
+        {
+            foreach (var species in ProgressionRules.PickableSpecies(ProgressionRules.MaxTier))
+                Items[PenIdFor(species)] = SpeciesPen(species);
+        }
+
+        /// <summary>Catalogue id of the pen for <paramref name="species"/>.</summary>
+        public static string PenIdFor(Pet.Species species) =>
+            SpeciesPenPrefix + species.ToString().ToLowerInvariant();
+
+        /// <summary>The pen entry for <paramref name="species"/>: base pen plus its breeding pair.</summary>
+        private static PlacedObjectData SpeciesPen(Pet.Species species) => new()
+        {
+            Id = PenIdFor(species), DisplayName = $"{species} Pen", Type = PenType,
+            Category = BuildCategory.Furniture,
+            Description = $"Four stalls for {species}s. Ships with a breeding pair of adult {species}s.",
+            Size = new Vector2Int(2, 2),
+            Cost = PenBaseCost + PenStarterPairSize * Pet.WholesalePrice(species),
+            Tint = PenBeddingTints.TryGetValue(species, out var tint) ? tint : Color.white,
         };
 
         private static PlacedObjectData Decor(string id, string name, string description,
@@ -182,7 +231,7 @@ namespace PetShop.Shop
             switch (def.Type)
             {
                 case "shelf": ConfigureShelf(go, def, variant); break;
-                case "pen":   ConfigurePen(go, def, variant);   break;
+                case BuildCatalog.PenType: ConfigurePen(go, def, variant); break;
                 case "counter":
                     if (go.GetComponent<CounterInteractable>() == null) go.AddComponent<CounterInteractable>();
                     break;
@@ -203,13 +252,36 @@ namespace PetShop.Shop
             unit.Category    = ParseEnum(variant, ProductCategory.Food);
         }
 
+        /// <summary>
+        /// A per-species pen takes its species from its id; the legacy <c>pet_pen</c> reads it
+        /// from <paramref name="variant"/>, defaulting to Rabbit.
+        /// </summary>
         private static void ConfigurePen(GameObject go, PlacedObjectData def, string variant)
         {
             var pen = go.GetComponent<PetPen>();
             if (pen == null) pen = go.AddComponent<PetPen>();
             pen.PenSize    = def.Size.x * GridManager.CellSize * 0.86f;
             pen.Capacity   = 4;
-            pen.PenSpecies = ParseEnum(variant, Pet.Species.Rabbit);
+            pen.PenSpecies = ProgressionRules.PenSpeciesFor(def.Id) ?? ParseEnum(variant, Pet.Species.Rabbit);
+            if (def.Id != BuildCatalog.PetPen) ApplyPenBedding(go, def);
+        }
+
+        /// <summary>Name of the pen prefab's floor child, recoloured as each species' bedding.</summary>
+        private const string PenFloorName = "PenFloor";
+        /// <summary>Bedding is matte.</summary>
+        private const float BeddingSmoothness = 0.1f;
+
+        /// <summary>Recolours the pen floor with the entry's tint so each species' pen looks distinct.</summary>
+        private static void ApplyPenBedding(GameObject go, PlacedObjectData def)
+        {
+            var bedding = MaterialFactory.Get($"pen_bedding_{def.Id}", def.Tint, 0f, BeddingSmoothness);
+            if (bedding == null) return;
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != PenFloorName) continue;
+                var renderer = t.GetComponent<Renderer>();
+                if (renderer != null) renderer.sharedMaterial = bedding;
+            }
         }
 
         private static T ParseEnum<T>(string value, T fallback) where T : struct =>

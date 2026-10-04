@@ -54,6 +54,7 @@ namespace PetShop.Progression
         {
             _game      = game;
             _layout    = layout;
+            // Q cycles species only for the legacy pet_pen; per-species pens take theirs from the id.
             if (build != null) build.PenVariantSource = () => ProgressionRules.PenVariantsForTier(Tier);
         }
 
