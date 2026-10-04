@@ -152,6 +152,8 @@ namespace PetShop.Shop
         public Vector2Int    Size = Vector2Int.one;
         public float         Cost;
         public Color         Tint = Color.white;
+        /// <summary>Kept loadable for old saves but left out of catalogue listings.</summary>
+        public bool          Hidden;
     }
 
     public class GridEntry

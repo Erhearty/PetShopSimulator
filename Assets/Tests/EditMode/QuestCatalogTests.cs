@@ -60,7 +60,7 @@ namespace PetShop.Tests
         [Test]
         public void TutorialInstructions_NameTheRealKeys()
         {
-            StringAssert.Contains("Press B", QuestCatalog.Get("tut_open_catalogue").InstructionText(QuestDefinition.DefaultKeyLabel));
+            StringAssert.Contains("Press Tab", QuestCatalog.Get("tut_open_catalogue").InstructionText(QuestDefinition.DefaultKeyLabel));
             StringAssert.Contains("press E", QuestCatalog.Get("tut_collect_crate").InstructionText(QuestDefinition.DefaultKeyLabel));
             StringAssert.Contains("Press Tab", QuestCatalog.Get("tut_order_stock").InstructionText(QuestDefinition.DefaultKeyLabel));
             StringAssert.Contains("Press Enter", QuestCatalog.Get("tut_close_day").InstructionText(QuestDefinition.DefaultKeyLabel));

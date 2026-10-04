@@ -8,6 +8,7 @@ using PetShop.Core;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Player;
+using PetShop.Progression;
 using PetShop.Shop;
 
 namespace PetShop.Tests
@@ -154,6 +155,64 @@ namespace PetShop.Tests
 
             var fallback = Spawn(BuildCatalog.PetPen).GetComponent<PetPen>();
             Assert.AreEqual(Pet.Species.Rabbit, fallback.PenSpecies, "default species");
+        }
+
+        [Test]
+        public void SpeciesPens_ExistForEveryPickableSpecies_WithPairPricing()
+        {
+            foreach (var species in ProgressionRules.PickableSpecies(ProgressionRules.MaxTier))
+            {
+                string id = BuildCatalog.PenIdFor(species);
+                Assert.AreEqual(BuildCatalog.SpeciesPenPrefix + species.ToString().ToLowerInvariant(), id);
+                var def = BuildCatalog.Get(id);
+                Assert.IsNotNull(def, $"{id}: missing.");
+                Assert.AreEqual(BuildCatalog.PenType, def.Type, $"{id}: type.");
+                Assert.AreEqual(BuildCategory.Furniture, def.Category, $"{id}: category.");
+                Assert.AreEqual(new Vector2Int(2, 2), def.Size, $"{id}: size.");
+                Assert.IsFalse(def.Hidden, $"{id}: hidden.");
+                float expected = BuildCatalog.Get(BuildCatalog.PetPen).Cost + 2 * Pet.WholesalePrice(species);
+                Assert.AreEqual(expected, def.Cost, 0.001f, $"{id}: cost.");
+                StringAssert.Contains("breeding pair", def.Description, $"{id}: description.");
+                Assert.AreEqual(species, ProgressionRules.PenSpeciesFor(id), $"{id}: species.");
+            }
+        }
+
+        [Test]
+        public void SpeciesPens_HaveDistinctTints()
+        {
+            var tints = new HashSet<Color>();
+            foreach (var species in ProgressionRules.PickableSpecies(ProgressionRules.MaxTier))
+                Assert.IsTrue(tints.Add(BuildCatalog.Get(BuildCatalog.PenIdFor(species)).Tint), $"{species}: tint reused.");
+        }
+
+        [Test]
+        public void LegacyPen_IsHiddenAndHasNoSpeciesFromId()
+        {
+            Assert.IsTrue(BuildCatalog.Get(BuildCatalog.PetPen).Hidden);
+            Assert.IsNull(ProgressionRules.PenSpeciesFor(BuildCatalog.PetPen));
+            Assert.IsNull(ProgressionRules.PenSpeciesFor(BuildCatalog.Counter));
+        }
+
+        [Test]
+        public void Spawn_SpeciesPen_TakesSpeciesFromId()
+        {
+            var pen = Spawn(BuildCatalog.PenIdFor(Pet.Species.Fox)).GetComponent<PetPen>();
+            Assert.IsNotNull(pen);
+            Assert.AreEqual(Pet.Species.Fox, pen.PenSpecies);
+            Assert.AreEqual(4, pen.Capacity);
+        }
+
+        [Test]
+        public void IsPenUnlocked_FollowsTiers()
+        {
+            string dog = BuildCatalog.PenIdFor(Pet.Species.Dog);
+            string horse = BuildCatalog.PenIdFor(Pet.Species.Horse);
+            string tiger = BuildCatalog.PenIdFor(Pet.Species.Tiger);
+            Assert.IsTrue(ProgressionRules.IsPenUnlocked(dog, ProgressionRules.CornerShopTier));
+            Assert.IsFalse(ProgressionRules.IsPenUnlocked(horse, ProgressionRules.HorseTier - 1));
+            Assert.IsTrue(ProgressionRules.IsPenUnlocked(horse, ProgressionRules.HorseTier));
+            Assert.IsFalse(ProgressionRules.IsPenUnlocked(tiger, ProgressionRules.TigerTier - 1));
+            Assert.IsTrue(ProgressionRules.IsPenUnlocked(tiger, ProgressionRules.TigerTier));
         }
 
         [Test]

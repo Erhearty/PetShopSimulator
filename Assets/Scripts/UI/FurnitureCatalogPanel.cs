@@ -5,17 +5,19 @@ using UnityEngine.EventSystems;
 using TMPro;
 using PetShop.Core;
 using PetShop.Shop;
+using PetShop.Progression;
 
 namespace PetShop.UI
 {
     /// <summary>
-    /// The furniture catalogue: a tab per <see cref="BuildCategory"/>, one row per item with its
-    /// name, description, cost, owned and on-order counts, and Order / Place buttons. Ordering
-    /// charges the catalogue price now and the item arrives later as a crate on the forecourt;
-    /// placing takes an owned unit into the hand, for free, and closes the panel.
+    /// The furniture catalogue content: a tab per <see cref="BuildCategory"/>, one row per item
+    /// with its name, description, cost, owned and on-order counts, and Order / Place buttons.
+    /// Ordering charges the catalogue price now and the item arrives later as a crate on the
+    /// forecourt; placing takes an owned unit into the hand, for free, and closes the host.
     ///
-    /// Owns the modal flag while open, like the other panels. Arrow keys / Enter navigate the
-    /// buttons; PageUp / PageDown turn pages; Esc (routed by GameUI) closes.
+    /// Built into a page of a host panel (the ledger's Build tab), which owns the modal flag;
+    /// <see cref="Show"/> / <see cref="Hide"/> open and close the host. Arrow keys / Enter
+    /// navigate the buttons; PageUp / PageDown turn pages; Esc (routed by GameUI) closes.
     /// </summary>
     public partial class FurnitureCatalogPanel : MonoBehaviour
     {
@@ -43,9 +45,10 @@ namespace PetShop.UI
         private Button      _prev, _next;
         private readonly List<Row>    _rows       = new();
         private readonly List<Button> _tabButtons = new();
+        private System.Action _openHost, _closeHost;
 
-        /// <summary>True while the catalogue is on screen.</summary>
-        public bool IsOpen => _root != null && _root.activeSelf;
+        /// <summary>True while the catalogue is on screen (its host is open on its page).</summary>
+        public bool IsOpen => _root != null && _root.activeInHierarchy;
 
         /// <summary>The category tab being shown.</summary>
         public BuildCategory Tab { get; private set; }
@@ -61,26 +64,40 @@ namespace PetShop.UI
 
         private FurnitureSupply Supply => _game != null ? _game.Furniture : null;
 
-        /// <summary>Every catalogue entry in <paramref name="category"/>, in catalogue order.</summary>
+        /// <summary>The top-down build view entered when building pieces are picked. Optional.</summary>
+        public BuildCamera BuildView { get; set; }
+
+        /// <summary>The shop's progression tier; the starting tier when no director is wired.</summary>
+        private int Tier => _game != null && _game.Progression != null
+            ? _game.Progression.Tier : ProgressionRules.CornerShopTier;
+
+        /// <summary>Every listed catalogue entry in <paramref name="category"/>, in catalogue order.</summary>
         public static List<PlacedObjectData> ItemsIn(BuildCategory category)
         {
             var list = new List<PlacedObjectData>();
             foreach (var def in BuildCatalog.Items.Values)
-                if (def.Category == category) list.Add(def);
+                if (def.Category == category && !def.Hidden) list.Add(def);
             return list;
         }
 
-        /// <summary>Builds the (hidden) panel under <paramref name="canvas"/>.</summary>
-        public void Build(Transform canvas, GameManager game, BuildMode build)
+        /// <summary>
+        /// Builds the catalogue content into <paramref name="page"/>, a page of a host panel.
+        /// <paramref name="openHost"/> opens the host on this page; <paramref name="closeHost"/>
+        /// closes it. The host calls <see cref="Activate"/> whenever the page is shown.
+        /// </summary>
+        public void BuildContent(Transform page, GameManager game, BuildMode build,
+                                 System.Action openHost, System.Action closeHost)
         {
-            _game  = game;
-            _build = build;
-            var panel = BuildFrame(canvas);
-            BuildTabs(panel);
-            BuildRows(panel);
-            BuildFooter(panel);
+            _game      = game;
+            _build     = build;
+            _openHost  = openHost;
+            _closeHost = closeHost;
+            _root      = page.gameObject;
+            BuildBalance(page);
+            BuildTabs(page);
+            BuildRows(page);
+            BuildFooter(page);
             if (Supply != null) Supply.OnChanged += RefreshIfOpen;
-            _root.SetActive(false);
         }
 
         private void OnDestroy()
@@ -90,14 +107,20 @@ namespace PetShop.UI
 
         // ── Open / close ────────────────────────────────────────────────────────
 
-        /// <summary>Opens on the current tab.</summary>
+        /// <summary>Opens the host on the catalogue page, on the current tab.</summary>
         public void Show()
+        {
+            if (_root == null) return;
+            if (_openHost != null) _openHost();
+            else Activate();
+        }
+
+        /// <summary>Called by the host each time the catalogue page is shown: clears the status and refreshes.</summary>
+        public void Activate()
         {
             if (_root == null) return;
             SetStatus(string.Empty, true);
             Refresh();
-            _root.SetActive(true);
-            _game?.SetModalOpen(true);
             _game?.Quests?.RaiseFlag(PetShop.Progression.Quests.QuestFlags.CatalogueOpened);
             SelectCurrentTab();
         }
@@ -117,30 +140,58 @@ namespace PetShop.UI
             Show();
         }
 
-        /// <summary>Closes the catalogue and releases the modal flag.</summary>
+        /// <summary>Closes the host panel, which releases the modal flag.</summary>
         public void Hide()
         {
             if (_root == null) return;
-            _root.SetActive(false);
-            _game?.SetModalOpen(false);
+            _closeHost?.Invoke();
         }
 
         // ── Actions ─────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Orders one <paramref name="catalogId"/> at catalogue cost. False (with a status
-        /// message) when the id is unknown or the shop cannot afford it.
+        /// Orders one <paramref name="catalogId"/> at catalogue cost. Building pieces are not
+        /// delivered: they close the panel and go straight into paid placement in the build view,
+        /// charged as each one is placed. False (with a status message) when the id is unknown,
+        /// locked at the current tier, or the shop cannot afford it.
         /// </summary>
         public bool Order(string catalogId)
         {
             var def = BuildCatalog.Get(catalogId);
             if (def == null || _game == null) return false;
+            if (!ProgressionRules.IsPenUnlocked(def.Id, Tier))
+            {
+                SetStatus($"{def.DisplayName} {LockedText(def)}.", false);
+                return false;
+            }
+            if (BuildCatalog.IsBuildingPiece(def.Id)) return StartBuilding(def);
 
             bool ok = _game.OrderFurniture(catalogId);
             SetStatus(ok ? $"Ordered a {def.DisplayName} — it arrives on the forecourt later today."
                          : OrderFailure(def), ok);
             Refresh();
             return ok;
+        }
+
+        /// <summary>
+        /// Closes the panel and opens pay-on-place build mode for <paramref name="def"/> in the
+        /// build view; it stays in placement so a run of walls can be laid one after another.
+        /// </summary>
+        private bool StartBuilding(PlacedObjectData def)
+        {
+            if (_build == null) return false;
+            Hide();
+            _build.EnterBuildMode(def);
+            if (BuildView != null) BuildView.Enter();
+            return true;
+        }
+
+        /// <summary>“unlocks at &lt;tier name&gt;” for the first tier at which <paramref name="def"/> may be bought.</summary>
+        private static string LockedText(PlacedObjectData def)
+        {
+            int tier = ProgressionRules.CornerShopTier;
+            while (tier < ProgressionRules.MaxTier && !ProgressionRules.IsPenUnlocked(def.Id, tier)) tier++;
+            return $"unlocks at {ProgressionRules.TierName(tier)}";
         }
 
         /// <summary>Why ordering <paramref name="def"/> failed: no shop to pay, or not enough money.</summary>
@@ -151,7 +202,8 @@ namespace PetShop.UI
 
         /// <summary>
         /// Closes the panel and takes one owned <paramref name="catalogId"/> into the hand for
-        /// placing. False (panel stays open, with a status message) when none is owned.
+        /// placing in the build view. False (panel stays open, with a status message) when none
+        /// is owned.
         /// </summary>
         public bool Place(string catalogId)
         {
@@ -164,7 +216,11 @@ namespace PetShop.UI
             }
 
             Hide();
-            if (_build.EnterPlacement(catalogId, null)) return true;
+            if (_build.EnterPlacement(catalogId, null))
+            {
+                if (BuildView != null) BuildView.Enter();
+                return true;
+            }
             Show();
             SetStatus($"Could not pick up the {def.DisplayName}.", false);
             return false;
@@ -223,8 +279,11 @@ namespace PetShop.UI
             row.Root.SetActive(def != null);
             if (def == null) return;
 
-            int owned = Supply != null ? Supply.OwnedCount(def.Id) : 0;
-            row.Name.text        = def.DisplayName;
+            int  owned    = Supply != null ? Supply.OwnedCount(def.Id) : 0;
+            bool unlocked = ProgressionRules.IsPenUnlocked(def.Id, Tier);
+            row.Name.text        = unlocked ? def.DisplayName : $"{def.DisplayName} — {LockedText(def)}";
+            row.Name.color       = unlocked ? UIFactory.Ink : UIFactory.InkMuted;
+            row.Order.interactable = unlocked;
             row.Description.text = def.Description;
             row.Cost.text        = $"€ {def.Cost:N0}";
             row.Cost.color       = CanAfford(def) ? UIFactory.Ink : UIFactory.Bad;

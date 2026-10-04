@@ -12,7 +12,7 @@ namespace PetShop.Core
     /// Single entry point. Lives in MainScene next to the scene-authored <see cref="ShopLayout"/>;
     /// it creates every system and the UI and wires them to the baked world.
     ///
-    /// WASD move · RMB orbit · scroll zoom · E interact · 1-8/B furniture catalogue · Enter close day · F5 save
+    /// WASD move · RMB orbit · scroll zoom · E interact · 1-9 inventory bar · B build view · Tab ledger & build · Enter close day · F5 save
     /// </summary>
     public class GameBootstrapper : MonoBehaviour
     {
@@ -28,6 +28,7 @@ namespace PetShop.Core
         private AudioManager    _audio;
         private GameManager     _game;
         private ShopLayout      _layout;
+        private BuildCamera     _buildView;
 
         private GameUI _ui;
 
@@ -86,7 +87,7 @@ namespace PetShop.Core
                 }, () => _ui.Settings.Show());
             }
 
-            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B furniture catalogue, Tab ledger, Enter to close the day.");
+            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B build view, Tab ledger, Enter to close the day.");
         }
 
         private void Update()
@@ -95,26 +96,22 @@ namespace PetShop.Core
             if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
                                     InputBindings.GetKeyDown(GameAction.BuildMode))) return;
             if (_ui != null && _ui.AnyModalOpen) return;
-            // BuildMode closes itself on the build key; don't reopen the catalogue on that press.
-            if (Time.frameCount == _buildExitFrame) return;
-
-            var ids = BuildCatalog.HotkeyOrder;
-            for (int i = 0; i < ids.Length; i++)
-                if (Input.GetKeyDown(KeyCode.Alpha1 + i))
-                    ToggleBuild(ids[i]);
-
-            if (InputBindings.GetKeyDown(GameAction.BuildMode) && !_build.IsActive)
-                ToggleBuild(null);
+            // Number keys 1-9 belong to the inventory bar (place an owned piece); the build key
+            // toggles the top-down build view.
+            if (InputBindings.GetKeyDown(GameAction.BuildMode)) ToggleBuild();
         }
 
         /// <summary>
-        /// Closes build mode when it is open; otherwise opens the furniture catalogue, on the tab
-        /// holding <paramref name="catalogId"/> when one is given.
+        /// The build key: leaves the build view (dropping any placement) when it is showing;
+        /// otherwise enters it, unless first-person placement just closed on this same press.
         /// </summary>
-        private void ToggleBuild(string catalogId)
+        private void ToggleBuild()
         {
-            if (_build.IsActive) { _build.ExitBuildMode(); return; }
-            _ui?.Catalogue?.Open(catalogId);
+            if (_buildView == null) return;
+            if (_buildView.IsActive) { _build.ExitBuildMode(); _buildView.Exit(); return; }
+            // BuildMode closes itself on the build key; don't open the view on that press.
+            if (_build.IsActive || Time.frameCount == _buildExitFrame) return;
+            _buildView.Enter();
         }
 
         /// <summary>
@@ -220,6 +217,10 @@ namespace PetShop.Core
             _game.Layout = _layout;
             _layout.FillFloorGrid(_grid);
             _build.ObjectRoot = _layout.FurnitureRoot;
+            _build.Layout     = _layout;   // keeps pens out of the shop room
+            _buildView = _build.gameObject.AddComponent<BuildCamera>();
+            _buildView.Init(_game, _layout, _build);
+            new GameObject("Roof").AddComponent<RoofBuilder>().Init(_layout, _grid);
 
             var points = new GameObject("CustomerWaypoints");
             points.transform.SetParent(_spawner.transform, false);
@@ -311,6 +312,9 @@ namespace PetShop.Core
                 _audio.PlaySfx("build");
                 _layout.BakeNavMesh();
             });
+
+            _ui.BuildView           = _buildView;
+            _ui.Catalogue.BuildView = _buildView;
 
             _game.OnDayEnded.AddListener(_ui.Results.Show);
             _game.OnInfoPanel.AddListener(_ui.Info.Show);

@@ -41,8 +41,8 @@ namespace PetShop.Core
         public UnityEvent<string>     OnGameOver     = new();
 
         [Header("Day length")]
-        [Tooltip("Real seconds of trading per in-game day. Override with -daylength <seconds>.")]
-        public float DayLengthSeconds = 210f;
+        [Tooltip("Real seconds of trading per in-game day. 540 = 9 trading hours (09:00-18:00) at 1 real second per game minute. Override with -daylength <seconds>.")]
+        public float DayLengthSeconds = 540f;
 
         public ItemDatabase Catalog { get; private set; }
 
@@ -73,6 +73,16 @@ namespace PetShop.Core
         public bool IsModalOpen { get; private set; }
 
         public void SetModalOpen(bool open) => IsModalOpen = open;
+
+        /// <summary>
+        /// True while the top-down build view is showing. It gates player movement, look and
+        /// interaction like <see cref="IsModalOpen"/>, but leaves the day clock, deliveries and
+        /// the quicksave and end-day keys running.
+        /// </summary>
+        public bool IsBuildViewActive { get; private set; }
+
+        /// <summary>Marks the top-down build view as showing or closed.</summary>
+        public void SetBuildViewActive(bool active) => IsBuildViewActive = active;
         public bool IsGameOver        { get; private set; }
         public bool IsDayRunning      { get; private set; }
 
@@ -202,11 +212,9 @@ namespace PetShop.Core
 
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
-        /// it just opens the books.
+        /// it does nothing.
         /// </summary>
         public void UseCounter() => _floor.UseCounter();
-
-        public void OpenShopSummary() => _floor.OpenShopSummary();
 
         // ── Day cycle ─────────────────────────────────────────────────────────
 

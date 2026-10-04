@@ -31,7 +31,7 @@ namespace PetShop.Tests
         {
             Balance = LotsOfMoney, LifetimeRevenue = LotsOfMoney, BestDayProfit = LotsOfMoney,
             PlacedById   = Counts((BuildCatalog.Counter, 1), (BuildCatalog.ShelfSmall, ManyShelves), (BuildCatalog.PetPen, 1)),
-            PlacedByType = Counts((QuestCatalog.ShelfType, ManyShelves)),
+            PlacedByType = Counts((QuestCatalog.ShelfType, ManyShelves), (BuildCatalog.PenType, 1)),
             HighestPlacedLotStage = ProgressionRules.FullYardLotStage,
             StaffCount = ManyStaff, Tier = ProgressionRules.MaxTier,
             InspectionsPassed = 1, BestInspectionGrade = 'A', PetsBred = 1,

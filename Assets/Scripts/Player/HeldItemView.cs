@@ -67,10 +67,11 @@ namespace PetShop.Player
             TearDownRig();
         }
 
-        /// <summary>Hidden while a modal panel or the pause menu is open.</summary>
+        /// <summary>Hidden while a modal panel or the pause menu is open, or the build view is showing.</summary>
         private void UpdateVisibility()
         {
-            bool modal   = GameManager.Instance != null && GameManager.Instance.IsModalOpen;
+            var  game    = GameManager.Instance;
+            bool modal   = game != null && (game.IsModalOpen || game.IsBuildViewActive);
             bool visible = _model != null && !modal;
             if (_model != null && _model.activeSelf != visible) _model.SetActive(visible);
             if (_overlay != null) _overlay.enabled = visible;

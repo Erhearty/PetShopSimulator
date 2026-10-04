@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -9,11 +8,19 @@ using PetShop.Shop;
 namespace PetShop.UI
 {
     /// <summary>
-    /// The whole in-game overlay: status bar, toast notifications, build palette,
-    /// interact prompt and the controls cheat-sheet. Builds itself on a canvas at runtime.
+    /// The whole in-game overlay: floating status cards, toast notifications, build hint and
+    /// interact prompt. Builds itself on a canvas at runtime. The furniture inventory lives in
+    /// <see cref="InventoryBar"/>.
     /// </summary>
     public class ShopHUD : MonoBehaviour
     {
+        // Floating card geometry, in canvas reference pixels.
+        private const float Margin     = 16f;
+        private const float CardTop    = -Margin;
+        private const float CardHeight = 70f;
+        private const float CardBottom = CardTop - CardHeight;      // -86
+        private const float ChipHeight = 26f;
+
         private ShopManager _shop;
         private GameManager _game;
         private BuildMode   _build;
@@ -27,21 +34,20 @@ namespace PetShop.UI
         private Image    _clockFill;
         private TMP_Text _shopperLabel;
         private TMP_Text _queueLabel;
+        private GameObject _shopperChip;
+        private GameObject _queueChip;
         private TMP_Text _alertLabel;
         private TMP_Text _notification;
         private TMP_Text _prompt;
         private TMP_Text _buildHint;
-        private GameObject _helpPanel;
-        private TMP_Text   _helpText;
         private GameObject _crosshair;
         private Image      _repFill;
 
         private string   _buildHintBase = string.Empty;
 
-        /// <summary>The furniture catalogue the build bar opens; set by GameUI.</summary>
+        /// <summary>The furniture catalogue; set by GameUI.</summary>
         public FurnitureCatalogPanel Catalogue { get; set; }
 
-        private readonly Dictionary<string, Image> _buildButtons = new();
         private float _notifyTimer;
         private float _alertTimer;
 
@@ -59,9 +65,8 @@ namespace PetShop.UI
             BuildToast(canvas);
             BuildPrompt(canvas);
             BuildCrosshair(canvas);
-            BuildBuildBar(canvas);
+            BuildBuildHint(canvas);
             BuildAlerts(canvas);
-            BuildHelp(canvas);
             (Tracker = gameObject.AddComponent<QuestTracker>()).Build(canvas, game);
             shop.OnBalanceChanged.AddListener(_ => RefreshStatus());
             shop.OnReputationChanged.AddListener(_ => RefreshStatus());
@@ -78,61 +83,79 @@ namespace PetShop.UI
 
         // ── Construction ────────────────────────────────────────────────────────
 
+        /// <summary>Three floating rounded cards (balance, day/clock, reputation) plus small chips.</summary>
         private void BuildStatusBar(Transform canvas)
         {
-            var bar = UIFactory.Panel("StatusBar", canvas, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                                      UIFactory.BarBg, new Vector2(0f, -54f), Vector2.zero);
+            var tl = new Vector2(0f, 1f);
+            var tc = new Vector2(0.5f, 1f);
+            var tr = new Vector2(1f, 1f);
 
-            _balanceLabel = UIFactory.Label("Balance", bar.transform, "€ 0",
-                new Vector2(0.012f, 0.40f), new Vector2(0.22f, 1f), 24f, UIFactory.Good);
-
+            // Balance card, top-left.
+            var money = UIFactory.Card("BalanceCard", canvas, tl, tl, UIFactory.CardBg,
+                                       new Vector2(Margin, CardBottom), new Vector2(Margin + 300f, CardTop));
+            _balanceLabel = UIFactory.Label("Balance", money.transform, "€ 0",
+                new Vector2(0.06f, 0.40f), new Vector2(0.96f, 0.97f), 30f, UIFactory.Good);
+            _balanceLabel.fontStyle = FontStyles.Bold;
             // Live running total for the day — the thing players check most often.
-            _tickerLabel = UIFactory.Label("Ticker", bar.transform, "today  +€ 0  /  −€ 0",
-                new Vector2(0.014f, 0.04f), new Vector2(0.23f, 0.42f), 14f, UIFactory.InkMuted);
-            _dayLabel = UIFactory.Label("Day", bar.transform, "Day 1",
-                new Vector2(0.23f, 0f), new Vector2(0.36f, 1f), 21f);
-            _rentLabel = UIFactory.Label("Rent", bar.transform, "Rent € 0",
-                new Vector2(0.36f, 0f), new Vector2(0.55f, 1f), 16f, UIFactory.InkMuted);
+            _tickerLabel = UIFactory.Label("Ticker", money.transform, "today  +€ 0  /  −€ 0",
+                new Vector2(0.06f, 0.05f), new Vector2(0.96f, 0.42f), 13f, UIFactory.InkMuted);
 
-            _clockLabel = UIFactory.Label("Clock", bar.transform, "09:00",
-                new Vector2(0.555f, 0.30f), new Vector2(0.665f, 1f), 22f, UIFactory.Ink,
+            // Day / clock pill, top-centre.
+            var day = UIFactory.Card("DayCard", canvas, tc, tc, UIFactory.CardBg,
+                                     new Vector2(-250f, CardBottom), new Vector2(250f, CardTop));
+            _dayLabel = UIFactory.Label("Day", day.transform, "Day 1",
+                new Vector2(0.05f, 0.34f), new Vector2(0.32f, 0.96f), 20f, UIFactory.Accent);
+            _dayLabel.fontStyle = FontStyles.Bold;
+            _clockLabel = UIFactory.Label("Clock", day.transform, "09:00",
+                new Vector2(0.32f, 0.30f), new Vector2(0.68f, 0.98f), 30f, UIFactory.Ink,
                 TextAlignmentOptions.Center);
+            _clockLabel.fontStyle = FontStyles.Bold;
+            _rentLabel = UIFactory.Label("Rent", day.transform, "Rent € 0",
+                new Vector2(0.60f, 0.34f), new Vector2(0.96f, 0.96f), 14f, UIFactory.InkMuted,
+                TextAlignmentOptions.MidlineRight);
 
-            var clockTrack = UIFactory.Panel("ClockTrack", bar.transform, new Vector2(0.555f, 0.12f),
-                                             new Vector2(0.665f, 0.26f), new Color(1f, 1f, 1f, 0.13f));
-            _clockFill = UIFactory.Panel("ClockFill", clockTrack.transform, Vector2.zero, new Vector2(0f, 1f),
-                                         UIFactory.InkMuted).GetComponent<Image>();
+            var clockTrack = UIFactory.Card("ClockTrack", day.transform, new Vector2(0.05f, 0.12f),
+                                            new Vector2(0.95f, 0.26f), UIFactory.TrackBg);
+            _clockFill = UIFactory.Card("ClockFill", clockTrack.transform, Vector2.zero, new Vector2(0f, 1f),
+                                        UIFactory.Accent).GetComponent<Image>();
 
-            UIFactory.Label("RepCaption", bar.transform, "Reputation",
-                new Vector2(0.70f, 0.48f), new Vector2(0.88f, 0.96f), 14f, UIFactory.InkMuted);
+            // Reputation meter, top-right.
+            var rep = UIFactory.Card("ReputationCard", canvas, tr, tr, UIFactory.CardBg,
+                                     new Vector2(-(Margin + 300f), CardBottom), new Vector2(-Margin, CardTop));
+            UIFactory.Label("RepCaption", rep.transform, "Reputation",
+                new Vector2(0.06f, 0.50f), new Vector2(0.60f, 0.95f), 14f, UIFactory.InkMuted);
+            _repLabel = UIFactory.Label("RepValue", rep.transform, "0",
+                new Vector2(0.60f, 0.46f), new Vector2(0.94f, 0.97f), 26f, UIFactory.Ink,
+                TextAlignmentOptions.MidlineRight);
+            _repLabel.fontStyle = FontStyles.Bold;
+            var track = UIFactory.Card("RepTrack", rep.transform, new Vector2(0.06f, 0.14f),
+                                       new Vector2(0.94f, 0.38f), UIFactory.TrackBg);
+            _repFill = UIFactory.Card("RepFill", track.transform, Vector2.zero, new Vector2(1f, 1f),
+                                      UIFactory.Accent).GetComponent<Image>();
 
-            var track = UIFactory.Panel("RepTrack", bar.transform, new Vector2(0.70f, 0.16f),
-                                        new Vector2(0.94f, 0.46f), new Color(1f, 1f, 1f, 0.13f));
-            var fill = UIFactory.Panel("RepFill", track.transform, Vector2.zero, new Vector2(1f, 1f),
-                                       UIFactory.Accent);
-            _repFill = fill.GetComponent<Image>();
-
-            _repLabel = UIFactory.Label("RepValue", bar.transform, "0",
-                new Vector2(0.945f, 0.16f), new Vector2(0.99f, 0.96f), 18f, UIFactory.Ink,
-                TextAlignmentOptions.Right);
-
-            _shopperLabel = UIFactory.Label("Shoppers", bar.transform, "",
-                new Vector2(0.665f, 0f), new Vector2(0.70f, 1f), 15f, UIFactory.InkMuted,
-                TextAlignmentOptions.Center);
-            _shopperLabel.lineSpacing = -18f;
-
-            _queueLabel = UIFactory.Label("Queue", bar.transform, "",
-                new Vector2(0.555f, 0f), new Vector2(0.665f, 0.45f), 15f, new Color(0.98f, 0.78f, 0.35f),
-                TextAlignmentOptions.Center);
+            // Chips under the day card; each hides itself when it has nothing to say.
+            float chipTop = CardBottom - 6f;
+            float chipBot = chipTop - ChipHeight;
+            _shopperChip = UIFactory.Card("ShoppersChip", canvas, tc, tc, UIFactory.CardBg,
+                                          new Vector2(-250f, chipBot), new Vector2(-100f, chipTop));
+            _shopperLabel = UIFactory.Label("Shoppers", _shopperChip.transform, "",
+                Vector2.zero, Vector2.one, 14f, UIFactory.InkMuted, TextAlignmentOptions.Center);
+            _queueChip = UIFactory.Card("QueueChip", canvas, tc, tc, UIFactory.CardBg,
+                                        new Vector2(-92f, chipBot), new Vector2(150f, chipTop));
+            _queueLabel = UIFactory.Label("Queue", _queueChip.transform, "",
+                Vector2.zero, Vector2.one, 14f, UIFactory.Warn, TextAlignmentOptions.Center);
+            _shopperChip.SetActive(false);
+            _queueChip.SetActive(false);
         }
 
         private void BuildToast(Transform canvas)
         {
-            var toast = UIFactory.Panel("Toast", canvas, new Vector2(0.22f, 1f), new Vector2(0.78f, 1f),
-                                        new Color(0.10f, 0.13f, 0.19f, 0.92f),
-                                        new Vector2(0f, -124f), new Vector2(0f, -88f));
+            float top = CardBottom - ChipHeight - 6f - 38f;   // below chips and the alert strip
+            var toast = UIFactory.Card("Toast", canvas, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                                       new Color(0.10f, 0.14f, 0.21f, 0.94f),
+                                       new Vector2(-400f, top - 40f), new Vector2(400f, top));
             _notification = UIFactory.Label("ToastText", toast.transform, "",
-                new Vector2(0.02f, 0f), new Vector2(0.98f, 1f), 17f, new Color(1f, 0.94f, 0.72f),
+                new Vector2(0.03f, 0f), new Vector2(0.97f, 1f), 17f, new Color(1f, 0.94f, 0.72f),
                 TextAlignmentOptions.Center);
             toast.SetActive(false);
         }
@@ -159,83 +182,30 @@ namespace PetShop.UI
             _prompt.enabled   = false;
         }
 
-        private void BuildBuildBar(Transform canvas)
+        /// <summary>The placement hint, anchored just above the inventory bar.</summary>
+        private void BuildBuildHint(Transform canvas)
         {
-            var ids = BuildCatalog.HotkeyOrder;
-            float halfWidth = Mathf.Max(330f, ids.Length * 84f * 0.5f);
-
-            var bar = UIFactory.Panel("BuildBar", canvas, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                                      UIFactory.BarBg,
-                                      new Vector2(-halfWidth, 12f), new Vector2(halfWidth, 92f));
-
-            float pad  = 0.008f;
-            float slot = (1f - pad * (ids.Length + 1)) / ids.Length;
-
-            for (int i = 0; i < ids.Length; i++)
-            {
-                var def = BuildCatalog.Get(ids[i]);
-                float x0 = pad + i * (slot + pad);
-
-                int index = i;
-                var btn = UIFactory.Button($"Build_{def.Id}", bar.transform, "",
-                    new Vector2(x0, 0.30f), new Vector2(x0 + slot, 0.94f));
-                btn.onClick.AddListener(() => { if (Catalogue != null) Catalogue.Open(BuildCatalog.HotkeyOrder[index]); });
-
-                var caption = UIFactory.Label("Name", btn.transform, def.DisplayName,
-                    new Vector2(0.01f, 0.40f), new Vector2(0.99f, 0.95f), 13f, UIFactory.Ink,
-                    TextAlignmentOptions.Center);
-                // Long names ("Window Wall") were clipping mid-word in a narrow slot.
-                caption.enableAutoSizing = true;
-                caption.fontSizeMin      = 9f;
-                caption.fontSizeMax      = 13f;
-                UIFactory.Label("Cost", btn.transform, $"€{def.Cost:N0}",
-                    new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.42f), 14f, UIFactory.InkMuted,
-                    TextAlignmentOptions.Center);
-
-                _buildButtons[def.Id] = btn.GetComponent<Image>();
-
-                UIFactory.Label("Key", bar.transform, $"{i + 1}",
-                    new Vector2(x0, 0.03f), new Vector2(x0 + slot, 0.28f), 13f, UIFactory.InkMuted,
-                    TextAlignmentOptions.Center);
-            }
-
             _buildHint = UIFactory.Label("BuildHint", canvas, "",
                 new Vector2(0.25f, 0f), new Vector2(0.75f, 0f), 16f, UIFactory.Accent,
                 TextAlignmentOptions.Center);
             var hr = UIFactory.Rect(_buildHint.gameObject);
-            hr.offsetMin = new Vector2(0f, 96f);
-            hr.offsetMax = new Vector2(0f, 150f);
+            hr.offsetMin = new Vector2(0f, InventoryBar.TopEdge + UIFactory.Gap);
+            hr.offsetMax = new Vector2(0f, InventoryBar.TopEdge + UIFactory.Gap + 54f);
             _buildHint.enabled = false;
         }
 
-        /// <summary>A standing warning strip under the status bar — empty shelves, low cash.</summary>
+        /// <summary>A standing warning strip under the status chips — empty shelves, low cash.</summary>
         private void BuildAlerts(Transform canvas)
         {
             _alertLabel = UIFactory.Label("Alerts", canvas, "",
-                new Vector2(0f, 1f), new Vector2(1f, 1f), 15f, new Color(0.95f, 0.72f, 0.42f),
+                new Vector2(0.2f, 1f), new Vector2(0.8f, 1f), 16f, UIFactory.Warn,
                 TextAlignmentOptions.Center);
             var rt = UIFactory.Rect(_alertLabel.gameObject);
-            // Directly under the status bar; the toast sits below this strip so the two never overlap.
-            rt.offsetMin = new Vector2(0f, -84f);
-            rt.offsetMax = new Vector2(0f, -58f);
+            // Directly under the chips; the toast sits below this strip so the two never overlap.
+            float top = CardBottom - ChipHeight - 6f - 6f;
+            rt.offsetMin = new Vector2(0f, top - 28f);
+            rt.offsetMax = new Vector2(0f, top);
             _alertLabel.enabled = false;
-        }
-
-        private void BuildHelp(Transform canvas)
-        {
-            _helpPanel = UIFactory.Panel("Help", canvas, new Vector2(0f, 0f), new Vector2(0f, 0f),
-                                         new Color(0.07f, 0.09f, 0.13f, 0.80f),
-                                         new Vector2(12f, 12f), new Vector2(268f, 284f));
-
-            _helpText = UIFactory.Label("HelpText", _helpPanel.transform, HotkeyHelp.Controls(),
-                new Vector2(0.06f, 0.04f), new Vector2(0.97f, 0.96f), 14.5f, UIFactory.InkMuted,
-                TextAlignmentOptions.TopLeft);
-        }
-
-        /// <summary>Rebuilds the controls cheat-sheet after a key has been rebound.</summary>
-        public void RefreshHelp()
-        {
-            if (_helpText != null) _helpText.text = HotkeyHelp.Controls();
         }
 
         // ── Runtime ─────────────────────────────────────────────────────────────
@@ -254,13 +224,10 @@ namespace PetShop.UI
                 }
             }
 
-            if (InputBindings.GetKeyDown(GameAction.Help) && _helpPanel != null && (_game == null || !_game.IsModalOpen))
-                _helpPanel.SetActive(!_helpPanel.activeSelf);
-
             RefreshBuildHint();
 
             if (_crosshair != null && _game != null)
-                _crosshair.SetActive(!_game.IsModalOpen && !_game.IsGameOver);
+                _crosshair.SetActive(!_game.IsModalOpen && !_game.IsBuildViewActive && !_game.IsGameOver);
 
             _alertTimer -= Time.unscaledDeltaTime;
             if (_alertTimer <= 0f) { _alertTimer = 1.5f; RefreshAlerts(); }
@@ -268,8 +235,8 @@ namespace PetShop.UI
             if (_shopperLabel != null && _game != null)
             {
                 int inShop = _game.CustomersInShop;
-                // Text, not an emoji: the UI font has no person glyph and drew a box.
-                _shopperLabel.text = inShop > 0 ? $"<size=70%>shoppers</size>\n{inShop}" : "";
+                _shopperLabel.text = inShop > 0 ? $"shoppers  {inShop}" : "";
+                if (_shopperChip != null) _shopperChip.SetActive(inShop > 0);
             }
 
             if (_queueLabel != null && _game != null && _game.Queue != null)
@@ -278,6 +245,7 @@ namespace PetShop.UI
                 _queueLabel.text = waiting > 0
                     ? $"till: {waiting} waiting  €{_game.Queue.WaitingValue:N0}"
                     : "";
+                if (_queueChip != null) _queueChip.SetActive(waiting > 0);
             }
 
             if (_notification != null && _notification.transform.parent.gameObject.activeSelf)
@@ -298,9 +266,6 @@ namespace PetShop.UI
 
         private void OnBuildEntered(PlacedObjectData item)
         {
-            foreach (var kvp in _buildButtons)
-                kvp.Value.color = kvp.Key == item.Id ? UIFactory.ButtonOn : UIFactory.ButtonBg;
-
             if (_buildHint != null)
             {
                 _buildHintBase     = $"Placing {item.DisplayName} — LMB place · " +
@@ -319,8 +284,6 @@ namespace PetShop.UI
 
         private void OnBuildExited()
         {
-            foreach (var img in _buildButtons.Values)
-                img.color = UIFactory.ButtonBg;
             if (_buildHint != null) _buildHint.enabled = false;
         }
 

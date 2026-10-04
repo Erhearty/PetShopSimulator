@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using PetShop.Pets;
+using PetShop.Shop;
 
 namespace PetShop.Progression
 {
@@ -145,6 +146,32 @@ namespace PetShop.Progression
             var names   = new List<string>(species.Count);
             foreach (var s in species) names.Add(s.ToString());
             return names;
+        }
+
+        /// <summary>
+        /// The species a per-species pen id (<c>pet_pen_&lt;species&gt;</c>) holds, or null for any
+        /// other id, including the legacy <c>pet_pen</c>.
+        /// </summary>
+        public static Pet.Species? PenSpeciesFor(string catalogId)
+        {
+            if (catalogId == null || !catalogId.StartsWith(BuildCatalog.SpeciesPenPrefix)) return null;
+            string suffix = catalogId.Substring(BuildCatalog.SpeciesPenPrefix.Length);
+            foreach (var s in PickableSpecies(MaxTier))
+                if (s.ToString().ToLowerInvariant() == suffix) return s;
+            return null;
+        }
+
+        /// <summary>
+        /// Whether the pen <paramref name="catalogId"/> may be bought at <paramref name="tier"/>:
+        /// starter species from tier 0, Horse from <see cref="HorseTier"/>, Tiger from
+        /// <see cref="TigerTier"/>. Ids that are not per-species pens are never locked.
+        /// </summary>
+        public static bool IsPenUnlocked(string catalogId, int tier)
+        {
+            var species = PenSpeciesFor(catalogId);
+            if (species == null) return true;
+            foreach (var s in PickableSpecies(tier)) if (s == species.Value) return true;
+            return false;
         }
 
         private static int ClampTier(int tier) =>

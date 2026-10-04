@@ -6,14 +6,16 @@ using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
 using PetShop.Pets;
+using PetShop.Shop;
 
 namespace PetShop.UI
 {
     /// <summary>
-    /// The ledger (Tab): what is on the shelves, who lives in the pens, and what the
-    /// catalogue costs. Read-only — it answers "what should I do next?" at a glance.
+    /// The ledger (Tab): what is on the shelves, who lives in the pens, what the stock
+    /// catalogue costs, and the Build tab where furniture is ordered and picked up to place.
+    /// It answers "what should I do next?" at a glance.
     /// </summary>
-    public class StatsPanel : MonoBehaviour
+    public partial class StatsPanel : MonoBehaviour
     {
         private GameObject  _root;
         private GameManager _game;
@@ -37,7 +39,11 @@ namespace PetShop.UI
 
         private ReorderPanel _reorder;
 
-        public void Build(Transform canvas, GameManager game, ReorderPanel reorder = null)
+        /// <summary>
+        /// Builds the (hidden) ledger under <paramref name="canvas"/>. <paramref name="build"/> is
+        /// the build mode the Build tab places furniture with.
+        /// </summary>
+        public void Build(Transform canvas, GameManager game, ReorderPanel reorder = null, BuildMode build = null)
         {
             _game = game;
             _reorder = reorder;
@@ -64,10 +70,13 @@ namespace PetShop.UI
 
             _managePage = MakePage(panel.transform, out _manageText);
 
-            MakeTab(panel.transform, "Shelves",   0, 4, () => ShowPage(0));
-            MakeTab(panel.transform, "Animals",   1, 4, () => ShowPage(1));
-            MakeTab(panel.transform, "Catalogue", 2, 4, () => ShowPage(2));
-            MakeTab(panel.transform, "Manage",    3, 4, () => ShowPage(3));
+            BuildBuildPage(panel.transform, build);
+
+            MakeTab(panel.transform, "Shelves",   0, TabCount, () => ShowPage(0));
+            MakeTab(panel.transform, "Animals",   1, TabCount, () => ShowPage(1));
+            MakeTab(panel.transform, "Catalogue", 2, TabCount, () => ShowPage(2));
+            MakeTab(panel.transform, "Manage",    3, TabCount, () => ShowPage(3));
+            MakeTab(panel.transform, "Build", BuildTab, TabCount, () => ShowPage(BuildTab));
 
             BuildManageControls(panel.transform);
             BuildOrderControls(panel.transform);
@@ -113,6 +122,7 @@ namespace PetShop.UI
             _pensPage.SetActive(index == 1);
             _catalogPage.SetActive(index == 2);
             _managePage.SetActive(index == 3);
+            ShowBuildPage(index == BuildTab);
             foreach (var control in _manageControls) control.SetActive(index == 3);
             foreach (var control in _orderControls)  control.SetActive(index == 2);
             foreach (var control in _animalControls) control.SetActive(index == 1);
@@ -353,48 +363,5 @@ namespace PetShop.UI
             _pensText.text = sb.ToString();
         }
 
-        private void BuildCatalogPage()
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"<color=#9FB2C4>{"Product",-20}{"Category",-13}{"Buy",-10}{"Sell",-10}Margin</color>");
-
-            var catalog = _game.Catalog;
-            if (catalog != null)
-                foreach (var p in catalog.All)
-                    sb.AppendLine($"{p.displayName,-20}{p.category,-13}" +
-                                  $"{"€ " + p.unitCost.ToString("N2"),-10}{"€ " + p.basePrice.ToString("N2"),-10}" +
-                                  $"<color=#73DB95>€ {p.DefaultMargin:N2}</color>");
-
-            sb.AppendLine();
-            sb.AppendLine("<color=#9FB2C4>Stockroom and deliveries</color>");
-
-            var shop = _game.Shop;
-            if (shop != null)
-            {
-                foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
-                {
-                    float unit  = catalog != null ? catalog.AverageUnitCost(category) : 3.2f;
-                    float order = unit * ShopManager.WholesaleDiscount * shop.SupplierPriceMultiplier * OrderSize;
-                    int   ready = shop.Warehouse(category);
-
-                    sb.AppendLine($"{category,-20}{ready + " in stockroom",-18}" +
-                                  $"{"€ " + order.ToString("N2") + " per " + OrderSize,-20}" +
-                                  $"<color=#9FB2C4>vs € {unit * ShopManager.EmergencyMarkup * OrderSize:N2} at the door</color>");
-                }
-
-                foreach (var order in shop.Orders)
-                    sb.AppendLine($"<color=#F0C46A>on the van: {order.Units} {order.Category} " +
-                                  $"— arriving around {Mathf.Lerp(9f, 18f, order.ArrivalProgress):0}:00</color>");
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("<color=#9FB2C4>Animals</color>");
-            foreach (Pet.Species species in System.Enum.GetValues(typeof(Pet.Species)))
-                sb.AppendLine($"{species,-20}{"buy",-13}{"€ " + Pet.WholesalePrice(species).ToString("N0"),-10}" +
-                              $"{"€ " + Pet.SpeciesBasePrice(species).ToString("N0"),-10}" +
-                              "<color=#9FB2C4>× rarity, × 1.2 adult</color>");
-
-            _catalogText.text = sb.ToString();
-        }
     }
 }
