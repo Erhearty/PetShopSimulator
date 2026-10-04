@@ -61,6 +61,11 @@ namespace PetShop.Core
         /// fresh; a subset of <see cref="FurnitureInventory"/>. Absent (empty) in older saves.
         /// </summary>
         public List<StockEntry> PackedFurniture = new();
+        /// <summary>
+        /// True once the shop room's walls have been laid as placed pieces; they then live in
+        /// <see cref="PlacedObjects"/>. Older saves read false and get the walls laid once on load.
+        /// </summary>
+        public bool roomWallsSeeded;
 
         /// <summary>One furniture order as saved: what it is, when it lands, and whether it has.</summary>
         [Serializable]

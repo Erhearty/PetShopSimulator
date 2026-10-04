@@ -23,7 +23,7 @@ startup; there are no sound files.
 
 ```bash
 ./build.sh            # sets up, builds a Linux player, then smoke-tests it
-./build.sh run        # play it
+./build.sh run        # play it (rebuilds first if sources are newer; FORCE_BUILD=1 always rebuilds)
 ./build.sh look       # render screenshots of the running game into Screenshots/
 ./build.sh test       # run the EditMode unit tests headless
 ./build.sh playtest   # spawnverify + PlayMode tests + smoke + economy soak, one PASS/FAIL/SKIP line each
@@ -38,10 +38,29 @@ Tests live in `Assets/Tests/EditMode` (assembly `PetShop.Tests.EditMode`) and re
 | `./build.sh playmode` | PlayMode tests (`Assets/Tests/PlayMode`, assembly `PetShop.Tests.PlayMode`). Tests tagged `[Category("KnownIssue")]` run separately afterwards and are reported as `⚠ known issue` without failing the run. |
 | `./build.sh spawnverify` | Spawns key pack models and checks their size and grounding. With no asset pack installed it reports SKIP; a partial install fails. |
 | `./build.sh soak` | Seeded headless run of the Linux player (`SEED`, default 1; `SOAK_DAYS`, default 15) that writes `Logs/build/soak.jsonl` and fails when any day leaves the soak bands. |
-| `./build.sh playtest` | All of the above plus `smoke`. Every stage runs even if an earlier one fails; exits 1 if any stage failed. Needs a Linux build (`./build.sh linux`). |
+| `./build.sh playtest` | All of the above plus `smoke`. Every stage runs even if an earlier one fails; exits 1 if any stage failed. Rebuilds the Linux player first if it is stale. |
 | `./build.sh look` | Also photographs the quest UI: `quest_tracker` (the HUD with the tracker) and `quest_journal` (the journal open), and `street_traffic` (cars on the street, traffic frozen). 35 shots in all. |
-| `./build.sh look-diff` | `look`, then compares `Screenshots/` against the approved `Tests/Baselines/Screenshots/` and prints each image's difference; diff images go to `Logs/screenshot-diff/`. Never fails. |
+| `./build.sh look-diff` | `look`, then compares `Screenshots/` against the approved `Tests/Baselines/Screenshots/` and prints each image's difference; diff images go to `Logs/screenshot-diff/`. A difference never fails; a capture or comparison that did not run does. |
 | `./build.sh look-approve` | Copies the current `Screenshots/` over the baselines. |
+
+### Checks
+
+Every check target exits non-zero with a reason when it did not verify the current code.
+
+| Target | What a pass proves |
+|--------|--------------------|
+| `test` | EditMode tests compiled from current sources ran (at least one) and all passed. |
+| `playmode` | Gating PlayMode tests (excluding `KnownIssue`) ran and passed. |
+| `smoke` | A player built from current sources (rebuilt if stale) ran headless, logged `[Game]`/`[ShopManager]` lines and no exceptions. |
+| `soak` | A current player ran the seeded soak, wrote a summary line, stayed in band and threw no exceptions. |
+| `spawnverify` | Pack models spawned with sane size and grounding (SKIP, exit 0, when no pack is installed). |
+| `playtest` | spawnverify, playmode, smoke and soak all passed (or spawnverify skipped). |
+| `look-diff` | Fresh screenshots were captured and compared against the baselines; differences are reported, not failed. |
+| `linux` | This run's build log reports `[GameBuilder] Build succeeded` with no failure lines, and the player exists. |
+
+`run`, `smoke` and `soak` rebuild the player when anything under `Assets/`, `ProjectSettings/` or
+`Packages/` is newer than its last successful build (stamped in `Build/Linux/.build-stamp`; `FORCE_BUILD=1` always rebuilds); a failed build, or the Editor
+holding the project open, exits 1 instead of running the old binary.
 
 The soak band values in `Assets/Scripts/Dev/SoakBands.cs` are calibrated from the seed-1 15-day
 run of 2026-09-25 (an idle shop with no player input, measured with the Kenney kits absent).

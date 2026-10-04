@@ -266,7 +266,14 @@ namespace PetShop.UI
 
         private void OnBuildEntered(PlacedObjectData item)
         {
-            if (_buildHint != null)
+            if (_buildHint != null && item == null)
+            {
+                // The Remove tool carries no item.
+                _buildHintBase     = $"Remove tool — LMB / middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
+                _buildHint.text    = _buildHintBase;
+                _buildHint.enabled = true;
+            }
+            else if (_buildHint != null)
             {
                 _buildHintBase     = $"Placing {item.DisplayName} — LMB place · " +
                                      $"middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";

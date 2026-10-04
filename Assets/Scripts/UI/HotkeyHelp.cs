@@ -10,6 +10,7 @@ namespace PetShop.UI
     public static class HotkeyHelp
     {
         private static string L(GameAction a) => InputBindings.Label(a);
+        private static string K(UnityEngine.KeyCode key) => BuildToolbar.KeyLabel(key);
 
         /// <summary>The rotate keys while placing: "R / Shift+R / wheel" with the bound key.</summary>
         public static string RotateKeys()
@@ -29,6 +30,9 @@ namespace PetShop.UI
             "LMB place  ·  Esc cancel\n" +
             $"{RotateKeys()}  rotate\n" +
             $"Middle-click / {L(GameAction.BuildRemove)}  remove\n" +
+            $"Build view: {K(BuildToolbar.WallKey)} wall · {K(BuildToolbar.WindowWallKey)} window wall · " +
+            $"{K(BuildToolbar.DoorwayKey)} doorway · {K(BuildToolbar.FenceKey)} fence · " +
+            $"{K(BuildToolbar.RemoveKey)} remove tool · RMB orbit\n" +
             $"{L(GameAction.EndDay)}  close up early\n" +
             $"{L(GameAction.Interact)} at the counter  serve the queue\n" +
             $"{L(GameAction.Ledger)}  ledger & build\n" +

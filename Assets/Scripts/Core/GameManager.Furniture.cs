@@ -84,10 +84,19 @@ namespace PetShop.Core
         /// <summary>Gap in metres between the counter's back edge and the staff standing behind it.</summary>
         private const float StaffBehindCounter = 0.5f;
 
+        /// <summary>Corners of a box collider, walked to find how far it reaches along an axis.</summary>
+        private const int BoxCorners = 8;
+        /// <summary>Half of a box collider's size: centre to face.</summary>
+        private const float HalfExtent = 0.5f;
+        /// <summary>Reach assumed for a counter with neither colliders nor renderers.</summary>
+        private const float DefaultHalfDepth = 0.5f;
+
         /// <summary>
         /// The till is wherever the first placed counter is: customers queue out from its front
         /// (+Z, the customer side of every furniture prefab) and staff stand behind it. Without
         /// this the queue sat at the shop's old fixed till spot, metres from any placed counter.
+        /// The front and back faces come from the counter's colliders — what people actually bump
+        /// into — so the first place in line is always clear of the counter on its customer side.
         /// </summary>
         private void PlaceTillAtCounter()
         {
@@ -99,10 +108,11 @@ namespace PetShop.Core
             if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
             forward.Normalize();
 
-            float halfDepth = HalfDepthAlong(counter.gameObject, forward);
-            Vector3 centre  = new Vector3(counter.position.x, 0f, counter.position.z);
+            float front    = ReachAlong(counter.gameObject, forward);
+            float back     = ReachAlong(counter.gameObject, -forward);
+            Vector3 centre = new Vector3(counter.position.x, 0f, counter.position.z);
 
-            Spawner.RegisterPoint.position = centre + forward * halfDepth;
+            Spawner.RegisterPoint.position = centre + forward * front;
             if (Queue != null)
             {
                 Queue.TillPoint      = Spawner.RegisterPoint;
@@ -110,17 +120,43 @@ namespace PetShop.Core
             }
             if (StaffStation != null)
             {
-                StaffStation.SetPositionAndRotation(centre - forward * (halfDepth + StaffBehindCounter),
+                StaffStation.SetPositionAndRotation(centre - forward * (back + StaffBehindCounter),
                                                     Quaternion.LookRotation(forward, Vector3.up));
                 _roster?.RepositionStaff();
             }
         }
 
+        /// <summary>
+        /// How far the object's box colliders reach from its pivot along <paramref name="axis"/>
+        /// (a flat unit vector). Read from the collider shapes and transforms rather than
+        /// <c>Collider.bounds</c>, which is stale until physics syncs a freshly spawned object.
+        /// Falls back to the rendered extent when the object has no box collider.
+        /// </summary>
+        internal static float ReachAlong(GameObject go, Vector3 axis)
+        {
+            var boxes = go.GetComponentsInChildren<BoxCollider>();
+            if (boxes.Length == 0) return HalfDepthAlong(go, axis);
+
+            Vector3 pivot = go.transform.position;
+            float reach = 0f;
+            foreach (var box in boxes)
+                for (int i = 0; i < BoxCorners; i++)
+                {
+                    Vector3 local = box.center + Vector3.Scale(box.size * HalfExtent, CornerSign(i));
+                    reach = Mathf.Max(reach, Vector3.Dot(box.transform.TransformPoint(local) - pivot, axis));
+                }
+            return reach;
+        }
+
+        /// <summary>The ±1 signs of box corner <paramref name="i"/> (0-7) on each axis.</summary>
+        private static Vector3 CornerSign(int i) =>
+            new((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f);
+
         /// <summary>Half the object's rendered extent along <paramref name="axis"/> (a flat unit vector).</summary>
         private static float HalfDepthAlong(GameObject go, Vector3 axis)
         {
             var renderers = go.GetComponentsInChildren<Renderer>();
-            if (renderers.Length == 0) return 0.5f;
+            if (renderers.Length == 0) return DefaultHalfDepth;
             Bounds b = renderers[0].bounds;
             for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
             return Mathf.Abs(axis.x) * b.extents.x + Mathf.Abs(axis.z) * b.extents.z;

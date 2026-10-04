@@ -222,19 +222,26 @@ namespace PetShop.Core
             _game.OnInfoPanel.Invoke(pen.Describe());
         }
 
+        /// <summary>Shown when the counter is used with nobody in line, so E never seems dead.</summary>
+        public const string NobodyWaitingNotice = "Nobody is waiting at the till.";
+
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
-        /// it does nothing.
+        /// it says so.
         /// </summary>
         public void UseCounter()
         {
             var queue = _game.Queue;
-            if (queue != null && queue.AnyWaiting && !queue.FrontReady)
+            if (queue == null || !queue.AnyWaiting)
+            {
+                _game.Notify(NobodyWaitingNotice);
+                return;
+            }
+            if (!queue.FrontReady)
             {
                 _game.Notify("The next customer is still on their way to the till.");
                 return;
             }
-            if (queue == null || !queue.AnyWaiting) return;
 
             var shopper = queue.NextReady;
             float value = shopper.BasketValue;

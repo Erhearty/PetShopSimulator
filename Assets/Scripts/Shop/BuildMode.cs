@@ -13,7 +13,8 @@ namespace PetShop.Shop
     /// 3D build mode — projects the mouse onto the floor plane, shows a translucent
     /// ghost of the item, and places real furniture on LMB.
     /// LMB place | R / Shift+R rotate (wheel too while holding an item) | Q cycle pen species |
-    /// RMB/Esc/B cancel | Delete-key or middle-click removes.
+    /// RMB (first person only) / Esc / B cancel | Delete-key or middle-click removes.
+    /// The Remove tool lives in BuildMode.Remove.cs.
     /// Held-item placement (from the furniture inventory) lives in BuildMode.Held.cs, the ghost
     /// in BuildMode.Ghost.cs.
     /// </summary>
@@ -89,6 +90,7 @@ namespace PetShop.Shop
         {
             CurrentItem = item;
             IsActive    = true;
+            IsRemoving  = false;
             _rotation   = 0f;
             CreateGhost();
             OnBuildModeEntered.Invoke(item);
@@ -99,7 +101,8 @@ namespace PetShop.Shop
         public void ExitBuildMode()
         {
             if (!IsActive) return;
-            IsActive = false;
+            IsActive   = false;
+            IsRemoving = false;
             ReturnHeld();
             DestroyGhost();
             OnBuildModeExited.Invoke();
@@ -113,8 +116,10 @@ namespace PetShop.Shop
             if (!IsActive) return;
 
             // Escape is routed by GameUI so a single press cannot also close a panel.
-            if (InputBindings.GetKeyDown(GameAction.BuildMode) || Input.GetMouseButtonDown(1))
+            // RMB cancels in first person; in the build view it is the camera's.
+            if (InputBindings.GetKeyDown(GameAction.BuildMode) || (Input.GetMouseButtonDown(1) && RightClickCancels))
             { ExitBuildMode(); return; }
+            if (IsRemoving) { UpdateRemoveTool(); return; }
 
             HandleRotationInput();
             if (Input.GetKeyDown(KeyCode.Q)) CyclePenVariant();

@@ -12,7 +12,7 @@ namespace PetShop.Shop
     /// with an empty shop; the player orders and places every piece of furniture. Everything here is edited by hand in the scene; anchors left empty fall back to the
     /// positions derived from the dimensions, which reproduces the generated layout exactly.
     /// </summary>
-    public class ShopLayout : MonoBehaviour
+    public partial class ShopLayout : MonoBehaviour
     {
         [Header("Yard — the open lot the shop stands in (metres)")]
         public float YardWidth = 64f;
@@ -108,7 +108,9 @@ namespace PetShop.Shop
 
         /// <summary>
         /// Makes every cell of lot <paramref name="stage"/> buildable. Stages only grow, so
-        /// cells from an earlier stage stay buildable; the doorway never is. Does nothing
+        /// cells from an earlier stage stay buildable; the doorway never is, except where it crosses
+        /// the wall ring. The room's wall ring (<see cref="RoomWallCells"/>) always keeps its floor, so a
+        /// removed wall can be put back after a load or tier-up. Does nothing
         /// before <see cref="FillFloorGrid"/> has bound a grid.
         /// </summary>
         public void ApplyLotStage(int stage)
@@ -118,6 +120,7 @@ namespace PetShop.Shop
             RectInt area = LotStageCells(stage);
             _grid.FillFloorRect(area.position, area.size);
             ClearDoorway();
+            EnsureRoomWallFloor();
         }
 
         /// <summary>Grid cells covered by a lot stage, clamped to the yard.</summary>
@@ -220,12 +223,33 @@ namespace PetShop.Shop
 
         // ── NavMesh ─────────────────────────────────────────────────────────────
 
+        /// <summary>Open <see cref="SuspendNavMeshBakes"/> calls; bakes are deferred while above zero.</summary>
+        private int  _bakeSuspensions;
+        /// <summary>True when a bake was asked for while suspended and is still owed.</summary>
+        private bool _bakePending;
+
+        /// <summary>
+        /// Defers <see cref="BakeNavMesh"/> until the matching <see cref="ResumeNavMeshBakes"/>, so laying
+        /// many pieces at once (seeding, loading) bakes once instead of once per piece. Nests.
+        /// </summary>
+        public void SuspendNavMeshBakes() => _bakeSuspensions++;
+
+        /// <summary>Ends one <see cref="SuspendNavMeshBakes"/>; the last one runs a single owed bake.</summary>
+        public void ResumeNavMeshBakes()
+        {
+            if (_bakeSuspensions > 0) _bakeSuspensions--;
+            if (_bakeSuspensions > 0 || !_bakePending) return;
+            _bakePending = false;
+            BakeNavMesh();
+        }
+
         /// <summary>
         /// (Re)bakes the walkable surface. Call after furniture changes so customers
         /// path around new shelves.
         /// </summary>
         public void BakeNavMesh()
         {
+            if (_bakeSuspensions > 0) { _bakePending = true; return; }
             Transform root = ShopRoot != null ? ShopRoot : transform;
 
             if (_surface == null)

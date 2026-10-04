@@ -16,6 +16,8 @@ namespace PetShop.Shop
         private const float BoxGhostInset    = 0.9f;
         /// <summary>Half of a box's height: lifts its centre so the bottom sits on the floor.</summary>
         private const float HalfExtent       = 0.5f;
+        /// <summary>Thickness of the Remove tool's red cell highlight.</summary>
+        private const float RemoveGhostHeight = 0.1f;
 
         private GameObject _ghost;
         private Material   _ghostMat;
@@ -70,6 +72,36 @@ namespace PetShop.Shop
             }
             _ghostHeight = CurrentItem.Type == PenType ? PenGhostHeight : ItemGhostHeight;
             return new Vector2(CurrentItem.Size.x, CurrentItem.Size.y) * (cs * BoxGhostInset);
+        }
+
+        /// <summary>The Remove tool's highlight: a flat red tile over the cell (or piece) under the cursor.</summary>
+        private void CreateRemoveGhost()
+        {
+            DestroyGhost();
+            _ghostMat = MaterialFactory.CreateTransparent("remove_ghost", InvalidColor);
+            float cs = GridManager.CellSize;
+            _ghost = MeshBuilder.CreateBox(cs, RemoveGhostHeight, cs, null, "RemoveGhost");
+            _ghost.transform.SetParent(transform, false);
+            foreach (var col in _ghost.GetComponentsInChildren<Collider>(true)) PrefabPreview.DestroySafe(col);
+            PrefabPreview.ApplyMaterial(_ghost, _ghostMat);
+            PrefabPreview.DisableShadows(_ghost);
+            MeshBuilder.SetLayerRecursive(_ghost, GameLayers.Ghost);
+            _ghostLift = RemoveGhostHeight * HalfExtent + GhostFloorClearance;
+        }
+
+        /// <summary>Covers the whole footprint of the piece under the cursor, or just the cell when empty.</summary>
+        private void UpdateRemoveGhost()
+        {
+            if (_ghost == null || !RaycastFloor(out var worldPos)) return;
+
+            _hoverCell = GridManager.WorldToGrid(worldPos);
+            Vector2Int root = _hoverCell, size = Vector2Int.one;
+            _hoverValid = GridManager.TryGetObject(_hoverCell, out var entry);
+            if (_hoverValid) { root = entry.Root; size = entry.Size; }
+
+            _ghost.transform.position   = GridManager.FootprintCenter(root, size) + Vector3.up * _ghostLift;
+            _ghost.transform.rotation   = Quaternion.identity;
+            _ghost.transform.localScale = new Vector3(size.x, 1f, size.y);
         }
 
         private void DestroyGhost()

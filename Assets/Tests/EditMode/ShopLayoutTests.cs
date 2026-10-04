@@ -49,7 +49,25 @@ namespace PetShop.Tests
             Assert.IsTrue(_grid.HasFloor(new Vector2Int(-10, 4)));
             for (int x = -12; x <= -11; x++)
                 for (int z = 3; z <= 6; z++)
-                    Assert.IsFalse(_grid.HasFloor(new Vector2Int(x, z)), $"doorway cell {x},{z}");
+                {
+                    var cell = new Vector2Int(x, z);
+                    // Where the doorway crosses the wall ring the floor stays, so a doorway piece can stand there.
+                    bool ring = _layout.IsRoomWallCell(cell);
+                    Assert.AreEqual(ring, _grid.HasFloor(cell), $"doorway cell {x},{z} (wall ring: {ring})");
+                }
+        }
+
+        [Test]
+        public void FillFloorGrid_FloorsTheWholeWallRing()
+        {
+            _layout.FillFloorGrid(_grid);
+            RectInt ring = _layout.RoomWallCells();
+            for (int x = ring.xMin; x < ring.xMax; x++)
+                for (int z = ring.yMin; z < ring.yMax; z++)
+                {
+                    var cell = new Vector2Int(x, z);
+                    if (_layout.IsRoomWallCell(cell)) Assert.IsTrue(_grid.HasFloor(cell), $"wall ring cell {x},{z}");
+                }
         }
 
         [Test]

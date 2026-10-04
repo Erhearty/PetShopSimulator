@@ -36,6 +36,9 @@ namespace PetShop.UI
         /// <summary>The furniture catalogue on the ledger's Build tab: order furniture and pick owned pieces up to place.</summary>
         public FurnitureCatalogPanel Catalogue { get; private set; }
 
+        /// <summary>The build view's Wall / Window wall / Doorway / Fence / Remove tool strip.</summary>
+        public BuildToolbar Toolbar { get; private set; }
+
         /// <summary>The top-down build view; Esc leaves it once nothing more transient is open.</summary>
         public BuildCamera BuildView { get; set; }
 
@@ -106,6 +109,7 @@ namespace PetShop.UI
             Showcase   = canvasGO.AddComponent<ShowcasePanel>();
             Reorder    = canvasGO.AddComponent<ReorderPanel>();
             Inventory  = canvasGO.AddComponent<InventoryBar>();
+            Toolbar    = canvasGO.AddComponent<BuildToolbar>();
             Pause    = canvasGO.AddComponent<PauseMenu>();
             Title    = canvasGO.AddComponent<TitleScreen>();
             Settings = canvasGO.AddComponent<SettingsPanel>();
@@ -120,6 +124,7 @@ namespace PetShop.UI
             Reorder.Build(canvasGO.transform, game);
             HUD.Catalogue = Catalogue;
             Inventory.Build(canvasGO.transform, game.Furniture, shop, build, () => AnyModalOpen || game.IsGameOver);
+            Toolbar.Build(canvasGO.transform, game, shop, build, () => BuildView, () => AnyModalOpen || game.IsGameOver);
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
@@ -161,7 +166,7 @@ namespace PetShop.UI
         }
 
         /// <summary>
-        /// Escape, most-transient first: cancel a placement, close a popup, close the ledger,
+        /// Escape, most-transient first: cancel a placement or build-view tool (Remove included), close a popup, close the ledger,
         /// leave the build view once no panel is open, otherwise open or close the pause menu.
         /// </summary>
         internal void HandleEscape()

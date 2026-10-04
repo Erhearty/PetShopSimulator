@@ -39,10 +39,15 @@ namespace PetShop.Shop
 
         /// <summary>
         /// True when <paramref name="def"/> fits at <paramref name="cell"/>: pens anywhere free in the
-        /// yard outside the shop room and doorway, everything else on free buildable floor.
+        /// yard outside the shop room and doorway, everything else on free buildable floor. The room's
+        /// wall ring takes only building pieces, and only doorway pieces across the doorway
+        /// (<see cref="ShopLayout.AllowsOnRoomWallRing"/>).
         /// </summary>
-        private bool CanPlaceItem(PlacedObjectData def, Vector2Int cell, Vector2Int size) =>
-            UsesYardRule(def) ? Layout.CanPlacePen(GridManager, cell, size) : GridManager.CanPlace(cell, size);
+        public bool CanPlaceItem(PlacedObjectData def, Vector2Int cell, Vector2Int size)
+        {
+            if (Layout != null && !Layout.AllowsOnRoomWallRing(def, cell, size)) return false;
+            return UsesYardRule(def) ? Layout.CanPlacePen(GridManager, cell, size) : GridManager.CanPlace(cell, size);
+        }
 
         /// <summary>
         /// Refuses <paramref name="def"/> at <paramref name="cell"/> when it does not fit, posting the

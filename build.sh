@@ -6,15 +6,16 @@
 #    ./build.sh setup      TMP essentials + runtime shaders + repair URP materials
 #    ./build.sh linux      build the Linux player
 #    ./build.sh windows    build the Windows player
-#    ./build.sh run        run the last Linux build
-#    ./build.sh smoke      headless multi-day run, fails on any exception
+#    ./build.sh run        run the Linux player, rebuilding it first if sources are newer
+#    ./build.sh smoke      headless multi-day run, fails on any exception (rebuilds if stale)
 #    ./build.sh test       run EditMode unit tests headless (results in Logs/build/)
 #    ./build.sh playmode   run PlayMode tests headless; KnownIssue tests run too, non-gating
-#    ./build.sh soak       seeded 15-day headless economy run, checked against SoakBands
+#    ./build.sh soak       seeded 15-day headless economy run, checked against SoakBands (rebuilds if stale)
 #    ./build.sh spawnverify  check spawned pack models' size and grounding (SKIP without packs)
 #    ./build.sh playtest   spawnverify + playmode + smoke + soak, with a PASS/FAIL/SKIP summary
 #    ./build.sh look       render screenshots of the running game into Screenshots/
-#    ./build.sh look-diff  look, then compare against Tests/Baselines/Screenshots (never fails)
+#    ./build.sh look-diff  look, then compare against Tests/Baselines/Screenshots (a diff never
+#                          fails; a failed capture or comparison does)
 #    ./build.sh look-approve  copy the current Screenshots/ over the baselines
 #    ./build.sh assets     import Asset Store packages you've downloaded via Package Manager
 #    ./build.sh assets?    report which downloaded packages are present
@@ -24,6 +25,8 @@
 #
 #  Override the editor with:  UNITY=/path/to/Unity ./build.sh
 #  soak takes SEED (default 1) and SOAK_DAYS (default 15) from the environment.
+#  run/smoke/soak rebuild the player when anything under Assets/, ProjectSettings/ or Packages/
+#  is newer than it; FORCE_BUILD=1 always rebuilds. A failed build never runs the old player.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -51,7 +54,7 @@ clear_stale_lock() {
     local lock="$PROJECT/Temp/UnityLockfile"
     [ -f "$lock" ] || return 0
     if ps -eo args= | grep -q "[E]ditor/Unity .*$PROJECT"; then
-        echo "✘ another Unity instance has this project open — close it first" >&2
+        echo "✘ a Unity Editor or batch run has the project open - close the Editor / wait for the other run (then optionally FORCE_BUILD=1) and retry" >&2
         exit 1
     fi
     echo "· clearing stale Unity lockfile"
@@ -65,6 +68,7 @@ run_editor() {
     shift 2
     [[ "${1:-}" == "--no-quit" ]] && { quit=""; shift; }
     local log="$LOG_DIR/$name.log"
+    rm -f "$log"   # never judge this run by a previous run's log
 
     echo "▶ $method"
     local rc=0
@@ -72,7 +76,9 @@ run_editor() {
               -executeMethod "$method" $quit "$@" -logFile "$log" || rc=$?
     if [[ $rc -ne 0 ]]; then
         # Only call it a compile failure when the log says so; otherwise the method itself failed.
-        if grep -qE "error CS[0-9]+" "$log" 2>/dev/null; then
+        if grep -q "another Unity instance is running" "$log" 2>/dev/null; then
+            echo "✘ $method failed — Unity Editor has the project open - close the Editor (then optionally FORCE_BUILD=1) and retry" >&2
+        elif grep -qE "error CS[0-9]+" "$log" 2>/dev/null; then
             echo "✘ $method failed — compiler errors:" >&2
             grep -E "error CS[0-9]+" "$log" | sort -u | head -40 >&2 || true
             echo "  full log: $log" >&2
@@ -91,9 +97,54 @@ do_setup() {
     run_editor MaterialRepair.Repair            materials
 }
 
+# Unity's incremental player build does not necessarily rewrite the executable (it is a copied
+# engine stub), so its mtime says nothing about freshness. build_linux instead touches this stamp
+# when a build STARTS and keeps it only if the build succeeds; sources edited mid-build stay newer.
+BUILD_STAMP="$PROJECT/Build/Linux/.build-stamp"
+
+# True when the Linux player or its build stamp is missing, or any project source is newer than
+# the last successful build.
+player_is_stale() {
+    [[ -x "$PLAYER" && -f "$BUILD_STAMP" ]] || return 0
+    [[ -n "$(find "$PROJECT/Assets" "$PROJECT/ProjectSettings" "$PROJECT/Packages" \
+                 -type f -newer "$BUILD_STAMP" ! -name '*.meta' -print -quit 2>/dev/null)" ]]
+}
+
+# Build the Linux player and prove it happened: this run's log (run_editor deletes the old one)
+# must report "[GameBuilder] Build succeeded" and no build failure, and the player must exist.
+# Exits non-zero otherwise. Compiler errors in assemblies the player does not include (e.g. test
+# assemblies) do not fail the build; errors in player code make BuildPlayer itself fail.
+build_linux() {
+    local log="$LOG_DIR/player-linux.log" pending="$LOG_DIR/.build-stamp.pending"
+    rm -f "$BUILD_STAMP"
+    touch "$pending"
+    run_editor GameBuilder.BuildLinux player-linux
+    if grep -qE "Build failed|BuildFailedException|\[GameBuilder\] Build (Failed|Cancelled|Unknown)" "$log" 2>/dev/null; then
+        echo "✘ Linux build failed:" >&2
+        grep -E "Build failed|BuildFailedException|error CS[0-9]+|\[GameBuilder\]" "$log" | sort -u | head -20 >&2 || true
+        echo "  full log: $log" >&2
+        exit 1
+    fi
+    if ! grep -q "^\[GameBuilder\] Build succeeded" "$log" 2>/dev/null || [[ ! -x "$PLAYER" ]]; then
+        echo "✘ Linux build did not report success or produced no player at $PLAYER — see $log" >&2
+        exit 1
+    fi
+    mv -f "$pending" "$BUILD_STAMP" || { echo "✘ could not write build stamp $BUILD_STAMP" >&2; exit 1; }
+}
+
+# Rebuild the player when it is stale (or FORCE_BUILD=1), so nothing ever runs an old binary.
+ensure_fresh_player() {
+    if [[ "${FORCE_BUILD:-0}" == 1 ]] || player_is_stale; then
+        echo "· Linux player is missing or older than the sources — rebuilding"
+        ensure_kenney
+        build_linux
+    fi
+}
+
 do_smoke() {
-    [[ -x "$PLAYER" ]] || { echo "No build at $PLAYER — run: $0 linux" >&2; exit 1; }
+    ensure_fresh_player
     local log="$LOG_DIR/smoke.log"
+    rm -f "$log"   # a leftover log from an earlier run must not pass for this one
     # A throwaway save slot (a directory, so the .bak/.tmp siblings go with it): the smoke run
     # must neither pick up nor overwrite the player's real save.
     local save_dir; save_dir=$(mktemp -d)
@@ -132,7 +183,7 @@ run_unity_tests() {
     local label="${TEST_LABEL:-${platform,,}}"
     local results="$LOG_DIR/$label-results.xml"
     local log="$LOG_DIR/$label-tests.log"
-    rm -f "$results"
+    rm -f "$results" "$log"
 
     echo "▶ $platform tests${*:+ ($*)}"
     local rc=0
@@ -152,6 +203,10 @@ run_unity_tests() {
             for attr in total passed failed; do
                 printf -v "$attr" '%s' "$(echo "$run" | grep -o " $attr=\"[0-9]*\"" | sed -E 's/.*="([0-9]*)"/\1/' || true)"
             done
+            if [[ -z "${total:-}" || "$total" == 0 ]]; then
+                echo "✘ $platform run reported no tests — nothing was verified ($results)" >&2
+                exit 1
+            fi
             echo "✔ $platform tests passed (total ${total:-?}, passed ${passed:-?}, failed ${failed:-?})"
             ;;
         2)
@@ -162,6 +217,10 @@ run_unity_tests() {
             exit 1
             ;;
         *)
+            if grep -q "another Unity instance is running" "$log" 2>/dev/null; then
+                echo "✘ $platform test run failed — Unity Editor has the project open - close the Editor and retry" >&2
+                exit 1
+            fi
             echo "✘ $platform test run failed (exit $rc) — compiler errors:" >&2
             grep -E "error CS[0-9]+" "$log" | sort -u | head -40 >&2 || true
             echo "  full log: $log" >&2
@@ -209,10 +268,10 @@ do_playmode() {
 # to soak.jsonl, logs each SoakBands violation as "[Soak] VIOLATION ...", and quits the player
 # with exit code 3 when any band was violated (0 when all held).
 do_soak() {
-    [[ -x "$PLAYER" ]] || { echo "No build at $PLAYER — run: $0 linux" >&2; exit 1; }
+    ensure_fresh_player
     local log="$LOG_DIR/soak.log" jsonl="$LOG_DIR/soak.jsonl" save="$LOG_DIR/soak-save.json"
     # Telemetry appends, and a leftover save changes the run — always start from nothing.
-    rm -f "$jsonl" "$save" "$save".*
+    rm -f "$log" "$jsonl" "$save" "$save".*
 
     echo "▶ headless economy soak (${SOAK_DAYS:-15} days, seed ${SEED:-1})"
     local rc=0
@@ -318,17 +377,21 @@ do_playtest() {
     echo "✔ playtest passed"
 }
 
-# Non-gating visual check: a diff is for a human to review, so this never fails the build.
+# Visual check: a diff is for a human to review, so a difference never fails the build — but a
+# capture or comparison that did not run verified nothing, and that does fail.
 do_look_diff() {
-    ( do_look ) || echo "⚠ screenshot capture failed — comparing whatever is in Screenshots/"
+    if ! ( do_look ); then
+        echo "✘ screenshot capture failed — nothing current to compare" >&2
+        exit 1
+    fi
     if ( run_editor ScreenshotDiff.Compare screenshot-diff \
              -baseline "$BASELINES" -current "$PROJECT/Screenshots" ); then
         grep -E "^\[ScreenshotDiff\]" "$LOG_DIR/screenshot-diff.log" | sed "s|^|  |" || true
         echo "  diff images: $PROJECT/Logs/screenshot-diff/"
     else
-        echo "⚠ screenshot comparison did not run — see $LOG_DIR/screenshot-diff.log"
+        echo "✘ screenshot comparison did not run — see $LOG_DIR/screenshot-diff.log" >&2
+        exit 1
     fi
-    return 0
 }
 
 # Photograph the running game so it can be reviewed without sitting in front of it.
@@ -339,6 +402,7 @@ do_look_diff() {
 do_look() {
     local out="$PROJECT/Screenshots"
     rm -rf "$out"; mkdir -p "$out"
+    rm -f "$LOG_DIR/look.log"
 
     : "${DISPLAY:=:0}"
     if [ -z "${XAUTHORITY:-}" ]; then
@@ -355,7 +419,11 @@ do_look() {
         exit 1
     fi
     grep -E "^\[Tour\] done" "$LOG_DIR/look.log" || true
-    ls "$out"/*.png 2>/dev/null | sed "s|^|  |"
+    if ! compgen -G "$out/*.png" >/dev/null; then
+        echo "✘ capture wrote no screenshots to $out — see $LOG_DIR/look.log" >&2
+        exit 1
+    fi
+    ls "$out"/*.png | sed "s|^|  |"
 }
 
 # The Kenney kits are gitignored, so a fresh clone or worktree has none; restore them first.
@@ -370,7 +438,7 @@ esac
 
 case "${1:-all}" in
     setup)   do_setup ;;
-    linux)   run_editor GameBuilder.BuildLinux   player-linux ;;
+    linux)   build_linux ;;
     windows) run_editor GameBuilder.BuildWindows player-windows ;;
     # Retired: MainScene.unity is authored in the editor now. Kept as a no-op so old
     # check commands and scripts that still call it do not fail; it never touches the scene.
@@ -382,7 +450,7 @@ case "${1:-all}" in
     spawnverify) do_spawnverify ;;
     playtest)    do_playtest ;;
     look)    do_look ;;
-    look-diff)   do_look_diff; exit 0 ;;
+    look-diff)   do_look_diff ;;
     look-approve)
         run_editor ScreenshotDiff.Approve screenshot-approve \
             -baseline "$BASELINES" -current "$PROJECT/Screenshots"
@@ -400,11 +468,11 @@ case "${1:-all}" in
         echo "✔ asset packages extracted and materials repaired"
         ;;
     assets?) run_editor AssetStoreImporter.Report    assetstore-report ;;
-    run)     exec "$PLAYER" ;;
+    run)     ensure_fresh_player; exec "$PLAYER" ;;
     kenney)  ensure_kenney ;;
     all)
         do_setup
-        run_editor GameBuilder.BuildLinux player-linux
+        build_linux
         do_smoke
         echo ""
         echo "✔ Done. Play it with:  $PLAYER"
