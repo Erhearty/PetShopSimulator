@@ -37,8 +37,8 @@ namespace PetShop.UI
 
         private static readonly Vector2 Centre        = new(0.5f, 0.5f);
         private static readonly Vector2 PanelHalfSize = new(450f, 330f);
-        private static readonly Color   DimColor      = new(0.03f, 0.05f, 0.08f, 0.72f);
-        private static readonly Color   PaneColor     = new(0.05f, 0.07f, 0.10f, 1f);
+        private static readonly Color   DimColor      = UIFactory.Dim;
+        private static readonly Color   PaneColor     = UIFactory.Recessed;
         private static readonly QuestChapter[] Chapters = (QuestChapter[])Enum.GetValues(typeof(QuestChapter));
 
         private GameObject  _root;
@@ -59,7 +59,7 @@ namespace PetShop.UI
         {
             _game = game;
             _root = UIFactory.Panel("QuestJournalDim", canvas, Vector2.zero, Vector2.one, DimColor);
-            var panel = UIFactory.Panel("QuestJournal", _root.transform, Centre, Centre,
+            var panel = UIFactory.ModalPanel("QuestJournal", _root.transform, Centre, Centre,
                                         UIFactory.PanelBg, -PanelHalfSize, PanelHalfSize).transform;
             BuildChrome(panel);
             BuildChapterButtons(panel);

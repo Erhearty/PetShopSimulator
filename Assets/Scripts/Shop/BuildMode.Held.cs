@@ -91,6 +91,7 @@ namespace PetShop.Shop
             var go = Place(cell, def, HeldVariant(), _rotation, charge: false, footprintRotated: swapped);
             if (go == null && !GridManager.TryGetObject(cell, out _)) return null;
             if (!_heldPacked) AddStarterPair(go, def);
+            if (go != null) OnFurniturePlacedByPlayer.Invoke(go);
             IsHolding = false;
             TakeNextOrExit(def);
             return go;

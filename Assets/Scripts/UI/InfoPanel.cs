@@ -17,7 +17,7 @@ namespace PetShop.UI
 
         public void Build(Transform canvas)
         {
-            _root = UIFactory.Panel("InfoPanel", canvas,
+            _root = UIFactory.ModalPanel("InfoPanel", canvas,
                                     new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
                                     UIFactory.PanelBg,
                                     new Vector2(16f, -170f), new Vector2(370f, 170f));

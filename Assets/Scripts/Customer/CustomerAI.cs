@@ -474,9 +474,8 @@ namespace PetShop.Customer
             ShopManager.ChangeReputation(0.4f + _basket.Count * 0.5f);
             if (_basket.Count >= 3) _visual?.PlayTrigger("happy_dance");
 
+            // The "+€" float is FeedbackFX's, at the till; the customer only says thanks.
             SetBubble("thanks!", UIFactory.Good);
-            FloatingText.Spawn(transform.position + Vector3.up * 2.3f,
-                               $"+€ {total:N2}", UIFactory.Good, 0.3f);
             GameManager.Instance?.Notify($"Sold {_basket.Count} item(s) for €{total:N2}");
             AudioManager.Instance?.PlaySfx("sale");
 

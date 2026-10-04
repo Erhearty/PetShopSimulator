@@ -33,9 +33,9 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("StaffDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
+                                    UIFactory.Dim);
 
-            var panel = UIFactory.Panel("Staff", _root.transform,
+            var panel = UIFactory.ModalPanel("Staff", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-430f, -250f), new Vector2(430f, 250f));
@@ -156,7 +156,7 @@ namespace PetShop.UI
         {
             var card = UIFactory.Panel($"Card_{i}", _cardRoot,
                 new Vector2(x + 0.006f, 0f), new Vector2(x + w - 0.006f, 1f),
-                new Color(0.11f, 0.14f, 0.19f, 0.95f));
+                UIFactory.Raised);
             _spawned.Add(card);
 
             UIFactory.Label("Name", card.transform, candidate.Name,

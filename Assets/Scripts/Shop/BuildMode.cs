@@ -42,6 +42,13 @@ namespace PetShop.Shop
         public UnityEvent<GameObject>                   OnFurnitureDespawning   = new();
 
         /// <summary>
+        /// Raised after the player places furniture interactively (paid or from the hand). Unlike
+        /// <see cref="OnFurnitureSpawned"/> it is not raised by save loading, room seeding or dev
+        /// furnishing, which call <see cref="Place"/> directly — game-feel effects listen here.
+        /// </summary>
+        public UnityEvent<GameObject>                   OnFurniturePlacedByPlayer = new();
+
+        /// <summary>
         /// Pen species the player may pick with Q for the legacy <c>pet_pen</c>, as pen variant
         /// strings. Per-species pens ignore it. Null or empty leaves the factory default (Rabbit).
         /// </summary>
@@ -150,7 +157,9 @@ namespace PetShop.Shop
 
             PrepareFloor(CurrentItem, cell, CurrentItem.Size);
             string variant = IsLegacyPen(CurrentItem) ? CurrentPenVariant() : null;
-            AddStarterPair(Place(cell, CurrentItem, variant, _rotation, charge: true), CurrentItem);
+            var go = Place(cell, CurrentItem, variant, _rotation, charge: true);
+            AddStarterPair(go, CurrentItem);
+            if (go != null) OnFurniturePlacedByPlayer.Invoke(go);
         }
 
         /// <summary>

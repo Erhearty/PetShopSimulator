@@ -105,27 +105,16 @@ namespace PetShop.Core
             MeshBuilder.SetLayerRecursive(body, GameLayers.Character);
         }
 
-        public static Color RandomSkin()
-        {
-            Color[] p = { new(1f, 0.87f, 0.73f), new(0.94f, 0.76f, 0.59f),
-                          new(0.80f, 0.60f, 0.40f), new(0.60f, 0.40f, 0.24f), new(0.40f, 0.24f, 0.13f) };
-            return p[UnityEngine.Random.Range(0, p.Length)];
-        }
+        /// <summary>A skin tone from the world palette.</summary>
+        public static Color RandomSkin() => Pick(MaterialFactory.Palette.Skin);
 
-        public static Color RandomShirt()
-        {
-            Color[] p = { new(0.85f, 0.28f, 0.28f), new(0.25f, 0.45f, 0.80f), new(0.30f, 0.65f, 0.38f),
-                          new(0.90f, 0.75f, 0.25f), new(0.70f, 0.35f, 0.75f), new(0.25f, 0.70f, 0.72f),
-                          new(0.92f, 0.92f, 0.90f), new(0.95f, 0.55f, 0.20f) };
-            return p[UnityEngine.Random.Range(0, p.Length)];
-        }
+        /// <summary>A shirt colour from the world palette's clothing roles.</summary>
+        public static Color RandomShirt() => Pick(MaterialFactory.Palette.Shirts);
 
-        public static Color RandomTrousers()
-        {
-            Color[] p = { new(0.22f, 0.25f, 0.32f), new(0.35f, 0.32f, 0.28f),
-                          new(0.18f, 0.20f, 0.24f), new(0.45f, 0.42f, 0.38f) };
-            return p[UnityEngine.Random.Range(0, p.Length)];
-        }
+        /// <summary>A trouser colour from the world palette's clothing roles.</summary>
+        public static Color RandomTrousers() => Pick(MaterialFactory.Palette.Trousers);
+
+        private static Color Pick(Color[] options) => options[UnityEngine.Random.Range(0, options.Length)];
     }
 
     /// <summary>

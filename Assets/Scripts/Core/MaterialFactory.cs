@@ -15,17 +15,89 @@ namespace PetShop.Core
 
         // ── Palette ─────────────────────────────────────────────────────────────
 
-        public static readonly Color FloorColor       = new(0.55f, 0.47f, 0.38f);
-        public static readonly Color WallColor        = new(0.92f, 0.91f, 0.87f);
-        public static readonly Color WallTrimColor    = new(0.55f, 0.40f, 0.25f);
-        public static readonly Color ShelfColor       = new(0.72f, 0.52f, 0.31f);
-        public static readonly Color ShelfBackColor   = new(0.44f, 0.30f, 0.19f);
-        public static readonly Color CounterColor     = new(0.90f, 0.88f, 0.82f);
-        public static readonly Color CounterTrimColor = new(0.40f, 0.28f, 0.18f);
-        public static readonly Color PenColor         = new(0.62f, 0.54f, 0.38f);   // sand and straw
-        public static readonly Color PenFenceColor    = new(0.80f, 0.60f, 0.35f);
-        public static readonly Color PlayerColor      = new(0.25f, 0.45f, 0.85f);
-        public static readonly Color CustomerColor    = new(0.85f, 0.55f, 0.25f);
+        /// <summary>
+        /// Named world colour roles for the warm shop interior: oak floors, cream-sage walls and
+        /// sunflower accents that match the UI accent (#F5B935). World code picks a role from
+        /// here rather than inventing a colour, so the shop, pens, pets and people stay coherent.
+        /// </summary>
+        public static class Palette
+        {
+            /// <summary>Warm oak floorboards.</summary>
+            public static readonly Color OakFloor     = new(0.60f, 0.44f, 0.29f);
+            /// <summary>Darker oak for trims, shelf backs and fences.</summary>
+            public static readonly Color OakDark      = new(0.42f, 0.29f, 0.18f);
+            /// <summary>Mid oak for shelving and furniture.</summary>
+            public static readonly Color OakMid       = new(0.70f, 0.51f, 0.32f);
+            /// <summary>Light oak for pen fencing.</summary>
+            public static readonly Color OakLight     = new(0.82f, 0.64f, 0.41f);
+            /// <summary>Cream wall plaster.</summary>
+            public static readonly Color CreamWall    = new(0.94f, 0.91f, 0.83f);
+            /// <summary>Sage green for wall trims and skirting.</summary>
+            public static readonly Color Sage         = new(0.56f, 0.66f, 0.54f);
+            /// <summary>Counter tops: warm cream.</summary>
+            public static readonly Color CounterCream = new(0.95f, 0.92f, 0.84f);
+            /// <summary>Sunflower accent, identical to the UI accent #F5B935.</summary>
+            public static readonly Color Sunflower    = new(0.961f, 0.725f, 0.208f);
+            /// <summary>Pen floor: sand.</summary>
+            public static readonly Color PenSand      = new(0.70f, 0.60f, 0.43f);
+            /// <summary>Clean straw bedding.</summary>
+            public static readonly Color Straw        = new(0.89f, 0.77f, 0.45f);
+            /// <summary>Feed heap.</summary>
+            public static readonly Color Feed         = new(0.80f, 0.62f, 0.30f);
+            /// <summary>Muck in a dirty pen.</summary>
+            public static readonly Color Muck         = new(0.36f, 0.29f, 0.18f);
+            /// <summary>Dark track behind the pen upkeep bars.</summary>
+            public static readonly Color BarTrack     = new(0.10f, 0.11f, 0.14f, 0.9f);
+            /// <summary>The shopkeeper's apron colour — sage, so they read as staff.</summary>
+            public static readonly Color Staff        = new(0.36f, 0.55f, 0.45f);
+            /// <summary>Generic customer clothing.</summary>
+            public static readonly Color Customer     = new(0.85f, 0.55f, 0.25f);
+
+            /// <summary>Skin tones for procedural people.</summary>
+            public static readonly Color[] Skin =
+            {
+                new(1f, 0.87f, 0.73f), new(0.94f, 0.76f, 0.59f), new(0.80f, 0.60f, 0.40f),
+                new(0.60f, 0.40f, 0.24f), new(0.40f, 0.24f, 0.13f),
+            };
+
+            /// <summary>Muted, warm-leaning shirt colours, so crowds stay varied but in key.</summary>
+            public static readonly Color[] Shirts =
+            {
+                new(0.80f, 0.36f, 0.32f), new(0.33f, 0.50f, 0.72f), new(0.40f, 0.62f, 0.44f),
+                new(0.96f, 0.73f, 0.21f), new(0.62f, 0.42f, 0.66f), new(0.32f, 0.64f, 0.64f),
+                new(0.93f, 0.90f, 0.84f), new(0.90f, 0.55f, 0.30f), new(0.56f, 0.66f, 0.54f),
+            };
+
+            /// <summary>Trouser colours: denim, khaki, charcoal and stone.</summary>
+            public static readonly Color[] Trousers =
+            {
+                new(0.24f, 0.30f, 0.42f), new(0.52f, 0.46f, 0.34f),
+                new(0.20f, 0.21f, 0.24f), new(0.46f, 0.43f, 0.39f),
+            };
+
+            /// <summary>Warm key light (late-afternoon sun through the shopfront).</summary>
+            public static readonly Color KeyLight      = new(1f, 0.91f, 0.78f);
+            /// <summary>Cool, soft fill light that lifts the shadows.</summary>
+            public static readonly Color FillLight     = new(0.72f, 0.82f, 0.95f);
+            /// <summary>Ambient sky colour (trilight).</summary>
+            public static readonly Color AmbientSky    = new(0.62f, 0.66f, 0.70f);
+            /// <summary>Ambient horizon colour (trilight).</summary>
+            public static readonly Color AmbientEquator = new(0.58f, 0.52f, 0.44f);
+            /// <summary>Ambient ground bounce: warm oak.</summary>
+            public static readonly Color AmbientGround = new(0.34f, 0.27f, 0.20f);
+        }
+
+        public static readonly Color FloorColor       = Palette.OakFloor;
+        public static readonly Color WallColor        = Palette.CreamWall;
+        public static readonly Color WallTrimColor    = Palette.Sage;
+        public static readonly Color ShelfColor       = Palette.OakMid;
+        public static readonly Color ShelfBackColor   = Palette.OakDark;
+        public static readonly Color CounterColor     = Palette.CounterCream;
+        public static readonly Color CounterTrimColor = Palette.Sunflower;
+        public static readonly Color PenColor         = Palette.PenSand;   // sand and straw
+        public static readonly Color PenFenceColor    = Palette.OakLight;
+        public static readonly Color PlayerColor      = Palette.Staff;
+        public static readonly Color CustomerColor    = Palette.Customer;
 
         public static Material Floor       => Get("floor",        FloorColor,       0f,    0.12f);
         public static Material Wall        => Get("wall",         WallColor,        0f,    0.15f);
@@ -58,10 +130,10 @@ namespace PetShop.Core
 
         public static Material ForProduct(Commerce.ProductCategory cat) => cat switch
         {
-            Commerce.ProductCategory.Food      => Get("prod_food", new Color(0.90f, 0.75f, 0.30f), 0f, 0.6f),
-            Commerce.ProductCategory.Toy       => Get("prod_toy",  new Color(0.85f, 0.30f, 0.30f), 0f, 0.6f),
-            Commerce.ProductCategory.Accessory => Get("prod_acc",  new Color(0.45f, 0.60f, 0.85f), 0f, 0.6f),
-            Commerce.ProductCategory.Medicine  => Get("prod_med",  new Color(0.35f, 0.80f, 0.55f), 0f, 0.6f),
+            Commerce.ProductCategory.Food      => Get("prod_food", Palette.Sunflower,             0f, 0.6f),
+            Commerce.ProductCategory.Toy       => Get("prod_toy",  new Color(0.84f, 0.36f, 0.32f), 0f, 0.6f),
+            Commerce.ProductCategory.Accessory => Get("prod_acc",  new Color(0.36f, 0.54f, 0.76f), 0f, 0.6f),
+            Commerce.ProductCategory.Medicine  => Get("prod_med",  new Color(0.40f, 0.72f, 0.54f), 0f, 0.6f),
             _                                  => Get("prod_default", Color.gray, 0f, 0.6f),
         };
 

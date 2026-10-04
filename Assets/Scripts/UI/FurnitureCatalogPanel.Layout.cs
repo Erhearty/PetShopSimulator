@@ -8,7 +8,7 @@ namespace PetShop.UI
     public partial class FurnitureCatalogPanel
     {
         /// <summary>Row backing: a shade lighter than the panel so rows read as separate.</summary>
-        private static readonly Color   RowColour = new(0.11f, 0.14f, 0.19f, 0.96f);
+        private static readonly Color   RowColour = UIFactory.Raised;
 
         private const float BalanceLeft   = 0.60f;
         private const float BalanceBottom = 0.88f;

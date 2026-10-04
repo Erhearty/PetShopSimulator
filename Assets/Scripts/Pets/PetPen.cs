@@ -216,7 +216,7 @@ namespace PetShop.Pets
             const float width = 0.62f, height = 0.055f;
 
             var track = MeshBuilder.CreateBox(width, height, 0.015f,
-                MaterialFactory.Get("penBar_track", new Color(0.1f, 0.11f, 0.14f, 0.9f)), "BarTrack");
+                MaterialFactory.Get("penBar_track", MaterialFactory.Palette.BarTrack), "BarTrack");
             track.transform.SetParent(parent, false);
             track.transform.localPosition = new Vector3(0f, localY, 0f);
             Destroy(track.GetComponent<Collider>());
@@ -381,7 +381,7 @@ namespace PetShop.Pets
 
             if (Cleanliness < 0.5f)
             {
-                var muck = MaterialFactory.Get("pen_muck", new Color(0.36f, 0.29f, 0.18f), 0f, 0.1f);
+                var muck = MaterialFactory.Get("pen_muck", MaterialFactory.Palette.Muck, 0f, 0.1f);
                 int blobs = Mathf.RoundToInt(Mathf.Lerp(6f, 1f, Cleanliness / 0.5f));
                 for (int i = 0; i < blobs; i++)
                 {
@@ -401,7 +401,7 @@ namespace PetShop.Pets
             {
                 float size = Mathf.Lerp(0.08f, 0.3f, FoodLevel);
                 var feed = MeshBuilder.CreateBox(size, size * 0.45f, size,
-                    MaterialFactory.Get("pen_feed", new Color(0.82f, 0.68f, 0.34f), 0f, 0.15f), "Feed");
+                    MaterialFactory.Get("pen_feed", MaterialFactory.Palette.Feed, 0f, 0.15f), "Feed");
                 feed.transform.SetParent(_upkeepRoot, false);
                 feed.transform.localPosition = new Vector3(PenSize * 0.32f, 0.04f, -PenSize * 0.20f);
                 Destroy(feed.GetComponent<Collider>());
@@ -466,7 +466,7 @@ namespace PetShop.Pets
 
             const float dividerH = 0.3f, dividerT = 0.05f;
             var fence = MaterialFactory.PenFence;
-            var straw = MaterialFactory.Get("pen_straw", new Color(0.86f, 0.74f, 0.42f), 0f, 0.1f);
+            var straw = MaterialFactory.Get("pen_straw", MaterialFactory.Palette.Straw, 0f, 0.1f);
             float stall = PenSize / StallCols;
 
             for (int c = 1; c < StallCols; c++)
@@ -503,68 +503,118 @@ namespace PetShop.Pets
         }
     }
 
-    /// <summary>Gentle idle wander + hop, so pens do not look like static props.</summary>
+    /// <summary>
+    /// Gentle idle wander + hop, so pens do not look like static props. While resting the
+    /// animal breathes (a slight bob) and now and then twitches its head/ears with a quick roll.
+    /// Allocation-free per frame: the CharacterVisual lookup is cached.
+    /// </summary>
     public class PetVisual : MonoBehaviour
     {
-        private Vector3 _home;
-        private Vector3 _target;
-        private float   _radius;
-        private float   _speed;
-        private float   _hopPhase;
-        private float   _restTimer;
-        private Vector3 _lastPosition;
+        private const float MinRadius        = 0.15f;
+        private const float ArriveDistance   = 0.05f;
+        private const float MinRest          = 0.6f;
+        private const float MaxRest          = 2.5f;
+        private const float TurnRate         = 6f;
+        private const float HopBaseRate      = 2f;
+        private const float HopHeight        = 0.05f;
+        private const float BreathRate       = 2.4f;
+        private const float BreathHeight     = 0.012f;
+        private const float TwitchMinGap     = 2.5f;
+        private const float TwitchMaxGap     = 6f;
+        private const float TwitchDuration   = 0.18f;
+        private const float TwitchAngle      = 7f;
+        private const float PhaseSpread      = 10f;
+
+        private Vector3    _home;
+        private Vector3    _target;
+        private float      _radius;
+        private float      _speed;
+        private float      _hopPhase;
+        private float      _restTimer;
+        private float      _twitchTimer;
+        private float      _twitchLeft;
+        private Vector3    _lastPosition;
+        private Quaternion _facing = Quaternion.identity;
+        private bool       _walks;
 
         /// <summary>Local-space velocity, so an animator can be driven from the wander.</summary>
         public Vector3 Velocity { get; private set; }
 
+        /// <summary>Starts the wander around <paramref name="home"/> within its stall.</summary>
         public void Init(Vector3 home, float radius, float speed)
         {
             _home   = home;
-            _radius = Mathf.Max(0.15f, radius * 0.5f);
+            _radius = Mathf.Max(MinRadius, radius * 0.5f);
             _speed  = speed;
             transform.localPosition = home;
             _lastPosition = home;
-            _target   = home;
-            _hopPhase = Random.value * 10f;
+            _target      = home;
+            _hopPhase    = Random.value * PhaseSpread;
+            _twitchTimer = Random.Range(TwitchMinGap, TwitchMaxGap);
+            _facing      = transform.localRotation;
         }
+
+        private void Start() => _walks = GetComponent<PetShop.Core.CharacterVisual>() != null;
 
         private void Update()
         {
-            _hopPhase += Time.deltaTime * (2f + _speed);
-
-            if (_restTimer > 0f)
-            {
-                _restTimer -= Time.deltaTime;
-            }
-            else
-            {
-                Vector3 flat = transform.localPosition; flat.y = 0f;
-                Vector3 goal = _target;                 goal.y = 0f;
-
-                if (Vector3.Distance(flat, goal) < 0.05f)
-                {
-                    var offset = Random.insideUnitCircle * _radius;
-                    _target    = _home + new Vector3(offset.x, 0f, offset.y);
-                    _restTimer = Random.Range(0.6f, 2.5f);
-                }
-                else
-                {
-                    Vector3 dir = (goal - flat).normalized;
-                    transform.localPosition += dir * (_speed * Time.deltaTime);
-                    transform.localRotation  = Quaternion.Slerp(
-                        transform.localRotation, Quaternion.LookRotation(dir, Vector3.up), 6f * Time.deltaTime);
-                }
-            }
+            float dt = Time.deltaTime;
+            _hopPhase += dt * (HopBaseRate + _speed);
+            bool resting = _restTimer > 0f;
+            if (resting) _restTimer -= dt;
+            else Wander(dt);
 
             var p = transform.localPosition;
             // Modelled animals walk; the blocky stand-ins hop, which reads better for them.
-            p.y = _home.y + (GetComponent<PetShop.Core.CharacterVisual>() != null
-                ? 0f
-                : Mathf.Abs(Mathf.Sin(_hopPhase)) * 0.05f);
+            p.y = _home.y + IdleLift(resting);
             transform.localPosition = p;
+            transform.localRotation = _facing * Twitch(dt, resting);
 
-            Velocity = Time.deltaTime > 0f ? (p - _lastPosition) / Time.deltaTime : Vector3.zero;
+            Velocity = dt > 0f ? (p - _lastPosition) / dt : Vector3.zero;
             _lastPosition = p;
+        }
+
+        /// <summary>Steps towards the current target, picking a new one (and a rest) on arrival.</summary>
+        private void Wander(float dt)
+        {
+            Vector3 flat = transform.localPosition; flat.y = 0f;
+            Vector3 goal = _target;                 goal.y = 0f;
+
+            if (Vector3.Distance(flat, goal) < ArriveDistance)
+            {
+                var offset = Random.insideUnitCircle * _radius;
+                _target    = _home + new Vector3(offset.x, 0f, offset.y);
+                _restTimer = Random.Range(MinRest, MaxRest);
+                return;
+            }
+
+            Vector3 dir = (goal - flat).normalized;
+            transform.localPosition += dir * (_speed * dt);
+            _facing = Quaternion.Slerp(_facing, Quaternion.LookRotation(dir, Vector3.up), TurnRate * dt);
+        }
+
+        /// <summary>Hop for stand-ins on the move, a soft breathing bob for anything at rest.</summary>
+        private float IdleLift(bool resting)
+        {
+            if (resting) return (Mathf.Sin(_hopPhase * BreathRate / HopBaseRate) * 0.5f + 0.5f) * BreathHeight;
+            return _walks ? 0f : Mathf.Abs(Mathf.Sin(_hopPhase)) * HopHeight;
+        }
+
+        /// <summary>An occasional quick head/ear flick while resting.</summary>
+        private Quaternion Twitch(float dt, bool resting)
+        {
+            if (_twitchLeft > 0f)
+            {
+                _twitchLeft -= dt;
+                float t = Mathf.Clamp01(_twitchLeft / TwitchDuration);
+                return Quaternion.Euler(0f, 0f, Mathf.Sin(t * Mathf.PI) * TwitchAngle);
+            }
+            if (!resting) return Quaternion.identity;
+            _twitchTimer -= dt;
+            if (_twitchTimer > 0f) return Quaternion.identity;
+            _twitchTimer = Random.Range(TwitchMinGap, TwitchMaxGap);
+            _twitchLeft  = TwitchDuration;
+            return Quaternion.identity;
         }
     }
 }

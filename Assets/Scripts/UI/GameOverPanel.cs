@@ -17,9 +17,9 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("GameOverDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.05f, 0.02f, 0.02f, 0.82f));
+                                    UIFactory.DimStrong);
 
-            var panel = UIFactory.Panel("GameOver", _root.transform,
+            var panel = UIFactory.ModalPanel("GameOver", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-250f, -150f), new Vector2(250f, 150f));

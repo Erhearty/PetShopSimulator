@@ -27,11 +27,11 @@ namespace PetShop.UI
 
         private static readonly (string label, Color colour)[] Buckets =
         {
-            ("Animals",   new Color(0.95f, 0.62f, 0.35f)),
-            ("Food",      new Color(0.92f, 0.78f, 0.34f)),
-            ("Toys",      new Color(0.88f, 0.42f, 0.45f)),
-            ("Accessory", new Color(0.44f, 0.66f, 0.92f)),
-            ("Medicine",  new Color(0.42f, 0.84f, 0.62f)),
+            ("Animals",   UIFactory.ChartAnimals),
+            ("Food",      UIFactory.ChartFood),
+            ("Toys",      UIFactory.ChartToys),
+            ("Accessory", UIFactory.ChartAccessory),
+            ("Medicine",  UIFactory.ChartMedicine),
         };
 
         public void Build(Transform canvas, GameManager game)
@@ -39,18 +39,15 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("DayResultsDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.02f, 0.04f, 0.07f, 0.66f));
+                                    UIFactory.Dim);
 
-            var panel = UIFactory.Panel("DayResults", _root.transform,
+            var panel = UIFactory.ModalPanel("DayResults", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-330f, -270f), new Vector2(330f, 270f));
 
-            UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                            UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
-
-            _heading = UIFactory.Label("Heading", panel.transform, "End of day",
-                new Vector2(0.06f, 0.88f), new Vector2(0.94f, 0.96f), 26f, UIFactory.Ink);
+            _heading = UIFactory.Header(panel.transform, "End of day",
+                new Vector2(0.06f, 0.88f), new Vector2(0.94f, 0.96f));
 
             _figures = UIFactory.Label("Figures", panel.transform, "",
                 new Vector2(0.06f, 0.55f), new Vector2(0.52f, 0.87f), 17f, UIFactory.Ink,
@@ -61,7 +58,7 @@ namespace PetShop.UI
 
             // Stacked proportion bar
             var track = UIFactory.Panel("BarTrack", panel.transform, new Vector2(0.55f, 0.76f),
-                                        new Vector2(0.94f, 0.81f), new Color(1f, 1f, 1f, 0.10f));
+                                        new Vector2(0.94f, 0.81f), UIFactory.TrackFaint);
             _barRow = track.transform;
 
             _breakdown = UIFactory.Label("Breakdown", panel.transform, "",

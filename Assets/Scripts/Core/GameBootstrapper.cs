@@ -182,6 +182,7 @@ namespace PetShop.Core
                 else Debug.LogWarning("[Bootstrap] No 'Player' object in the scene.");
             }
 
+            LightingSetup.Apply();
             if (RenderSettings.skybox != null) DynamicGI.UpdateEnvironment();
 
             if (_layout.Player != null)
@@ -297,6 +298,7 @@ namespace PetShop.Core
 
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);
+            new GameObject("FeedbackFX").AddComponent<FeedbackFX>().Attach(_queue, _build);
 
             // Walls block movement, so the NavMesh has to follow them immediately — waiting
             // until build mode exits lets customers walk through a wall you just built.

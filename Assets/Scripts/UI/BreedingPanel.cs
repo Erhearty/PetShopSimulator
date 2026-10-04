@@ -50,9 +50,9 @@ namespace PetShop.UI
             _showcase = showcase;
 
             _root = UIFactory.Panel("BreedDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
+                                    UIFactory.Dim);
 
-            var panel = UIFactory.Panel("Breeding", _root.transform,
+            var panel = UIFactory.ModalPanel("Breeding", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-400f, -260f), new Vector2(400f, 260f));
@@ -306,7 +306,7 @@ namespace PetShop.UI
             if (image == null) return;
 
             // Keep full alpha: scaling the colour scales alpha too, and the button disappears.
-            image.color = on ? enabledColour : new Color(0.13f, 0.16f, 0.21f, 0.96f);
+            image.color = on ? enabledColour : UIFactory.DisabledFill;
         }
     }
 }

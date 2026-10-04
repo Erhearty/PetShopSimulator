@@ -29,12 +29,50 @@ namespace PetShop.UI
         public static readonly Color Warning     = Hex(0xF0, 0x8A, 0x4B);
         /// <summary>Bad news or irreversible actions (#E5555A).</summary>
         public static readonly Color Destructive = Hex(0xE5, 0x55, 0x5A);
+        /// <summary>
+        /// Fill of destructive action buttons (#B83A3F): a deep red that keeps ink text at ≥ 4.5:1,
+        /// where <see cref="Destructive"/> (#E5555A) is only ≈ 3.3:1.
+        /// </summary>
+        public static readonly Color DestructiveFill = Hex(0xB8, 0x3A, 0x3F);
         /// <summary>Hairlines and dividers (#2F5A68).</summary>
         public static readonly Color Border      = Hex(0x2F, 0x5A, 0x68);
         /// <summary>Full-screen dimmer behind modal panels.</summary>
         public static readonly Color Dim         = new(0f, 0f, 0f, DimAlpha);
         /// <summary>Outline colour around the keyboard-selected control.</summary>
         public static readonly Color FocusRing   = Accent;
+        /// <summary>Heavier dimmer for full-stop screens (game over, settings over the title).</summary>
+        public static readonly Color DimStrong   = new(0f, 0f, 0f, DimStrongAlpha);
+        /// <summary>Faint track behind charts and proportion bars.</summary>
+        public static readonly Color TrackFaint  = WithAlpha(Ink, TrackFaintAlpha);
+        /// <summary>The HUD crosshair dot.</summary>
+        public static readonly Color Crosshair   = WithAlpha(Ink, CrosshairAlpha);
+        /// <summary>Fill of a disabled action button: visible on the panel, clearly inert.</summary>
+        public static readonly Color DisabledFill = Border;
+        /// <summary>Highlighted node (e.g. the focused pet in the family tree).</summary>
+        public static readonly Color FocusFill   = Border;
+        /// <summary>Toggle-on fill: a deep positive green that keeps ink text at ≥ 4.5:1.</summary>
+        public static readonly Color PositiveFill = Hex(0x1A, 0x61, 0x38);
+        /// <summary>Recessed well inside a panel (scroll panes, reading areas): darker than the surface.</summary>
+        public static readonly Color Recessed    = Hex(0x0E, 0x24, 0x2C);
+        /// <summary>White multiplier: leaves an image's sprite/tint untouched.</summary>
+        public static readonly Color NoTint      = Color.white;
+        /// <summary>Dark text for light swatches (contrast picking).</summary>
+        public static readonly Color SwatchInkDark  = Color.black;
+        /// <summary>Light text for dark swatches (contrast picking).</summary>
+        public static readonly Color SwatchInkLight = Color.white;
+
+        // ── Chart roles (sales categories) ──
+
+        /// <summary>Chart colour: animal sales.</summary>
+        public static readonly Color ChartAnimals   = Warning;
+        /// <summary>Chart colour: food sales.</summary>
+        public static readonly Color ChartFood      = Accent;
+        /// <summary>Chart colour: toy sales.</summary>
+        public static readonly Color ChartToys      = Hex(0xE0, 0x6B, 0x73);
+        /// <summary>Chart colour: accessory sales.</summary>
+        public static readonly Color ChartAccessory = Hex(0x70, 0xA8, 0xEB);
+        /// <summary>Chart colour: medicine sales.</summary>
+        public static readonly Color ChartMedicine  = Positive;
 
         // ── Legacy names (aliases of the token roles, so older panels keep compiling) ──
 
@@ -59,6 +97,11 @@ namespace PetShop.UI
 
         private const float DimAlpha = 0.62f;
         private const float HudAlpha = 0.9f;
+        private const float DimStrongAlpha  = 0.8f;
+        private const float TrackFaintAlpha = 0.10f;
+        private const float CrosshairAlpha  = 0.55f;
+        /// <summary>Height of the accent strip along a modal's top edge (reference pixels).</summary>
+        public const float AccentStripHeight = 4f;
 
         // ── Type, spacing, radius ───────────────────────────────────────────────
 
@@ -156,6 +199,33 @@ namespace PetShop.UI
             img.type          = Image.Type.Sliced;
             img.raycastTarget = false;
             return go;
+        }
+
+        /// <summary>
+        /// A modal panel: an anchored panel with the rounded panel sprite, so every dialog shares
+        /// the same corner radius. Same parameters as <see cref="Panel"/>; unlike <see cref="Card"/>
+        /// it keeps raycasts so clicks on the panel do not fall through.
+        /// </summary>
+        public static GameObject ModalPanel(string name, Transform parent,
+                                            Vector2 anchorMin, Vector2 anchorMax, Color color,
+                                            Vector2 offsetMin = default, Vector2 offsetMax = default)
+        {
+            var go  = Panel(name, parent, anchorMin, anchorMax, color, offsetMin, offsetMax);
+            var img = go.GetComponent<Image>();
+            img.sprite = RoundedSprite();
+            img.type   = Image.Type.Sliced;
+            return go;
+        }
+
+        /// <summary>
+        /// The shared modal header: an accent strip inset inside the rounded corners and a title
+        /// in the title size. Returns the title label.
+        /// </summary>
+        public static TMP_Text Header(Transform panel, string title, Vector2 titleMin, Vector2 titleMax)
+        {
+            Panel("Accent", panel, new Vector2(0f, 1f), new Vector2(1f, 1f), Accent,
+                  new Vector2(PanelRadius, -AccentStripHeight), new Vector2(-PanelRadius, 0f));
+            return Label("Heading", panel, title, titleMin, titleMax, TextHeading, Ink);
         }
 
         /// <summary>The RectTransform of a UI object (adds one, with a warning, if it was built bare).</summary>
@@ -268,6 +338,12 @@ namespace PetShop.UI
             $"<color=#{ColorUtility.ToHtmlStringRGB(colour)}>{text}</color>";
 
         /// <summary>Text colour readable on <paramref name="fill"/>.</summary>
-        public static Color LabelColourOn(Color fill) => fill == Accent ? OnAccent : Ink;
+        public static Color LabelColourOn(Color fill)
+        {
+            if (fill == Accent) return OnAccent;
+            // The deep fills (DestructiveFill, PositiveFill) were chosen to carry ink text at ≥ 4.5:1.
+            if (fill == DestructiveFill || fill == PositiveFill) return Ink;
+            return Ink;
+        }
     }
 }

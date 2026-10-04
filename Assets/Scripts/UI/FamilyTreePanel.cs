@@ -21,7 +21,7 @@ namespace PetShop.UI
 
         private static readonly float[] GrandX  = { 0.03f, 0.27f, 0.51f, 0.75f };
         private static readonly float[] ParentX = { 0.15f, 0.63f };
-        private static readonly Color FocusBg   = new Color(0.12f, 0.28f, 0.45f, 0.98f);
+        private static readonly Color FocusBg   = UIFactory.FocusFill;
 
         private GameObject  _root;
         private GameManager _game;
@@ -40,9 +40,9 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("TreeDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
+                                    UIFactory.Dim);
 
-            var panel = UIFactory.Panel("FamilyTree", _root.transform,
+            var panel = UIFactory.ModalPanel("FamilyTree", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-430f, -260f), new Vector2(430f, 260f));
@@ -184,7 +184,7 @@ namespace PetShop.UI
             UIFactory.Label("Info", box, $"{e.rarity}  ·  gen {e.generation}{sold}",
                 new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.64f), 13f, UIFactory.InkMuted);
 
-            var coat   = new Color(e.coat.r, e.coat.g, e.coat.b, 1f);
+            var coat   = UIFactory.WithAlpha(e.coat, 1f);
             var swatch = UIFactory.Panel("Swatch", box,
                 new Vector2(0.05f, 0.06f), new Vector2(0.95f, 0.36f), coat);
             UIFactory.Label("CoatName", swatch.transform, CoatColours.Classify(e.coat),
@@ -206,7 +206,7 @@ namespace PetShop.UI
             float l = Luminance(bg);
             float withWhite = 1.05f / (l + 0.05f);
             float withBlack = (l + 0.05f) / 0.05f;
-            return withBlack >= withWhite ? Color.black : Color.white;
+            return withBlack >= withWhite ? UIFactory.SwatchInkDark : UIFactory.SwatchInkLight;
         }
 
         private static float Luminance(Color c) =>

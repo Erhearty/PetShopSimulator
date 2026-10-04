@@ -12,6 +12,10 @@ namespace PetShop.Core
         /// <summary>Persisted key for <see cref="ShowQuestTracker"/>.</summary>
         public const string ShowQuestTrackerKey = "settings.showQuestTracker";
 
+        /// <summary>Persisted key for <see cref="ReduceMotion"/>.</summary>
+        public const string ReduceMotionKey = "settings.reduceMotion";
+
+        private const bool   ReduceMotionDefault = false;
         private const bool   ShowQuestTrackerDefault = true;
         private const bool   AutosaveMorningDefault = true;
         private const string TrueValue  = "1";
@@ -38,6 +42,13 @@ namespace PetShop.Core
         {
             get => ReadBool(ShowQuestTrackerKey, ShowQuestTrackerDefault);
             set => _store.Write(ShowQuestTrackerKey, value ? TrueValue : FalseValue);
+        }
+
+        /// <summary>When true, scale pops, bubble pops and counter ticks are skipped. Defaults to false.</summary>
+        public static bool ReduceMotion
+        {
+            get => ReadBool(ReduceMotionKey, ReduceMotionDefault);
+            set => _store.Write(ReduceMotionKey, value ? TrueValue : FalseValue);
         }
 
         /// <summary>The stored flag under <paramref name="key"/>, or <paramref name="fallback"/> when unset.</summary>
