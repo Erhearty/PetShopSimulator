@@ -53,6 +53,8 @@ world (see above). Its `Bootstrap` GameObject carries `GameBootstrapper`, which 
 
 `build.sh` sub-commands: `setup`, `linux`, `windows`, `run`, `smoke`.
 
+To open the editor on this checkout/worktree: `Tools/open-editor.sh [--fresh] [--approve-mcp]` (see `--help`).
+
 ## Controls — first person
 
 | Key | Action |
@@ -640,6 +642,13 @@ needs it, otherwise buy an animal, otherwise report.
   Do not run `build.sh` editor targets while the editor has the project open — the batch editor
   cannot share the project and crashes. Edit scripts only outside Play mode: a recompile during
   play resets every static (`GameManager.Instance` turns null mid-session).
+- **Open the editor on a worktree with `Tools/open-editor.sh [--fresh] [--approve-mcp]`**, run from
+  that worktree (it skips the launch if the editor already has it open). Verify agent-side with an MCP
+  `RunCommand` logging `Application.dataPath`: it must equal `<worktree>/Assets`. `--approve-mcp`
+  allows direct MCP connections without approval by patching **machine-wide** EditorPrefs (every
+  project on the machine), so it is opt-in; without it, approve once by hand in *Project Settings →
+  AI → Unity MCP Server → Pending Connections → Allow* (`UserSettings/` is gitignored, so each new
+  worktree needs this again).
 - The parade's building facing was derived from the city pack's demo scene (+Z won 28
   votes to 15 across 56 buildings) when the removed `StreetGenerator` placed them. A plurality,
   not a certainty — if the parade shows its back, rotate those buildings in MainScene
