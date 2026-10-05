@@ -21,7 +21,10 @@ namespace PetShop.Core
         private static readonly Vector3 KeyEuler  = new(42f, -35f, 0f);
         private static readonly Vector3 FillEuler = new(28f, 150f, 0f);
 
-        /// <summary>Applies key, fill and ambient lighting. Safe to call more than once.</summary>
+        /// <summary>
+        /// Applies key, fill and ambient lighting, then post FX via <see cref="PostFxSetup.Apply"/>.
+        /// Safe to call more than once.
+        /// </summary>
         public static void Apply()
         {
             var key = FindKeyLight();
@@ -33,6 +36,7 @@ namespace PetShop.Core
             ConfigureFill(fill);
 
             ApplyAmbient();
+            PostFxSetup.Apply();
         }
 
         /// <summary>The scene's sun if it names one, otherwise its first directional light.</summary>

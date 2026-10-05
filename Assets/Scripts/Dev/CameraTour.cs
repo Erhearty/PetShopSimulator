@@ -89,8 +89,8 @@ namespace PetShop.Dev
             cam.nearClipPlane   = 0.05f;
             cam.farClipPlane    = 900f;
 
-            var rt  = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
-            var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
+            // Same post FX as the player's camera, rendered HDR; plain LDR on a null device.
+            var capture = new TourCapture(cam, Width, Height);
 
             for (int index = 0; index < shots.Count; index++)
             {
@@ -113,18 +113,8 @@ namespace PetShop.Dev
 
                 if (shot.FromMainCamera) MatchMainCamera(cam);
 
-                cam.targetTexture = rt;
-                cam.Render();
-                cam.targetTexture = null;
-
-                var previous = RenderTexture.active;
-                RenderTexture.active = rt;
-                tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
-                tex.Apply();
-                RenderTexture.active = previous;
-
                 string file = Path.Combine(OutputDir, $"{index:00}_{shot.Name}.png");
-                File.WriteAllBytes(file, tex.EncodeToPNG());
+                File.WriteAllBytes(file, capture.RenderPng(cam));
                 Debug.Log($"[Tour] {file}");
 
                 try { shot.Teardown?.Invoke(); }
@@ -133,8 +123,8 @@ namespace PetShop.Dev
                 if (canvas != null) RestoreCanvas(canvas);
             }
 
-            Destroy(cam.gameObject);
-            rt.Release();
+            Destroy(cam.gameObject);   // takes the PostProcessLayer with it
+            capture.Dispose();
             if (traffic != null) traffic.Unfreeze();
 
             // After the camera work: paths that cannot be photographed get checked instead.
