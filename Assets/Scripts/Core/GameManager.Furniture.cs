@@ -48,6 +48,21 @@ namespace PetShop.Core
         /// </summary>
         public bool StaffStationValid { get; private set; }
 
+        /// <summary>True once the loss of the last counter has been announced; cleared when a counter is placed again.</summary>
+        private bool _noCounterNoticeGiven;
+
+        /// <summary>
+        /// True for the first caller since the last counter went (<see cref="StaffStationValid"/> false), false for
+        /// every later one until a counter is placed again — so the shop hears "no counter" once, however many
+        /// cashiers are waiting.
+        /// </summary>
+        public bool ClaimNoCounterNotice()
+        {
+            if (StaffStationValid || _noCounterNoticeGiven) return false;
+            _noCounterNoticeGiven = true;
+            return true;
+        }
+
         /// <summary>
         /// True when <paramref name="candidate"/> could be hired now (sign-on fee aside); otherwise
         /// false with a short reason — a cashier needs a counter (<see cref="HasCounter"/>).
@@ -122,6 +137,7 @@ namespace PetShop.Core
         {
             // No counter left: the old station is stale. Staff stay put; cashiers stop serving.
             StaffStationValid = _counters.Count > 0;
+            if (StaffStationValid) _noCounterNoticeGiven = false;
             if (!StaffStationValid || Spawner == null || Spawner.RegisterPoint == null) return;
             Transform counter = _counters[0].transform;
 

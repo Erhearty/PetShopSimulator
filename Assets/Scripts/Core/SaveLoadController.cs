@@ -180,7 +180,7 @@ namespace PetShop.Core
             _game.Progression?.Restore(data.ProgressionTier);
             _game.Events?.Restore(data);
 
-            RestorePlacedObjects(data, loadedPets);
+            var migration = RestorePlacedObjects(data, loadedPets);
             SaveLineage.Apply(data, loadedPets, data.Day);
             SaveReorder.Apply(data, _game.AutoReorder);
             SaveFurniture.Apply(data, _game.Furniture);
@@ -191,6 +191,7 @@ namespace PetShop.Core
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);
 
             _game.Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");
+            if (migration.HasChanges) _game.Notify(migration.Notice());
         }
 
         /// <summary>
@@ -198,12 +199,13 @@ namespace PetShop.Core
         /// saved piece, then lays the room walls if the save predates them. NavMesh bakes
         /// are suspended meanwhile, so the whole load costs one bake rather than one per wall.
         /// </summary>
-        private void RestorePlacedObjects(SaveData data, System.Collections.Generic.List<Pet> loadedPets)
+        /// <returns>What the layout migration moved or packed, for the load's one combined notice.</returns>
+        private LayoutMigrationReport RestorePlacedObjects(SaveData data, System.Collections.Generic.List<Pet> loadedPets)
         {
             var layout = _game.Layout;
-            var evicted = new System.Collections.Generic.List<SaveData.PlacedItem>();
-            SaveLayoutMigration.Apply(data, layout, evicted);
-            foreach (var item in evicted) SettleEvicted(item);
+            var migration = new LayoutMigrationReport();
+            SaveLayoutMigration.Apply(data, layout, migration);
+            foreach (var item in migration.Evicted) SettleEvicted(item);
             SaveLayoutMigration.SeedBackDoor(data, layout);
             layout?.SuspendNavMeshBakes();
             try
@@ -213,12 +215,13 @@ namespace PetShop.Core
                 SeedRoomWallsOnce(data.roomWallsSeeded);
             }
             finally { layout?.ResumeNavMeshBakes(); }
+            return migration;
         }
 
         /// <summary>
         /// Settles the contents of a piece the layout migration packed away instead of placing (it would have
-        /// stood off the yard): shelf stock goes to the warehouse, as when the Remove tool packs a shelf. A pen's
-        /// residents have nowhere to go without a pen, so they are not restored and a warning names them.
+        /// stood off the yard): shelf stock goes to the warehouse, as when the Remove tool packs a shelf. A packed
+        /// pen is always empty: the migration relocates or empties an occupied pen rather than pack its pets.
         /// </summary>
         private void SettleEvicted(SaveData.PlacedItem item)
         {
@@ -227,9 +230,8 @@ namespace PetShop.Core
                 var product = _game.Catalog?.Get(line.id);
                 if (product != null && line.qty > 0) _game.Shop.AddToWarehouse(product.category, line.qty);
             }
-            string pets = item.pets.Count > 0 ? $" {item.pets.Count} resident pet(s) were not restored." : "";
-            Debug.LogWarning($"[SaveLoad] layout migration: '{item.catalogId}' at cell ({item.cellX},{item.cellY}) " +
-                             $"lies outside the yard; returned to the furniture inventory instead of placed.{pets}");
+            Debug.LogWarning($"[SaveLoad] layout migration: action=pack id='{item.catalogId}' " +
+                             $"cell=({item.cellX},{item.cellY}) reason=outside-yard shelfLines={item.shelfStock.Count}");
         }
 
         /// <summary>Places one saved piece and refills its shelf stock or pen residents.</summary>

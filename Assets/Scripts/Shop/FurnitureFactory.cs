@@ -50,6 +50,21 @@ namespace PetShop.Shop
         /// <summary>Adults delivered with every new per-species pen.</summary>
         public const int PenStarterPairSize = 2;
 
+        /// <summary>Stalls in every pen: the most pets one pen holds.</summary>
+        public const int PenCapacity = 4;
+
+        /// <summary>Species of the legacy <c>pet_pen</c> when its variant names none.</summary>
+        public const Pet.Species DefaultLegacyPenSpecies = Pet.Species.Rabbit;
+
+        /// <summary>
+        /// The species a pen holds: a per-species pen takes it from <paramref name="catalogId"/>; the legacy
+        /// <c>pet_pen</c> reads it from <paramref name="variant"/>, defaulting to <see cref="DefaultLegacyPenSpecies"/>.
+        /// </summary>
+        public static Pet.Species PenSpecies(string catalogId, string variant) =>
+            ProgressionRules.PenSpeciesFor(catalogId) ??
+            (!string.IsNullOrEmpty(variant) && System.Enum.TryParse(variant, out Pet.Species parsed)
+                ? parsed : DefaultLegacyPenSpecies);
+
         /// <summary>Bedding colour of each species' pen, so every pen reads differently at a glance.</summary>
         private static readonly Dictionary<Pet.Species, Color> PenBeddingTints = new()
         {
@@ -261,8 +276,8 @@ namespace PetShop.Shop
             var pen = go.GetComponent<PetPen>();
             if (pen == null) pen = go.AddComponent<PetPen>();
             pen.PenSize    = def.Size.x * GridManager.CellSize * 0.86f;
-            pen.Capacity   = 4;
-            pen.PenSpecies = ProgressionRules.PenSpeciesFor(def.Id) ?? ParseEnum(variant, Pet.Species.Rabbit);
+            pen.Capacity   = BuildCatalog.PenCapacity;
+            pen.PenSpecies = BuildCatalog.PenSpecies(def.Id, variant);
             if (def.Id != BuildCatalog.PetPen) ApplyPenBedding(go, def);
         }
 

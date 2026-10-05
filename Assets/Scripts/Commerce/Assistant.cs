@@ -58,8 +58,9 @@ namespace PetShop.Commerce
         /// <summary>True while walking to or working at a shelf or pen, away from the till.</summary>
         private bool _away;
 
-        /// <summary>True once this cashier has said there is no counter; cleared when one is placed.</summary>
-        private bool _toldNoCounter;
+        /// <summary>The notice shown, once for the whole shop, when the last counter goes and cashiers stop serving.</summary>
+        public const string NoCounterNotice =
+            "Your cashiers have no counter to serve from — place a counter to open the till again.";
 
         /// <summary>Builds an assistant standing at the till, facing the queue.</summary>
         public static Assistant Create(Transform parent, Vector3 position, Vector3 facing,
@@ -187,17 +188,14 @@ namespace PetShop.Commerce
 
         /// <summary>
         /// True when there is a counter to serve from. Without one (the last counter was packed away)
-        /// the cashier stays on the payroll but waits, saying so once until a counter is placed again.
+        /// the cashier stays on the payroll but waits. The shop is told once per loss of the last counter, not
+        /// once per cashier (<see cref="GameManager.ClaimNoCounterNotice"/>).
         /// </summary>
         private bool HasCounterToServeFrom()
         {
             var game = GameManager.Instance;
-            if (game == null || game.StaffStationValid) { _toldNoCounter = false; return true; }
-            if (!_toldNoCounter)
-            {
-                _toldNoCounter = true;
-                Notify($"{DisplayName} has no counter to serve from — place a counter to open the till again.");
-            }
+            if (game == null || game.StaffStationValid) return true;
+            if (game.ClaimNoCounterNotice()) Notify(NoCounterNotice);
             return false;
         }
 

@@ -4,6 +4,7 @@ using NUnit.Framework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Events;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using PetShop.Commerce;
@@ -164,6 +165,36 @@ namespace PetShop.Tests
             AssertBehind(second, cashier.transform.position);
             for (int i = 0; i < ServeFrames; i++) yield return null;
             Assert.IsTrue(shopper.Served, "The cashier did not resume serving once a counter was placed.");
+        }
+
+        /// <summary>
+        /// With two cashiers, packing the last counter away shows the no-counter notice once for the shop, not
+        /// once per cashier; placing a counter and losing it again shows it once more.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RemoveCounter_TwoCashiers_OneNoCounterNotice()
+        {
+            yield return BootWorld();
+            var counter = PlaceCounter(MiddleCell(), NoTurn);
+            HireCashier();
+            HireCashier();
+
+            int notices = 0;
+            UnityAction<string> listen = m => { if (m == Assistant.NoCounterNotice) notices++; };
+            _game.OnNotification.AddListener(listen);
+            try
+            {
+                _game.Build.RemoveAtWorldPos(counter.transform.position);
+                for (int i = 0; i < ServeFrames; i++) yield return null;
+                Assert.AreEqual(1, notices, "Two cashiers losing the last counter should give exactly one notice.");
+
+                var again = PlaceCounter(MiddleCell(), NoTurn);
+                for (int i = 0; i < ServeFrames; i++) yield return null;
+                _game.Build.RemoveAtWorldPos(again.transform.position);
+                for (int i = 0; i < ServeFrames; i++) yield return null;
+                Assert.AreEqual(2, notices, "Losing the last counter again should give exactly one more notice.");
+            }
+            finally { _game.OnNotification.RemoveListener(listen); }
         }
 
         private IEnumerator BootWorld()
