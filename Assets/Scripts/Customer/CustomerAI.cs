@@ -16,7 +16,7 @@ namespace PetShop.Customer
     /// till at real catalogue prices, then leaves. Leaving empty-handed costs reputation.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
-    public class CustomerAI : MonoBehaviour, CheckoutQueue.IShopper
+    public partial class CustomerAI : MonoBehaviour, CheckoutQueue.IShopper
     {
         [Header("Wiring")]
         public ShopManager     ShopManager;
@@ -152,6 +152,7 @@ namespace PetShop.Customer
             WantsPet          = Random.value < Profile.WantsPetChance;
             PetBudget         = WantsPet ? Profile.RollPetBudget() : 0f;
             BudgetCap         = WantsPet ? PetBudget : Profile.RollItemBudget();
+            _spawnTime        = Time.time;
 
             BuildBubble();
             StartCoroutine(RunBehaviour());
@@ -199,13 +200,14 @@ namespace PetShop.Customer
 
             // Walk in off the pavement first
             State = CustomerState.Entering;
-            if (EntryPoint != null) yield return NavigateTo(EntryPoint.position);
+            if (EntryPoint != null) yield return NavigateTo(EntryPoint.position, NavLeg.ForecourtIn);
 
             State = CustomerState.Browsing;
             int stops = Random.Range(2, 5);
             for (int i = 0; i < stops; i++)
             {
-                yield return NavigateTo(PickBrowseTarget());
+                yield return NavigateTo(PickBrowseTarget(), NavLeg.Browse);
+                if (!_lastWalkArrived) _missedUnreachable = true;
                 yield return new WaitForSeconds(Random.Range(BrowseTimeMin, BrowseTimeMax));
                 TryPickUp();
                 if (_basket.Count >= MaxPurchases) break;
@@ -215,7 +217,7 @@ namespace PetShop.Customer
             ApplyBrowsePenalties();
             bool queued = _basket.Count > 0 && Queue != null;
             if (_basket.Count > 0) yield return WaitToBeServed();
-            else WalkedOutEmpty?.Invoke(this);
+            else ReportWalkout();
 
             State = CustomerState.Leaving;
             // Off the queue line first: it runs from the till towards the door, and walking back
@@ -223,13 +225,13 @@ namespace PetShop.Customer
             if (queued)
             {
                 // Still holding priority over the line (see WaitToBeServed) until clear of it.
-                yield return NavigateTo(StepAsideFromTill());
+                yield return NavigateTo(StepAsideFromTill(), NavLeg.StepAside);
                 _agent.avoidancePriority = _walkingPriority;
             }
-            if (EntryPoint != null) yield return NavigateTo(EntryPoint.position);
+            if (EntryPoint != null) yield return NavigateTo(EntryPoint.position, NavLeg.ForecourtOut);
             Vector3 exit = ExitPoint != null ? ExitPoint.position : transform.position + Vector3.forward * 10f;
             exit.x += Random.Range(-14f, 14f);
-            yield return NavigateTo(exit);
+            yield return NavigateTo(exit, NavLeg.Exit);
 
             State = CustomerState.Done;
             Destroy(gameObject);
@@ -247,7 +249,7 @@ namespace PetShop.Customer
             {
                 // No till in the shop — fall back to paying on the way out rather than
                 // silently losing the sale.
-                if (RegisterPoint != null) yield return NavigateTo(RegisterPoint.position);
+                if (RegisterPoint != null) yield return NavigateTo(RegisterPoint.position, NavLeg.Register);
                 Checkout();
                 yield break;
             }
@@ -267,7 +269,7 @@ namespace PetShop.Customer
                 if (place != lastPlace)
                 {
                     lastPlace = place;
-                    yield return NavigateTo(Queue.StandingPosition(place));
+                    yield return NavigateTo(Queue.StandingPosition(place), NavLeg.Queue);
                     // Face the till while waiting.
                     if (Queue.TillPoint != null)
                     {
@@ -342,9 +344,14 @@ namespace PetShop.Customer
             return _agent.isOnNavMesh;
         }
 
-        /// <summary>Walks to a point, giving up after a timeout so nobody stalls forever.</summary>
-        private IEnumerator NavigateTo(Vector3 target)
+        /// <summary>
+        /// Walks to a point on <paramref name="leg"/>, giving up after a timeout so nobody stalls forever.
+        /// Leaves <see cref="_lastWalkArrived"/> true only when the walk actually arrived.
+        /// </summary>
+        private IEnumerator NavigateTo(Vector3 target, NavLeg leg)
         {
+            _lastWalkArrived = false;
+            _legStart = transform.position;
             if (!_agent.isOnNavMesh) yield break;
 
             target.y = 0f;
@@ -354,18 +361,20 @@ namespace PetShop.Customer
             _agent.isStopped = false;
             if (!_agent.SetDestination(target)) yield break;
 
-            float timeout = 20f;
-            while (timeout > 0f)
+            // The limit is sized from the planned path once it is ready (see WalkTimeout).
+            float elapsed = 0f, limit = MinWalkTimeoutSeconds;
+            bool  sized   = false;
+            while (elapsed < limit)
             {
-                timeout -= Time.deltaTime;
+                elapsed += Time.deltaTime;
                 if (_agent.pathPending) { yield return null; continue; }
                 if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
-                if (_agent.remainingDistance <= _agent.stoppingDistance) yield break;
+                if (!sized) { sized = true; limit = WalkTimeout(_agent.remainingDistance, _agent.speed); }
+                if (_agent.remainingDistance <= _agent.stoppingDistance) { _lastWalkArrived = true; yield break; }
                 yield return null;
             }
 
-            Debug.LogWarning($"[CustomerAI] {name} ran out of time walking to {target}.");
-            NavigationTimedOut?.Invoke(this);
+            ReportNavTimeout(target, leg);
 
             // Deliberately not setting isStopped here: toggling it between legs makes the
             // agent lurch. autoBraking already eases it into each stop.
@@ -408,7 +417,8 @@ namespace PetShop.Customer
             // Favour the aisle they came for; fall back to anything stocked.
             var preferred = stocked.FindAll(s => s.Category == PreferredCategory);
             if (preferred.Count > 0) stocked = preferred;
-            if (stocked.Count == 0 || !WillBuy(Random.value, ShelfBuyChance, demand)) return;
+            if (stocked.Count == 0) { _missedNoStock = !WantsPet || _missedNoStock; return; }
+            if (!WillBuy(Random.value, ShelfBuyChance, demand)) return;
 
             var shelf   = stocked[Random.Range(0, stocked.Count)];
             var product = shelf.TakeOne();
@@ -422,6 +432,7 @@ namespace PetShop.Customer
                 return;
             }
             // Too dear: put it back, and let the player see why.
+            _missedTooExpensive = true;
             shelf.AddStock(product, 1);
             SetBubble("too expensive", UIFactory.Bad);
         }
@@ -432,6 +443,7 @@ namespace PetShop.Customer
             if (_boughtPet || !WantsPet) return;
             var pens = PetPens.FindAll(p => p != null && Profile.FirstWantedPet(p) != null);
             if (pens.Count > 0) _sawWantedPet = true;
+            else _missedNoStock = true;
             if (!WillBuy(Random.value, PetBuyChance * 3f, demand) || pens.Count == 0) return;
 
             var pen = pens[Random.Range(0, pens.Count)];
@@ -440,6 +452,7 @@ namespace PetShop.Customer
             if (price > PetBudget)
             {
                 // Skip this pet but keep browsing: shelf items may still sell (as before archetypes).
+                _missedTooExpensive = true;
                 SetBubble($"{pet.species}? too pricey", UIFactory.Bad);
                 return;
             }

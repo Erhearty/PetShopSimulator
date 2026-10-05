@@ -345,7 +345,7 @@ print_soak_table() {
     local fmt='  %4s %6s %9s %9s %8s %7s %7s %9s %6s %9s\n'
     # shellcheck disable=SC2059
     printf "$fmt" day sales revenue checkouts walkouts gaveUp navT/O stranded rep balance
-    jq -r 'select(.summary != true)
+    jq -r 'select(.summary != true and .walkout != true)
            | [.day, .sales, (.revenue * 100 | round / 100), .checkouts, .walkoutsEmpty, .gaveUp,
               .navTimeouts, .strandedCheckouts, .reputation, (.balance * 100 | round / 100)]
            | @tsv' "$jsonl" \

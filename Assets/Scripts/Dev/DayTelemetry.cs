@@ -12,7 +12,7 @@ namespace PetShop.Dev
     /// <see cref="SoakBands"/> violation as "[Soak] VIOLATION ...", and quits the player once
     /// the requested number of days has ended (exit code 0 when clean, 3 otherwise).
     /// </summary>
-    public class DayTelemetry : MonoBehaviour
+    public partial class DayTelemetry : MonoBehaviour
     {
         /// <summary>Process exit code when every band held.</summary>
         public const int ExitClean = 0;
@@ -83,9 +83,7 @@ namespace PetShop.Dev
                 _current.strandedCheckouts++;
         }
 
-        private void OnWalkedOutEmpty(CustomerAI _)       => _current.walkoutsEmpty++;
         private void OnGaveUp(CustomerAI _)               => _current.gaveUp++;
-        private void OnNavigationTimedOut(CustomerAI _)   => _current.navTimeouts++;
 
         // ── Day close ──────────────────────────────────────────────────────────────────────
 
