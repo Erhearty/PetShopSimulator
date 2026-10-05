@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Shop;
@@ -36,6 +37,22 @@ namespace PetShop.Core
 
         /// <summary>Placed counters; customers only come once at least one exists.</summary>
         private readonly List<CounterInteractable> _counters = new();
+
+        /// <summary>True while at least one counter is placed: cashiers can be hired and can serve.</summary>
+        public bool HasCounter => _counters.Exists(c => c != null);
+
+        /// <summary>
+        /// True while <see cref="StaffStation"/> stands behind a placed counter. False before the first
+        /// counter and again once the last one is removed: the station is then stale, so staff keep
+        /// their jobs and wages but cashiers do not serve until a counter is placed again.
+        /// </summary>
+        public bool StaffStationValid { get; private set; }
+
+        /// <summary>
+        /// True when <paramref name="candidate"/> could be hired now (sign-on fee aside); otherwise
+        /// false with a short reason — a cashier needs a counter (<see cref="HasCounter"/>).
+        /// </summary>
+        public bool CanHire(StaffCandidate candidate, out string reason) => _roster.CanHire(candidate, out reason);
 
         /// <summary>Adds a placed shelf, pen or counter to the registry the customers shop from.</summary>
         public void RegisterFurniture(GameObject go)
@@ -84,6 +101,9 @@ namespace PetShop.Core
         /// <summary>Gap in metres between the counter's back edge and the staff standing behind it.</summary>
         private const float StaffBehindCounter = 0.5f;
 
+        /// <summary>How far from the wanted spot behind the counter the NavMesh is searched for standing room.</summary>
+        private const float StationSampleRadius = 1f;
+
         /// <summary>Corners of a box collider, walked to find how far it reaches along an axis.</summary>
         private const int BoxCorners = 8;
         /// <summary>Half of a box collider's size: centre to face.</summary>
@@ -100,7 +120,9 @@ namespace PetShop.Core
         /// </summary>
         private void PlaceTillAtCounter()
         {
-            if (_counters.Count == 0 || Spawner == null || Spawner.RegisterPoint == null) return;
+            // No counter left: the old station is stale. Staff stay put; cashiers stop serving.
+            StaffStationValid = _counters.Count > 0;
+            if (!StaffStationValid || Spawner == null || Spawner.RegisterPoint == null) return;
             Transform counter = _counters[0].transform;
 
             Vector3 forward = counter.forward;
@@ -120,10 +142,26 @@ namespace PetShop.Core
             }
             if (StaffStation != null)
             {
-                StaffStation.SetPositionAndRotation(centre - forward * (back + StaffBehindCounter),
+                StaffStation.SetPositionAndRotation(StationBehind(centre, forward, back),
                                                     Quaternion.LookRotation(forward, Vector3.up));
                 _roster?.RepositionStaff();
             }
+        }
+
+        /// <summary>
+        /// Where staff stand behind a counter centred on <paramref name="centre"/> whose customer side
+        /// faces <paramref name="forward"/> and whose back face is <paramref name="back"/> metres behind
+        /// its centre: <see cref="StaffBehindCounter"/> past the back face, moved to the nearest walkable
+        /// NavMesh point when that spot is not walkable (a wall or other furniture behind the counter) —
+        /// but only to a point that is still behind the back face, never round to the customers' side.
+        /// </summary>
+        internal static Vector3 StationBehind(Vector3 centre, Vector3 forward, float back)
+        {
+            Vector3 wanted = centre - forward * (back + StaffBehindCounter);
+            if (!NavMesh.SamplePosition(wanted, out NavMeshHit hit, StationSampleRadius, NavMesh.AllAreas))
+                return wanted;
+            Vector3 found = new(hit.position.x, wanted.y, hit.position.z);
+            return Vector3.Dot(found - centre, -forward) > back ? found : wanted;
         }
 
         /// <summary>

@@ -10,7 +10,7 @@ namespace PetShop.Pets
     /// An in-store enclosure holding live pets. Each resident gets a procedural 3D body
     /// that wanders gently inside the fence.
     /// </summary>
-    public class PetPen : MonoBehaviour
+    public partial class PetPen : MonoBehaviour
     {
         [Header("Config")]
         public int         Capacity   = 4;
@@ -187,6 +187,7 @@ namespace PetShop.Pets
         private void Start()
         {
             BuildPenSign();
+            RefreshDecor();
             RefreshLabel();
         }
 
@@ -406,6 +407,8 @@ namespace PetShop.Pets
                 feed.transform.localPosition = new Vector3(PenSize * 0.32f, 0.04f, -PenSize * 0.20f);
                 Destroy(feed.GetComponent<Collider>());
             }
+
+            RefreshDecor();
         }
 
         /// <summary>Candidate Resources paths for a species' model, best first.</summary>

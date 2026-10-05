@@ -176,16 +176,25 @@ namespace PetShop.UI
             BuildHireButton(i, card.transform, candidate);
         }
 
-        /// <summary>Hire button for a card, disabled when the shop is full.</summary>
+        /// <summary>Type size of a hire button that says why it is disabled; smaller to fit the reason.</summary>
+        private const float HireReasonFontSize = 12f;
+        /// <summary>Type size of an enabled hire button.</summary>
+        private const float HireFontSize = 15f;
+
+        /// <summary>
+        /// Hire button for a card, disabled with the reason on it when the applicant cannot be taken
+        /// on (the shop is full, or a cashier has no counter to work behind).
+        /// </summary>
         private void BuildHireButton(int i, Transform card, StaffCandidate candidate)
         {
-            bool room = _game.StaffCount < StaffRoster.MaxStaff;
+            bool canHire = _game.CanHire(candidate, out string reason);
             var hire = UIFactory.Button($"Hire_{i}", card,
-                room ? "Hire" : "No room",
-                new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f), 15f,
-                room ? UIFactory.ButtonOn : UIFactory.ButtonBg);
+                canHire ? "Hire" : reason,
+                new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f),
+                canHire ? HireFontSize : HireReasonFontSize,
+                canHire ? UIFactory.ButtonOn : UIFactory.ButtonBg);
 
-            hire.interactable = room;
+            hire.interactable = canHire;
             hire.onClick.AddListener(() => { _game.HireCandidate(candidate); Refresh(); });
         }
 

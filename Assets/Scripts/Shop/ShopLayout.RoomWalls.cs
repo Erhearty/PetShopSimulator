@@ -28,6 +28,12 @@ namespace PetShop.Shop
         /// <summary>Thickness of a corner filler, matching a wall piece.</summary>
         private const float CornerFillerThickness = 0.24f;
 
+        /// <summary>
+        /// Metres either side of the till spot's X that customers fill standing at the till and in its queue (the
+        /// queue runs straight out from the till along +Z). The back door keeps out of the columns this lane covers.
+        /// </summary>
+        private const float TillLaneHalfWidth = 0.5f;
+
         /// <summary>Parent of the four corner fillers; null until <see cref="EnsureRoomWallCorners"/> runs.</summary>
         private Transform _wallCorners;
 
@@ -35,7 +41,8 @@ namespace PetShop.Shop
         /// Lays the room's walls on every free cell of the wall ring (<see cref="RoomWallCells"/>) through
         /// <paramref name="build"/>, without charging the player: the shopfront row (street side, corners
         /// excluded) gets doorway pieces in the doorway's columns (<see cref="DoorwayCells"/>) and window walls
-        /// elsewhere — doorway pieces have no jambs, so adjacent ones form one opening centred on the door; every
+        /// elsewhere — doorway pieces have no jambs, so adjacent ones form one opening centred on the door; the back
+        /// row gets doorway pieces in the back door's columns (<see cref="BackDoorwayCells"/>, into the yard); every
         /// other ring cell, corners included, gets a plain wall. Cells already occupied are left alone.
         /// </summary>
         /// <returns>How many wall pieces were placed.</returns>
@@ -54,6 +61,7 @@ namespace PetShop.Shop
             GridManager grid = build.GridManager;
             RectInt ring     = RoomWallCells();
             RectInt doorway  = DoorwayCells(grid.WorldToGrid(DoorPosition));
+            RectInt backDoor = BackDoorwayCells();
             int placed = 0;
 
             for (int x = ring.xMin; x < ring.xMax; x++)
@@ -62,7 +70,7 @@ namespace PetShop.Shop
                 var cell = new Vector2Int(x, y);
                 if (!IsRoomWallCell(cell)) continue;
 
-                PlacedObjectData def = BuildCatalog.Get(RoomWallPieceFor(cell, ring, doorway));
+                PlacedObjectData def = BuildCatalog.Get(RoomWallPieceFor(cell, ring, doorway, backDoor));
                 if (def == null) continue;
                 grid.EnsureFloor(cell, def.Size);
                 if (grid.TryGetObject(cell, out _)) continue;
@@ -93,8 +101,39 @@ namespace PetShop.Shop
                    cell.y == ring.yMin || cell.y == ring.yMax - 1;
         }
 
-        /// <summary>True when <paramref name="cell"/> is one of the doorway cells (<see cref="DoorwayCells"/>).</summary>
-        public bool IsDoorwayCell(Vector2Int cell) => DoorwayCells(DoorCell).Contains(cell);
+        /// <summary>
+        /// True when <paramref name="cell"/> is one of the doorway cells: the shopfront's (<see cref="DoorwayCells"/>)
+        /// or the back door's (<see cref="BackDoorwayCells"/>).
+        /// </summary>
+        public bool IsDoorwayCell(Vector2Int cell) =>
+            DoorwayCells(DoorCell).Contains(cell) || BackDoorwayCells().Contains(cell);
+
+        /// <summary>True when <paramref name="footprint"/> overlaps the front or back doorway.</summary>
+        public bool OverlapsDoorway(RectInt footprint) =>
+            DoorwayCells(DoorCell).Overlaps(footprint) || BackDoorwayCells().Overlaps(footprint);
+
+        /// <summary>
+        /// The back door's clear cells: the shopfront doorway's shape mirrored across the wall ring, so it crosses
+        /// the back ring row and reaches into the room and out into the yard behind. It is as wide as the front
+        /// doorway but offset towards the room's low-X side, ending just short of the till lane
+        /// (<see cref="TillLaneHalfWidth"/> around <see cref="TillPosition"/>) so neither the till spot nor its
+        /// queue stands in the back-door lane; it never starts left of the room's first interior column.
+        /// </summary>
+        public RectInt BackDoorwayCells()
+        {
+            RectInt ring  = RoomWallCells();
+            RectInt front = DoorwayCells(DoorCell);
+            int laneMin   = Mathf.FloorToInt((TillPosition.x - TillLaneHalfWidth) / GridManager.CellSize);
+            int xMin      = Mathf.Max(RoomCells().xMin, laneMin - front.width);
+            return new RectInt(xMin, ring.yMin + ring.yMax - front.yMax, front.width, front.height);
+        }
+
+        /// <summary>The back ring row's cells the back door's pieces stand on.</summary>
+        public RectInt BackDoorRingCells()
+        {
+            RectInt back = BackDoorwayCells();
+            return new RectInt(back.xMin, RoomWallCells().yMin, back.width, 1);
+        }
 
         /// <summary>Grid cell of <see cref="DoorPosition"/>; needs no bound grid.</summary>
         private Vector2Int DoorCell => new(Mathf.FloorToInt(DoorPosition.x / GridManager.CellSize),
@@ -167,14 +206,21 @@ namespace PetShop.Shop
             }
         }
 
-        /// <summary>Catalogue id of the wall piece for a cell on the outer ring of <paramref name="ring"/>.</summary>
-        private static string RoomWallPieceFor(Vector2Int cell, RectInt ring, RectInt doorway)
+        /// <summary>
+        /// Catalogue id of the wall piece for a cell on the outer ring of <paramref name="ring"/>, given the front
+        /// <paramref name="doorway"/> and the <paramref name="backDoor"/>'s cells.
+        /// </summary>
+        private static string RoomWallPieceFor(Vector2Int cell, RectInt ring, RectInt doorway, RectInt backDoor)
         {
-            bool shopfront = cell.y == ring.yMax - 1 && !IsSideWallCell(cell, ring);
-            if (!shopfront) return BuildCatalog.Wall;
-            bool doorColumn = cell.x >= doorway.xMin && cell.x < doorway.xMax;
-            return doorColumn ? BuildCatalog.WallDoor : BuildCatalog.WallWindow;
+            if (IsSideWallCell(cell, ring)) return BuildCatalog.Wall;
+            if (cell.y == ring.yMax - 1)
+                return InColumns(cell, doorway) ? BuildCatalog.WallDoor : BuildCatalog.WallWindow;
+            bool backDoorCell = cell.y == ring.yMin && InColumns(cell, backDoor);
+            return backDoorCell ? BuildCatalog.WallDoor : BuildCatalog.Wall;
         }
+
+        /// <summary>True when <paramref name="cell"/>'s column lies within <paramref name="cells"/>' columns.</summary>
+        private static bool InColumns(Vector2Int cell, RectInt cells) => cell.x >= cells.xMin && cell.x < cells.xMax;
 
         /// <summary>True for ring cells on the low-X or high-X side, corners included.</summary>
         private static bool IsSideWallCell(Vector2Int cell, RectInt ring) =>

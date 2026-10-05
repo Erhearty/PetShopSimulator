@@ -86,6 +86,9 @@ namespace PetShop.Core
                 PriceMultiplier = shop.PriceMultiplier,
                 ProgressionTier = _game.Progression?.Tier ?? 0,
                 roomWallsSeeded = _roomWallsSeeded,
+                layoutVersion   = ShopLayout.CurrentLayoutVersion,
+                // Every game this build saves has its back door: seeded, migrated, or left as the player edited it.
+                backDoorSeeded  = true,
             };
             _game.Events?.Capture(data);
 
@@ -191,12 +194,17 @@ namespace PetShop.Core
         }
 
         /// <summary>
-        /// Places every saved piece, then lays the room walls if the save predates them. NavMesh bakes
+        /// Moves an older layout's cells onto the current one (<see cref="SaveLayoutMigration"/>), places every
+        /// saved piece, then lays the room walls if the save predates them. NavMesh bakes
         /// are suspended meanwhile, so the whole load costs one bake rather than one per wall.
         /// </summary>
         private void RestorePlacedObjects(SaveData data, System.Collections.Generic.List<Pet> loadedPets)
         {
             var layout = _game.Layout;
+            var evicted = new System.Collections.Generic.List<SaveData.PlacedItem>();
+            SaveLayoutMigration.Apply(data, layout, evicted);
+            foreach (var item in evicted) SettleEvicted(item);
+            SaveLayoutMigration.SeedBackDoor(data, layout);
             layout?.SuspendNavMeshBakes();
             try
             {
@@ -205,6 +213,23 @@ namespace PetShop.Core
                 SeedRoomWallsOnce(data.roomWallsSeeded);
             }
             finally { layout?.ResumeNavMeshBakes(); }
+        }
+
+        /// <summary>
+        /// Settles the contents of a piece the layout migration packed away instead of placing (it would have
+        /// stood off the yard): shelf stock goes to the warehouse, as when the Remove tool packs a shelf. A pen's
+        /// residents have nowhere to go without a pen, so they are not restored and a warning names them.
+        /// </summary>
+        private void SettleEvicted(SaveData.PlacedItem item)
+        {
+            foreach (var line in item.shelfStock)
+            {
+                var product = _game.Catalog?.Get(line.id);
+                if (product != null && line.qty > 0) _game.Shop.AddToWarehouse(product.category, line.qty);
+            }
+            string pets = item.pets.Count > 0 ? $" {item.pets.Count} resident pet(s) were not restored." : "";
+            Debug.LogWarning($"[SaveLoad] layout migration: '{item.catalogId}' at cell ({item.cellX},{item.cellY}) " +
+                             $"lies outside the yard; returned to the furniture inventory instead of placed.{pets}");
         }
 
         /// <summary>Places one saved piece and refills its shelf stock or pen residents.</summary>

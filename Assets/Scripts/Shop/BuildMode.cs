@@ -148,7 +148,7 @@ namespace PetShop.Shop
             var cell = GridManager.WorldToGrid(worldPos);
             if (IsHolding) { PlaceHeld(cell); return; }
 
-            if (RefusePlacement(CurrentItem, cell, CurrentItem.Size)) return;
+            if (RefusePlacement(CurrentItem, cell, CurrentItem.Size, _rotation)) return;
             if (Shop != null && Shop.Balance < CurrentItem.Cost)
             {
                 OnBuildMessage.Invoke($"Not enough money — {CurrentItem.DisplayName} costs €{CurrentItem.Cost:N0}.");

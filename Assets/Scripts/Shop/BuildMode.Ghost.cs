@@ -117,7 +117,7 @@ namespace PetShop.Shop
 
             _hoverCell = GridManager.WorldToGrid(worldPos);
             Vector2Int size = ActiveFootprint;
-            _hoverValid = CanPlaceItem(CurrentItem, _hoverCell, size)
+            _hoverValid = CanPlaceItem(CurrentItem, _hoverCell, size, _rotation)
                        && (IsHolding || Shop == null || Shop.Balance >= CurrentItem.Cost);
 
             Vector3 centre = GridManager.FootprintCenter(_hoverCell, size);

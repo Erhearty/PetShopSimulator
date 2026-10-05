@@ -25,6 +25,12 @@ namespace PetShop.Core
         /// <summary>Offset of the first assistant from the station centre.</summary>
         private const float StationStartOffset = -0.55f;
 
+        /// <summary>Why a cashier cannot be hired while the shop has no counter.</summary>
+        public const string NoCounterReason = "Place a counter first";
+
+        /// <summary>Why nobody can be hired while every place behind the counter is taken.</summary>
+        public const string NoRoomReason = "No room";
+
         /// <summary>Reputation lost when someone is let go.</summary>
         private const float FireReputationCost = 0.5f;
 
@@ -74,9 +80,11 @@ namespace PetShop.Core
         public bool HireCandidate(StaffCandidate candidate)
         {
             if (candidate == null) return false;
-            if (_assistants.Count >= MaxStaff)
+            if (!CanHire(candidate, out string reason))
             {
-                _game.Notify("There is no room behind that counter for another assistant.");
+                _game.Notify(reason == NoCounterReason
+                    ? $"{NoCounterReason} — a cashier needs a counter to work behind."
+                    : "There is no room behind that counter for another assistant.");
                 return false;
             }
             if (!PaySignOnFee(candidate)) return false;
@@ -86,6 +94,20 @@ namespace PetShop.Core
             PushToShop();
             _game.Notify($"Hired {candidate.Name} — {candidate.Role}, {candidate.SkillWord}, " +
                          $"€{candidate.DailyWage:N0} a day, {_assistants.Count} on the payroll.");
+            return true;
+        }
+
+        /// <summary>
+        /// True when <paramref name="candidate"/> could be taken on now, ignoring the sign-on fee;
+        /// otherwise false with a short <paramref name="reason"/> for the staff board. Every role needs
+        /// room on the payroll; a cashier also needs a placed counter to work behind.
+        /// </summary>
+        public bool CanHire(StaffCandidate candidate, out string reason)
+        {
+            reason = null;
+            if (candidate == null) return false;
+            if (_assistants.Count >= MaxStaff) { reason = NoRoomReason; return false; }
+            if (candidate.Role == StaffRole.Cashier && !_game.HasCounter) { reason = NoCounterReason; return false; }
             return true;
         }
 

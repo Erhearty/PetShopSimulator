@@ -48,8 +48,8 @@ namespace PetShop.UI
             "Customers who want to buy something queue at the till. Stand at the counter and press " +
             $"{L(GameAction.Interact)} to serve whoever is at the front of the line. If nobody is waiting, " +
             "you are told so.\n\nEvery customer only waits so long. Serve the queue before they give up " +
-            "and walk out, or your reputation suffers. Assistants you hire work the till on their own, " +
-            "but you can always serve as well to clear the line faster.",
+            "and walk out, or your reputation suffers. A cashier you hire works the till from behind the " +
+            "counter, but you can always serve as well to clear the line faster.",
             GameAction.Interact);
 
         private static GuideSection Restocking() => new("Restocking shelves",
@@ -61,8 +61,8 @@ namespace PetShop.UI
             GameAction.Interact, GameAction.Ledger);
 
         private static GuideSection Deliveries() => new("Deliveries on the forecourt",
-            "Wholesale orders and furniture arrive by van later in the day and are left on the " +
-            $"forecourt in front of the shop. Walk to a pallet and press {L(GameAction.Interact)} to carry " +
+            "Your shop opens straight onto the street. Wholesale orders and furniture arrive by van later in " +
+            $"the day and are left on the forecourt in front of the shop. Walk to a pallet and press {L(GameAction.Interact)} to carry " +
             "it into the stockroom, ready to shelve. A furniture crate unpacks into your inventory bar " +
             "instead.\n\nAnything still on a van when you close lands overnight, so nothing you paid for is lost. " +
             "The Stock page shows what is on the van and roughly when it arrives.",
@@ -82,7 +82,10 @@ namespace PetShop.UI
             $"Doorway ({K(BuildToolbar.DoorwayKey)}) and Fence ({K(BuildToolbar.FenceKey)}). Walls are not " +
             "delivered: each piece is charged when you place it.\n\nThe Remove tool " +
             $"({K(BuildToolbar.RemoveKey)}) takes pieces away again, including the shop's own room walls, " +
-            "so you can open up the floor. Right-drag to orbit the view; Esc leaves it.",
+            "so you can open up the floor.\n\nWalls and fences can be built anywhere in the yard, not just " +
+            "on the unlocked lot, so you can fence off the yard or put up outbuildings. The shop's back door " +
+            "leads out into the yard behind it; keep a doorway there if you want to walk out to your pens. " +
+            "Right-drag to orbit the view; Esc leaves it.",
             GameAction.BuildMode);
 
         private static GuideSection Animals() => new("Pens, buying, feeding and breeding",
@@ -94,8 +97,9 @@ namespace PetShop.UI
             GameAction.Interact);
 
         private static GuideSection Staff() => new("Staff",
-            "Assistants work the till on their own, slower than you do. Each one is paid a daily wage, " +
-            "added to tonight's bill.\n\nOpen the staff board from the Staff page of the Shop book " +
+            "Assistants work the till on their own, slower than you do. A cashier needs a counter: you can " +
+            "only hire one once the shop has a counter, and they serve from behind it. Each one is paid a " +
+            "daily wage, added to tonight's bill.\n\nOpen the staff board from the Staff page of the Shop book " +
             $"({L(GameAction.Ledger)}) to hire from the applicants looking for work; the list changes every " +
             "morning. Letting someone go costs you some reputation.",
             GameAction.Ledger);

@@ -23,7 +23,26 @@ namespace PetShop.Shop
         public float RoomDepth  = 12f;
         public float WallHeight = 4f;
         public float ShopSideMargin  = 2f;
-        public float ShopFrontMargin = 7f;
+        /// <summary>
+        /// Room edge to street edge. 3 m puts the room's front wall-ring row on the yard's front row, so the
+        /// shopfront opens straight onto the street (layout version 1; version 0 stood 7 m back).
+        /// </summary>
+        public float ShopFrontMargin = 3f;
+
+        /// <summary>Save layout version written by this build; see <see cref="LegacyLayoutCellShift"/>.</summary>
+        public const int CurrentLayoutVersion = 1;
+        /// <summary>Grid cells the room moved towards the street between layout version 0 and 1.</summary>
+        public static readonly Vector2Int LegacyLayoutCellShift = new(0, 2);
+
+        /// <summary>Metres from the wall ring's street edge to the forecourt spot customers and deliveries use.</summary>
+        private const float ForecourtStandoff = 2.5f;
+        /// <summary>Metres from the forecourt spot to the derived pavement centre, along the street direction.</summary>
+        private const float PavementAhead = 2.5f;
+        /// <summary>
+        /// Metres of yard behind the room inside the starter lot: the strip the room vacated when it moved to the
+        /// street, so the starter lot keeps its old size.
+        /// </summary>
+        private const float StarterLotBackStrip = 4f;
 
         [Header("Anchors — optional, derived from the dimensions when empty")]
         public Transform ShopCentreAnchor;
@@ -67,9 +86,9 @@ namespace PetShop.Shop
         public Vector3 DoorPosition => DoorAnchor != null ? Flat(DoorAnchor.position)
             : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f - 1.6f);
 
-        /// <summary>On the forecourt, a couple of metres outside the shop door.</summary>
+        /// <summary>On the street side, a couple of metres outside the shopfront's wall ring.</summary>
         public Vector3 ForecourtPosition => ForecourtAnchor != null ? Flat(ForecourtAnchor.position)
-            : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f + 2.5f);
+            : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f + WallRingOffset * GridManager.CellSize + ForecourtStandoff);
 
         /// <summary>Where the player starts (full position, height included).</summary>
         public Vector3 PlayerStartPosition => PlayerStartAnchor != null ? PlayerStartAnchor.position
@@ -82,7 +101,7 @@ namespace PetShop.Shop
             {
                 if (PavementAnchor != null) return Flat(PavementAnchor.position);
                 if (_pavementOverride.HasValue) return _pavementOverride.Value;
-                return ForecourtPosition + Vector3.forward * 6f;
+                return ForecourtPosition + Vector3.forward * PavementAhead;
             }
         }
 
@@ -136,7 +155,8 @@ namespace PetShop.Shop
             Vector3 shop = ShopCentre;
             float xMin = shop.x - RoomWidth * 0.5f;
             float xMax = shop.x + RoomWidth * 0.5f;
-            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f : shop.z - RoomDepth * 0.5f;
+            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f
+                                                    : shop.z - RoomDepth * 0.5f - StarterLotBackStrip;
 
             int x0 = Mathf.Max(yard.xMin, Mathf.FloorToInt(xMin / cs));
             int x1 = Mathf.Min(yard.xMax, Mathf.CeilToInt(xMax / cs));
@@ -184,13 +204,34 @@ namespace PetShop.Shop
             if (grid == null) return false;
             var footprint = new RectInt(cell, size);
             RectInt yard  = LotStageCells(FullYardLotStage);
-            if (IsInsideShop(cell, size) || DoorwayCells(grid.WorldToGrid(DoorPosition)).Overlaps(footprint))
+            if (IsInsideShop(cell, size) || OverlapsDoorway(footprint))
                 return false;
             for (int x = 0; x < size.x; x++)
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
                 if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// True when a building piece (wall, window wall, doorway, fence) of <paramref name="size"/> rooted at
+        /// <paramref name="cell"/> may stand in the yard: every footprint cell lies inside the full yard (never the
+        /// street), is free on <paramref name="grid"/>, and is not a doorway clearance cell off the wall ring.
+        /// Ignores the unlocked lot stage and needs no floor — walls go anywhere in the yard. The wall ring's own
+        /// rule (<see cref="AllowsOnRoomWallRing"/>) is checked separately.
+        /// </summary>
+        public bool CanPlaceStructure(GridManager grid, Vector2Int cell, Vector2Int size)
+        {
+            if (grid == null) return false;
+            RectInt yard = LotStageCells(FullYardLotStage);
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            {
+                var check = cell + new Vector2Int(x, y);
+                if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+                if (IsDoorwayCell(check) && !IsRoomWallCell(check)) return false;
             }
             return true;
         }
@@ -215,12 +256,13 @@ namespace PetShop.Shop
             }
         }
 
+        /// <summary>Takes the floor off the front and back doorways so no furniture blocks either way through.</summary>
         private void ClearDoorway()
         {
-            Vector2Int door = _grid.WorldToGrid(DoorPosition);
-            for (int dz = DoorwayBehind; dz <= DoorwayAhead; dz++)
-                for (int dx = DoorwayLeft; dx <= DoorwayRight; dx++)
-                    _grid.SetFloor(new Vector2Int(door.x + dx, door.y + dz), false);
+            foreach (var cell in DoorwayCells(_grid.WorldToGrid(DoorPosition)).allPositionsWithin)
+                _grid.SetFloor(cell, false);
+            foreach (var cell in BackDoorwayCells().allPositionsWithin)
+                _grid.SetFloor(cell, false);
         }
 
         // ── NavMesh ─────────────────────────────────────────────────────────────

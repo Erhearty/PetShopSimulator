@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using PetShop.Core;
@@ -68,6 +69,18 @@ namespace PetShop.Tests
                     StringAssert.Contains("press K", section.Body);
                 }
             Assert.IsTrue(found);
+        }
+
+        /// <summary>The guide explains the street front, the back door, yard walls and the cashier's counter.</summary>
+        [Test]
+        public void Guide_CoversLayoutDoorsWallsAndCashierCounter()
+        {
+            var all = string.Join("\n", GuideContent.Sections().Select(s => s.Body));
+            StringAssert.Contains("onto the street", all);
+            StringAssert.Contains("back door", all);
+            StringAssert.Contains("anywhere in the yard", all);
+            StringAssert.Contains("cashier needs a counter", all);
+            StringAssert.Contains("behind the counter", all);
         }
 
         [Test]

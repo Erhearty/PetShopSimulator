@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using PetShop.Core;
+using PetShop.Progression;
 using PetShop.Shop;
 using PetShop.UI;
 
@@ -88,6 +89,74 @@ namespace PetShop.Tests
             Assert.IsTrue(ui.BuildView.IsActive, "Esc should not leave the view while a tool was active.");
             ui.BuildView.Exit();
             Assert.IsTrue(build.RightClickCancels, "RMB should still cancel in first person.");
+        }
+
+        /// <summary>Walls owned up front for the yard-building test: one per target cell.</summary>
+        private const int YardWalls = 3;
+        /// <summary>Ring row offset of the side wall the yard test lifts and puts back (clear of corners and doors).</summary>
+        private const int RingSideOffset = 2;
+
+        /// <summary>
+        /// At the starter stage a wall goes on a yard cell behind the room, one beside it (both off the unlocked
+        /// lot, so they get floor laid) and on a free wall-ring cell; each placement and removal rebakes the
+        /// NavMesh, and removing a yard wall frees the cell and takes back the floor it laid.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Wall_BuildsAnywhereInYard_AndReleasesFloorOnRemove()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game  = PlaytestHarness.Game;
+            var build = game.Build;
+            var wall  = BuildCatalog.Get(BuildCatalog.Wall);
+            RectInt ring = game.Layout.RoomWallCells();
+            game.Furniture.AddOwned(BuildCatalog.Wall, YardWalls);
+            StartWatchingLogs();
+
+            var behind = FreeYardCell(game, c => c.y < ring.yMin);
+            var beside = FreeYardCell(game, c => (c.x < ring.xMin || c.x >= ring.xMax) && c.y >= ring.yMin && c.y < ring.yMax);
+            foreach (var cell in new[] { behind, beside })
+            {
+                Assert.IsTrue(build.CanPlaceItem(wall, cell, wall.Size), $"The ghost should be valid at yard cell {cell}.");
+                PlaceHeldWall(game, cell);
+
+                int bakes = _bakes;
+                build.RemoveAtWorldPos(game.Grid.GridToWorld(cell));
+                Assert.IsFalse(game.Grid.TryGetObject(cell, out _), $"Removing the yard wall at {cell} left it on the grid.");
+                Assert.IsFalse(game.Grid.HasFloor(cell), $"Removing the yard wall at {cell} kept the floor it laid.");
+                Assert.Greater(_bakes, bakes, "Removing a yard wall should rebake the NavMesh.");
+            }
+
+            var ringCell = new Vector2Int(ring.xMin, ring.yMin + RingSideOffset);
+            build.RemoveAtWorldPos(game.Grid.GridToWorld(ringCell));
+            Assert.IsFalse(game.Grid.TryGetObject(ringCell, out _), "The side ring wall was not lifted.");
+            Assert.IsTrue(build.CanPlaceItem(wall, ringCell, wall.Size), "A wall should fit back on a free ring cell.");
+            PlaceHeldWall(game, ringCell);
+            AssertNoUnexpectedErrors();
+        }
+
+        /// <summary>Takes a wall into the hand and places it at <paramref name="cell"/>, asserting the grid entry and a rebake.</summary>
+        private void PlaceHeldWall(GameManager game, Vector2Int cell)
+        {
+            int bakes = _bakes;
+            Assert.IsTrue(game.Build.EnterPlacement(BuildCatalog.Wall), "No wall to take into the hand.");
+            Assert.IsNotNull(game.Build.PlaceHeld(cell), $"The wall was not placed at {cell}.");
+            Assert.IsTrue(game.Grid.TryGetObject(cell, out var entry) && entry.Data.Id == BuildCatalog.Wall,
+                          $"No wall on the grid at {cell}.");
+            Assert.Greater(_bakes, bakes, "Placing a wall should rebake the NavMesh.");
+        }
+
+        /// <summary>
+        /// A free cell of the full yard matching <paramref name="where"/> that has no floor yet (outside the
+        /// starter lot) and is clear of the doorways.
+        /// </summary>
+        private static Vector2Int FreeYardCell(GameManager game, System.Func<Vector2Int, bool> where)
+        {
+            RectInt yard = game.Layout.LotStageCells(ProgressionRules.FullYardLotStage);
+            foreach (var cell in yard.allPositionsWithin)
+                if (where(cell) && !game.Grid.HasFloor(cell) && !game.Grid.TryGetObject(cell, out _) &&
+                    !game.Layout.IsDoorwayCell(cell) && !game.Layout.IsRoomWallCell(cell)) return cell;
+            Assert.Fail("No free unfloored yard cell found.");
+            return default;
         }
 
         /// <summary>The selected tool's accent button gets the dark on-accent label; the others keep ink.</summary>

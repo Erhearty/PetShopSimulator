@@ -58,6 +58,9 @@ namespace PetShop.Commerce
         /// <summary>True while walking to or working at a shelf or pen, away from the till.</summary>
         private bool _away;
 
+        /// <summary>True once this cashier has said there is no counter; cleared when one is placed.</summary>
+        private bool _toldNoCounter;
+
         /// <summary>Builds an assistant standing at the till, facing the queue.</summary>
         public static Assistant Create(Transform parent, Vector3 position, Vector3 facing,
                                        CheckoutQueue queue, ShopManager shop, int index)
@@ -166,6 +169,7 @@ namespace PetShop.Commerce
         private void Update()
         {
             if (Role != StaffRole.Cashier || _away) { _timer = 0f; return; }
+            if (!HasCounterToServeFrom()) { _timer = 0f; return; }
             if (Queue == null || !Queue.FrontReady) { _timer = 0f; return; }
 
             _timer += Time.deltaTime;
@@ -179,6 +183,22 @@ namespace PetShop.Commerce
             Queue.ServeFront();
             AudioManager.Instance?.PlaySfx("sale", 0.6f);
             GameManager.Instance?.Notify($"{name.Replace('_', ' ')} served {shopper.ShopperName} — €{value:N2}");
+        }
+
+        /// <summary>
+        /// True when there is a counter to serve from. Without one (the last counter was packed away)
+        /// the cashier stays on the payroll but waits, saying so once until a counter is placed again.
+        /// </summary>
+        private bool HasCounterToServeFrom()
+        {
+            var game = GameManager.Instance;
+            if (game == null || game.StaffStationValid) { _toldNoCounter = false; return true; }
+            if (!_toldNoCounter)
+            {
+                _toldNoCounter = true;
+                Notify($"{DisplayName} has no counter to serve from — place a counter to open the till again.");
+            }
+            return false;
         }
 
         /// <summary>Name for notifications: the staff name, or the object name as a fallback.</summary>
