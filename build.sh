@@ -3,7 +3,8 @@
 #  build.sh — takes this project from a fresh checkout to a playable build.
 #
 #    ./build.sh            full pipeline (setup → Linux player → smoke)
-#    ./build.sh setup      TMP essentials + runtime shaders + repair URP materials
+#    ./build.sh setup      TMP essentials + Nunito font (if missing) + runtime shaders + repair URP materials
+#    ./build.sh font       (re)generate the Nunito TMP font asset Assets/Resources/Fonts/Nunito SDF.asset
 #    ./build.sh linux      build the Linux player
 #    ./build.sh windows    build the Windows player
 #    ./build.sh run        run the Linux player, rebuilding it first if sources are newer
@@ -22,6 +23,7 @@
 #    ./build.sh kenney     restore the CC0 Kenney kits (other checkout → Library/kenney-cache → kenney.nl)
 #
 #  Most targets run the kenney step first; KENNEY_SRC=/path/to/checkout picks where kits are copied from.
+#  setup and linux generate the Nunito font asset first when it is missing (it is checked in; regenerate with ./build.sh font).
 #
 #  Override the editor with:  UNITY=/path/to/Unity ./build.sh
 #  soak takes SEED (default 1) and SOAK_DAYS (default 15) from the environment.
@@ -87,12 +89,33 @@ run_editor() {
         fi
         exit 1
     fi
-    grep -E "^\[(ProjectSetup|ShaderInclusion|GameBuilder)\]" "$log" | head -5 || true
+    grep -E "^\[(ProjectSetup|ShaderInclusion|GameBuilder|FontAssetBuilder)\]" "$log" | head -5 || true
+}
+
+# The Nunito TMP SDF font asset UIFactory loads from Resources; generated from Assets/Fonts/.
+FONT_ASSET="$PROJECT/Assets/Resources/Fonts/Nunito SDF.asset"
+
+# (Re)generate the font asset and prove it was written. Exits non-zero otherwise.
+build_font() {
+    run_editor FontAssetBuilder.BuildNunito font
+    if [[ ! -f "$FONT_ASSET" ]]; then
+        echo "✘ font build wrote no asset at $FONT_ASSET — see $LOG_DIR/font.log" >&2
+        exit 1
+    fi
+}
+
+# Generate the font asset only when it is missing.
+ensure_font() {
+    if [[ ! -f "$FONT_ASSET" ]]; then
+        echo "· Nunito font asset is missing — generating it"
+        build_font
+    fi
 }
 
 do_setup() {
     # TMP's package import completes on a later editor tick, so this one must not -quit.
     run_editor ProjectSetup.ImportTMPEssentials tmp-import --no-quit
+    ensure_font
     run_editor ShaderInclusion.EnsureIncluded   shaders
     run_editor MaterialRepair.Repair            materials
 }
@@ -116,6 +139,8 @@ player_is_stale() {
 # assemblies) do not fail the build; errors in player code make BuildPlayer itself fail.
 build_linux() {
     local log="$LOG_DIR/player-linux.log" pending="$LOG_DIR/.build-stamp.pending"
+    # Before the pending stamp is touched, so a freshly generated font is older than the stamp.
+    ensure_font
     rm -f "$BUILD_STAMP"
     touch "$pending"
     run_editor GameBuilder.BuildLinux player-linux
@@ -439,6 +464,7 @@ esac
 case "${1:-all}" in
     setup)   do_setup ;;
     linux)   build_linux ;;
+    font)    build_font ;;
     windows) run_editor GameBuilder.BuildWindows player-windows ;;
     # Retired: MainScene.unity is authored in the editor now. Kept as a no-op so old
     # check commands and scripts that still call it do not fail; it never touches the scene.

@@ -57,6 +57,7 @@ Every check target exits non-zero with a reason when it did not verify the curre
 | `playtest` | spawnverify, playmode, smoke and soak all passed (or spawnverify skipped). |
 | `look-diff` | Fresh screenshots were captured and compared against the baselines; differences are reported, not failed. |
 | `linux` | This run's build log reports `[GameBuilder] Build succeeded` with no failure lines, and the player exists. |
+| `font` | `FontAssetBuilder.BuildNunito` ran without error and `Assets/Resources/Fonts/Nunito SDF.asset` exists. |
 
 `run`, `smoke` and `soak` rebuild the player when anything under `Assets/`, `ProjectSettings/` or
 `Packages/` is newer than its last successful build (stamped in `Build/Linux/.build-stamp`; `FORCE_BUILD=1` always rebuilds); a failed build, or the Editor
@@ -69,6 +70,13 @@ Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Pl
 
 A fresh clone needs one setup pass (`./build.sh setup`) before the first editor Play session,
 because TextMesh Pro's essential resources are not checked in.
+
+The UI font is Nunito (SIL OFL, `Assets/Fonts/Nunito-Variable.ttf` and `Assets/Fonts/OFL.txt`).
+Its TextMesh Pro SDF asset, `Assets/Resources/Fonts/Nunito SDF.asset`, is generated rather than
+hand-made: `./build.sh setup` and `./build.sh linux` generate it when it is missing, and
+`./build.sh font` regenerates it in place (keeping its GUID). It holds ASCII, Latin-1 and
+`€…—–‘’“”•` up front and adds other characters on demand. Without it the UI falls back to TMP's
+default font. The log is `Logs/build/font.log`.
 
 Neither the Asset Store packs nor the Kenney kits are in the repository. The game itself still
 runs without them (the world is baked into the scene and runtime models degrade to plainer
