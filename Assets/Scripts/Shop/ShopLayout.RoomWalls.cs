@@ -21,21 +21,30 @@ namespace PetShop.Shop
         /// </summary>
         private const int WallRingOffset = 1;
 
-        /// <summary>Name of each static corner-return filler built by <see cref="EnsureRoomWallCorners"/>.</summary>
+        /// <summary>
+        /// Name of each static corner filler older builds made. They are no longer built; any found on load is
+        /// destroyed by <see cref="RemoveLegacyRoomWallCorners"/>.
+        /// </summary>
         public const string RoomWallCornerName = "RoomWallCorner";
-        /// <summary>Height of a corner filler, matching a wall piece.</summary>
-        private const float CornerFillerHeight = 3.2f;
-        /// <summary>Thickness of a corner filler, matching a wall piece.</summary>
-        private const float CornerFillerThickness = 0.24f;
+        /// <summary>Name of the parent older builds gave the corner fillers.</summary>
+        private const string LegacyRoomWallCornersName = "RoomWallCorners";
+
+        /// <summary>Height of every wall, window-wall and doorway piece (the prefabs' shared convention).</summary>
+        public const float WallPieceHeight = 3.2f;
+        /// <summary>Thickness of every wall, window-wall and doorway piece (the prefabs' shared convention).</summary>
+        public const float WallPieceThickness = 0.24f;
+        /// <summary>Name of the return-arm children a wall piece on a ring corner gets from <see cref="ShapeRoomWallPiece"/>.</summary>
+        public const string CornerReturnName = "CornerReturn";
+        /// <summary>Yaw that turns a piece's child from running along the piece to running across it.</summary>
+        private const float CornerReturnYaw = 90f;
+        /// <summary>Slack when telling a child spanning the whole piece from a smaller one.</summary>
+        private const float FullSpanTolerance = 0.01f;
 
         /// <summary>
         /// Metres either side of the till spot's X that customers fill standing at the till and in its queue (the
         /// queue runs straight out from the till along +Z). The back door keeps out of the columns this lane covers.
         /// </summary>
         private const float TillLaneHalfWidth = 0.5f;
-
-        /// <summary>Parent of the four corner fillers; null until <see cref="EnsureRoomWallCorners"/> runs.</summary>
-        private Transform _wallCorners;
 
         /// <summary>
         /// Lays the room's walls on every free cell of the wall ring (<see cref="RoomWallCells"/>) through
@@ -179,30 +188,76 @@ namespace PetShop.Shop
         }
 
         /// <summary>
-        /// Builds, once, a static wall box at each corner of the wall ring that closes the strip between the
-        /// corner piece (a side wall, centred in its cell) and the first piece of the back or front row, which
-        /// starts at the cell edge. Not grid entries, so they stay whatever walls the player removes or re-places;
-        /// they sit under the NavMesh root on the non-interactable layer, so bakes treat them as walls.
+        /// Destroys the static corner fillers (and their parent) that older builds laid at the wall ring's corners.
+        /// Corners are now closed by the corner cell's own grid piece (<see cref="ShapeRoomWallPiece"/>).
         /// </summary>
-        private void EnsureRoomWallCorners()
+        private void RemoveLegacyRoomWallCorners()
         {
-            if (_wallCorners != null) return;
-            _wallCorners = new GameObject("RoomWallCorners").transform;
-            _wallCorners.SetParent(ShopRoot != null ? ShopRoot : transform, false);
+            Transform root = ShopRoot != null ? ShopRoot : transform;
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t == null || t == root) continue;
+                if (t.name == RoomWallCornerName || t.name == LegacyRoomWallCornersName)
+                    PrefabPreview.DestroySafe(t.gameObject);
+            }
+        }
+
+        /// <summary>True when <paramref name="cell"/> is one of the wall ring's four corner cells.</summary>
+        public bool IsRoomWallCorner(Vector2Int cell)
+        {
+            RectInt ring = RoomWallCells();
+            return (cell.x == ring.xMin || cell.x == ring.xMax - 1) && (cell.y == ring.yMin || cell.y == ring.yMax - 1);
+        }
+
+        /// <summary>
+        /// Turns a plain wall piece just spawned on a wall-ring corner cell into an L that closes the corner: the arm
+        /// along the piece runs from the room-side cell edge to the adjacent row's outer face, and a return arm runs
+        /// across from the piece to the other room-side cell edge, where the adjacent row's first piece starts. Both
+        /// arms are children of the piece, so the closure is removed with its cell. Other pieces and cells are left alone.
+        /// </summary>
+        public void ShapeRoomWallPiece(GameObject piece, Vector2Int cell, PlacedObjectData def)
+        {
+            if (piece == null || def == null || def.Id != BuildCatalog.Wall || !IsRoomWallCorner(cell)) return;
+            Transform t = piece.transform;
+            if (t.Find(CornerReturnName) != null) return;
 
             RectInt ring = RoomWallCells();
-            float cs = GridManager.CellSize;
-            foreach (int x in new[] { ring.xMin, ring.xMax - 1 })
-            foreach (int y in new[] { ring.yMin, ring.yMax - 1 })
+            Vector3 inX = cell.x == ring.xMin ? Vector3.right   : Vector3.left;
+            Vector3 inZ = cell.y == ring.yMin ? Vector3.forward : Vector3.back;
+            bool runsAlongZ = Mathf.Abs(t.right.z) > Mathf.Abs(t.right.x);
+            Vector3 runIn    = runsAlongZ ? inZ : inX;
+            Vector3 acrossIn = runsAlongZ ? inX : inZ;
+            float s = Mathf.Sign(Vector3.Dot(t.right, runIn));
+            float r = Mathf.Sign(Vector3.Dot(t.forward, acrossIn));
+
+            float half       = GridManager.CellSize * 0.5f;
+            float halfThick  = WallPieceThickness * 0.5f;
+            float runLength  = half + halfThick;           // adjacent row's outer face to the room-side edge
+            float runCentre  = s * (half - halfThick) * 0.5f;
+            float backLength = half - halfThick;           // piece's room-side face to the room-side edge
+            float backCentre = r * (half + halfThick) * 0.5f;
+
+            var spans = new System.Collections.Generic.List<Transform>();
+            foreach (Transform child in t)
+                if (Mathf.Abs(child.localScale.x - GridManager.CellSize) <= FullSpanTolerance) spans.Add(child);
+
+            foreach (var child in spans)
             {
-                float inward = x == ring.xMin ? 1f : -1f;   // towards the row's first piece
-                var centre = new Vector3((x + 0.5f + inward * 0.25f) * cs, CornerFillerHeight * 0.5f, (y + 0.5f) * cs);
-                var filler = MeshBuilder.CreateBox(cs * 0.5f, CornerFillerHeight, CornerFillerThickness,
-                                                   MaterialFactory.Wall, RoomWallCornerName);
-                filler.transform.SetParent(_wallCorners, false);
-                filler.transform.SetPositionAndRotation(centre, Quaternion.Euler(0f, AlongXWallYaw, 0f));
-                filler.isStatic = true;
-                MeshBuilder.SetLayerRecursive(filler, FurnitureFactory.DecorationLayer);
+                var back = Object.Instantiate(child.gameObject, t, false).transform;
+                back.name          = CornerReturnName;
+                back.localRotation = Quaternion.Euler(0f, CornerReturnYaw, 0f) * child.localRotation;
+                back.localPosition = new Vector3(0f, child.localPosition.y, backCentre);
+                back.localScale    = new Vector3(backLength, child.localScale.y, child.localScale.z);
+
+                child.localPosition = new Vector3(runCentre, child.localPosition.y, child.localPosition.z);
+                child.localScale    = new Vector3(runLength, child.localScale.y, child.localScale.z);
+            }
+
+            var box = piece.GetComponent<BoxCollider>();
+            if (box != null)
+            {
+                box.size   = new Vector3(runLength, box.size.y, box.size.z);
+                box.center = new Vector3(runCentre, box.center.y, box.center.z);
             }
         }
 

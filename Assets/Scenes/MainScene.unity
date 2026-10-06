@@ -10237,7 +10237,6 @@ MonoBehaviour:
   YardDepth: 34
   RoomWidth: 16
   RoomDepth: 12
-  WallHeight: 4
   ShopSideMargin: 2
   ShopFrontMargin: 3
   ShopCentreAnchor: {fileID: 1904700106}
@@ -30069,7 +30068,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &4530593781891414427
 GameObject:
   m_ObjectHideFlags: 0
@@ -41419,8 +41418,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: pet shop
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 647a2c120ea96bed8874eff50ceb3ce6, type: 2}
+  m_sharedMaterial: {fileID: 0}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -43551,8 +43550,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: PAWS & WHISKERS
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 647a2c120ea96bed8874eff50ceb3ce6, type: 2}
+  m_sharedMaterial: {fileID: 0}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

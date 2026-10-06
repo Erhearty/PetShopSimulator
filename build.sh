@@ -104,12 +104,37 @@ build_font() {
     fi
 }
 
-# Generate the font asset only when it is missing.
+# What the font asset is generated from: a change to either means the asset is stale.
+FONT_SOURCES=("$PROJECT/Assets/Fonts/Nunito-Regular.ttf" "$PROJECT/Assets/Editor/FontAssetBuilder.cs")
+# Committed sha256 of FONT_SOURCES the asset was generated from. Git keeps no mtimes, so content,
+# not age, decides staleness. The leading dot makes Unity skip it (no import, no .meta).
+FONT_STAMP="$PROJECT/Assets/Resources/Fonts/.Nunito SDF.hash"
+
+# sha256 of the font sources' contents, independent of where the project is checked out.
+font_sources_hash() {
+    local src
+    for src in "${FONT_SOURCES[@]}"; do
+        sha256sum < "$src"
+    done | sha256sum | cut -d' ' -f1
+}
+
+# Generate the font asset when it is missing or its stamp differs from the sources' hash, then
+# write the stamp. An existing asset with no stamp is trusted once: only the stamp is written.
 ensure_font() {
+    local hash
+    hash=$(font_sources_hash)
     if [[ ! -f "$FONT_ASSET" ]]; then
         echo "· Nunito font asset is missing — generating it"
         build_font
+    elif [[ ! -f "$FONT_STAMP" ]]; then
+        echo "· Nunito font asset has no source stamp — trusting it and writing $(basename "$FONT_STAMP")"
+    elif [[ "$(cat "$FONT_STAMP")" != "$hash" ]]; then
+        echo "· Nunito font sources changed since the asset was generated — regenerating it"
+        build_font
+    else
+        return
     fi
+    echo "$hash" > "$FONT_STAMP"
 }
 
 do_setup() {
@@ -449,6 +474,16 @@ do_look() {
         exit 1
     fi
     ls "$out"/*.png | sed "s|^|  |"
+
+    # A glyph the font lacks draws as an empty box; TMP only says so in the log.
+    local missing
+    missing=$(grep -E "was not found in the|[Cc]haracter with (ASCII|Unicode) value" \
+                   "$LOG_DIR/look.log" | sort -u || true)
+    if [[ -n "$missing" ]]; then
+        echo "✘ TMP reported missing glyphs during the tour — see $LOG_DIR/look.log:" >&2
+        echo "$missing" | head -40 | sed "s|^|  |" >&2
+        exit 1
+    fi
 }
 
 # The Kenney kits are gitignored, so a fresh clone or worktree has none; restore them first.

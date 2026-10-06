@@ -92,9 +92,8 @@ namespace PetShop.Shop
         /// <summary>Covers the whole footprint of the piece under the cursor, or just the cell when empty.</summary>
         private void UpdateRemoveGhost()
         {
-            if (_ghost == null || !RaycastFloor(out var worldPos)) return;
+            if (_ghost == null || !TryAimRay(out var ray) || !TryAimCell(ray, out _hoverCell)) return;
 
-            _hoverCell = GridManager.WorldToGrid(worldPos);
             Vector2Int root = _hoverCell, size = Vector2Int.one;
             _hoverValid = GridManager.TryGetObject(_hoverCell, out var entry);
             if (_hoverValid) { root = entry.Root; size = entry.Size; }

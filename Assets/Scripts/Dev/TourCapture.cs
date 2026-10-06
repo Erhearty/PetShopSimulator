@@ -50,6 +50,12 @@ namespace PetShop.Dev
             _pixels = new Texture2D(width, height, TextureFormat.RGB24, false);
         }
 
+        /// <summary>
+        /// Points <paramref name="cam"/> at this capture's target, so a ScreenSpaceCamera canvas
+        /// lays itself out at this capture's size on the frames before <see cref="RenderPng"/>.
+        /// </summary>
+        public void Bind(Camera cam) => cam.targetTexture = _render;
+
         /// <summary>Renders one frame through <paramref name="cam"/> and returns it PNG-encoded.</summary>
         public byte[] RenderPng(Camera cam)
         {

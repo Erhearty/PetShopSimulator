@@ -83,6 +83,7 @@ namespace PetShop.Shop
             _height = StartHeight;
             _blend  = 0f;
             IsActive = true;
+            SetRoofVisible(false);
             _game?.SetBuildViewActive(true);
             FreeCursor();
         }
@@ -92,6 +93,7 @@ namespace PetShop.Shop
         {
             if (!IsActive) return;
             IsActive = false;
+            SetRoofVisible(true);
             if (_cam != null)
             {
                 var t = _cam.transform;
@@ -186,6 +188,12 @@ namespace PetShop.Shop
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible   = true;
+        }
+
+        /// <summary>The overhead view looks into the room, so the roof hides while it shows.</summary>
+        private static void SetRoofVisible(bool visible)
+        {
+            if (RoofBuilder.Instance != null) RoofBuilder.Instance.SetVisible(visible);
         }
 
         private static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);

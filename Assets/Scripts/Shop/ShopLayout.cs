@@ -21,7 +21,8 @@ namespace PetShop.Shop
         [Header("Shop building (metres)")]
         public float RoomWidth  = 16f;
         public float RoomDepth  = 12f;
-        public float WallHeight = 4f;
+        /// <summary>Height of the room's walls: always the wall pieces' height, so the roof sits on their tops.</summary>
+        public float WallHeight => WallPieceHeight;
         public float ShopSideMargin  = 2f;
         /// <summary>
         /// Room edge to street edge. 3 m puts the room's front wall-ring row on the yard's front row, so the
@@ -140,7 +141,7 @@ namespace PetShop.Shop
             _grid.FillFloorRect(area.position, area.size);
             ClearDoorway();
             EnsureRoomWallFloor();
-            EnsureRoomWallCorners();
+            RemoveLegacyRoomWallCorners();
         }
 
         /// <summary>Grid cells covered by a lot stage, clamped to the yard.</summary>

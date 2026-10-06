@@ -163,7 +163,10 @@ namespace PetShop.Tests
             var colliders = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None)
                                   .Where(c => c.enabled && !c.isTrigger && c.gameObject.activeInHierarchy && c.bounds.Intersects(band))
                                   .Select(c => c.transform);
-            return renderers.Concat(colliders).Where(t => t.gameObject.layer != GameLayers.Character).Distinct();
+            // The city backdrop is a hollow ring far outside the shop; its box bounds swallow the whole world.
+            return renderers.Concat(colliders)
+                            .Where(t => t.gameObject.layer != GameLayers.Character && t.name != CityBackdrop.ObjectName)
+                            .Distinct();
         }
 
         /// <summary>Hierarchy path, world bounds and owning grid piece (if any) of <paramref name="t"/>.</summary>

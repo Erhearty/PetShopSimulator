@@ -36,6 +36,7 @@ namespace PetShop.Core
             ConfigureFill(fill);
 
             ApplyAmbient();
+            CityBackdrop.Apply();
             PostFxSetup.Apply();
         }
 

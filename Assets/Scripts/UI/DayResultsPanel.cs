@@ -72,7 +72,7 @@ namespace PetShop.UI
                 new Vector2(0.06f, 0.18f), new Vector2(0.94f, 0.42f), 15f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
 
-            var cont = UIFactory.Button("Continue", panel.transform, "Open up tomorrow  →",
+            var cont = UIFactory.Button("Continue", panel.transform, "Open up tomorrow  ›",
                 new Vector2(0.30f, 0.05f), new Vector2(0.70f, 0.15f), 19f, UIFactory.ButtonOn);
             cont.onClick.AddListener(Continue);
 
@@ -140,7 +140,7 @@ namespace PetShop.UI
                     cursor += share;
 
                     string hex = ColorUtility.ToHtmlStringRGB(Buckets[i].colour);
-                    text.AppendLine($"<color=#{hex}>■</color> {Buckets[i].label,-11} " +
+                    text.AppendLine($"<color=#{hex}>•</color> {Buckets[i].label,-11} " +
                                     $"€ {totals[i],8:N2}   {share * 100f:0}%");
                 }
             }

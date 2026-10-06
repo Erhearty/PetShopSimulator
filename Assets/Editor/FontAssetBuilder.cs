@@ -21,8 +21,15 @@ public static class FontAssetBuilder
     /// <summary>Log prefix that build.sh greps for.</summary>
     private const string LogTag = "[FontAssetBuilder]";
 
-    /// <summary>The source font, the variable Nunito TTF from google/fonts (OFL).</summary>
-    private const string SourceFontPath = "Assets/Fonts/Nunito-Variable.ttf";
+    /// <summary>
+    /// The source font: the static Nunito Regular instance from google/fonts (OFL). Not the
+    /// variable TTF: TMP rasterises a variable font at its default instance, which for Nunito is
+    /// ExtraLight (weight 200), so the UI came out hairline-thin.
+    /// </summary>
+    private const string SourceFontPath = "Assets/Fonts/Nunito-Regular.ttf";
+
+    /// <summary>Style the generated asset must report; anything else means the wrong source font.</summary>
+    private const string ExpectedStyleName = "Regular";
 
     /// <summary>Folder the font asset is written to; must sit under a Resources folder.</summary>
     private const string OutputFolder = "Assets/Resources/Fonts";
@@ -62,9 +69,10 @@ public static class FontAssetBuilder
 
     /// <summary>
     /// Typographic extras the UI uses: euro sign, ellipsis, em dash, en dash, curly single and
-    /// double quotes, and bullet (€…—–‘’“”•).
+    /// double quotes, bullet, minus sign and single angle quotes (€…—–‘’“”•−‹›).
     /// </summary>
-    private const string ExtraCharacters = "\u20AC\u2026\u2014\u2013\u2018\u2019\u201C\u201D\u2022";
+    private const string ExtraCharacters =
+        "\u20AC\u2026\u2014\u2013\u2018\u2019\u201C\u201D\u2022\u2212\u2039\u203A";
 
     /// <summary>
     /// Serialized field behind TMP_FontAsset's internal <c>clearDynamicDataOnBuild</c>. TMP copies
@@ -228,9 +236,16 @@ public static class FontAssetBuilder
             return;
         }
 
+        string style = asset.faceInfo.styleName;
+        if (style != ExpectedStyleName)
+        {
+            Fail($"{OutputPath} has style '{style}', expected '{ExpectedStyleName}' — wrong source font?");
+            return;
+        }
+
         int atlasCount = asset.atlasTextures?.Length ?? 0;
         Debug.Log($"{LogTag} Wrote {OutputPath}: {asset.characterTable.Count} characters, " +
-                  $"{atlasCount} atlas texture(s), GUID {AssetDatabase.AssetPathToGUID(OutputPath)}.");
+                  $"style {style}, {atlasCount} atlas texture(s), GUID {AssetDatabase.AssetPathToGUID(OutputPath)}.");
     }
 
     /// <summary>Logs <paramref name="message"/> as an error and, in batch mode, exits with a failure code.</summary>

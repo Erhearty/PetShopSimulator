@@ -56,6 +56,8 @@ namespace PetShop.Core
             textGo.transform.localPosition = Vector3.zero;
 
             var tmp = textGo.AddComponent<TextMeshPro>();
+            var font = PetShop.UI.UIFactory.Font();
+            if (font != null) tmp.font = font;
             tmp.text             = text;
             // TextMeshPro world units run at roughly fontSize/10 metres per line, so `size`
             // is the cap height in metres — the number a caller can actually reason about.

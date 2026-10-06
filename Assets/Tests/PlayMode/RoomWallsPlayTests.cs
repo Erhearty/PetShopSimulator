@@ -161,28 +161,172 @@ namespace PetShop.Tests
         }
 
         /// <summary>
-        /// Each wall-ring corner is closed along the back/front row line by a static filler, even with the
-        /// corner piece removed, and the fillers are built once across reloads, re-seeding and lot-stage changes.
+        /// Each wall-ring corner is closed along the back/front row line by the corner cell's own grid piece, so
+        /// removing that piece opens the corner; no static corner fillers exist, even across reloads, re-seeding and
+        /// lot-stage changes.
         /// </summary>
         [UnityTest]
-        public IEnumerator RoomWallCorners_ClosedOnBothRows_AndBuiltOnce()
+        public IEnumerator RoomWallCorners_ClosedByTheirGridPiece_AndNoStaticFillers()
         {
             yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
             var game = PlaytestHarness.Game;
             StartWatchingLogs();
             AssertCornersClosed(game);
+            AssertNoCornerFillers();
 
             RectInt ring = game.Layout.RoomWallCells();
-            game.Build.RemoveAtWorldPos(game.Grid.GridToWorld(new Vector2Int(ring.xMin, ring.yMin)));
+            var corner = new Vector2Int(ring.xMin, ring.yMin);
+            game.Build.RemoveAtWorldPos(game.Grid.GridToWorld(corner));
+            yield return null;   // let the removed piece's destruction land
+            Assert.IsFalse(game.Grid.TryGetObject(corner, out _), "The corner piece was not removed.");
+            Assert.IsFalse(CornerHit(game, corner), "Removing the corner piece left something closing its corner.");
+
             Reload(game, SaveAndRead(game));
             game.Layout.SeedRoomWalls(game.Build);
             game.Layout.ApplyLotStage(ShopLayout.StarterLotStage);
+            yield return null;
             AssertCornersClosed(game);
+            AssertNoCornerFillers();
+            AssertNoUnexpectedErrors();
+        }
 
+        /// <summary>Every seeded wall-ring cell holds a grid piece, and no static corner filler stands anywhere.</summary>
+        [UnityTest]
+        public IEnumerator NewGame_EveryRingCellHasAGridPiece()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game = PlaytestHarness.Game;
+            foreach (var cell in RingCells(game))
+            {
+                Assert.IsTrue(game.Grid.TryGetObject(cell, out var entry), $"Ring cell {cell} has no grid piece.");
+                Assert.IsTrue(entry.Data != null && BuildCatalog.IsBuildingPiece(entry.Data.Id),
+                              $"Ring cell {cell} holds {entry.Data?.Id}, not a building piece.");
+                Assert.IsNotNull(entry.Instance, $"Ring cell {cell}'s piece has no spawned object.");
+            }
+            AssertNoCornerFillers();
+        }
+
+        /// <summary>
+        /// Neighbouring ring pieces meet: along every run and round every corner the renderer bounds of adjacent
+        /// pieces touch within <see cref="JoinTolerance"/>, and no corner piece overhangs the adjacent row's outer face.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator NewGame_AdjacentRingPiecesMeet()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game = PlaytestHarness.Game;
+            var ring = game.Layout.RoomWallCells();
+            var cells = RingCells(game).ToList();
+            var set = new System.Collections.Generic.HashSet<Vector2Int>(cells);
+            int pairs = 0;
+
+            foreach (var cell in cells)
+            foreach (var step in new[] { Vector2Int.right, Vector2Int.up })
+            {
+                var next = cell + step;
+                if (!set.Contains(next)) continue;
+                Bounds a = PieceBounds(game, cell), b = PieceBounds(game, next);
+                float gap = step.x != 0 ? b.min.x - a.max.x : b.min.z - a.max.z;
+                Assert.LessOrEqual(gap, JoinTolerance, $"Pieces at {cell} and {next} leave a {gap:F3} m gap.");
+                pairs++;
+            }
+            Assert.Greater(pairs, 0, "No adjacent ring pieces were compared.");
+
+            foreach (var corner in Corners(ring))
+            {
+                Bounds bounds = PieceBounds(game, corner);
+                Vector3 centre = game.Grid.GridToWorld(corner);
+                float reach = ShopLayout.WallPieceThickness * 0.5f + SkirtingOverhang + JoinTolerance;
+                float outX = corner.x == ring.xMin ? centre.x - bounds.min.x : bounds.max.x - centre.x;
+                float outZ = corner.y == ring.yMin ? centre.z - bounds.min.z : bounds.max.z - centre.z;
+                Assert.LessOrEqual(outX, reach, $"The corner piece at {corner} overhangs its side row by {outX:F3} m.");
+                Assert.LessOrEqual(outZ, reach, $"The corner piece at {corner} overhangs its front/back row by {outZ:F3} m.");
+            }
+        }
+
+        /// <summary>
+        /// A window wall closes its whole cell at glass height: along the wall's run, its child renderers leave no
+        /// gap wider than <see cref="WindowSlitTolerance"/> between the cell's two edges (no see-through side slits).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator NewGame_WindowWallCoversItsCellAtGlassHeight()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game = PlaytestHarness.Game;
+            var corners = new System.Collections.Generic.HashSet<Vector2Int>(Corners(game.Layout.RoomWallCells()));
+            var entry = game.Grid.GetAllPlaced().FirstOrDefault(e =>
+                e.Data != null && e.Data.Id == BuildCatalog.WallWindow && e.Instance != null && !corners.Contains(e.Root));
+            Assert.IsNotNull(entry, "A new game has no window wall off the ring corners.");
+
+            var renderers = entry.Instance.GetComponentsInChildren<Renderer>();
+            var glass = renderers.FirstOrDefault(r => r.name == WindowGlassName);
+            Assert.IsNotNull(glass, $"The window wall at {entry.Root} has no {WindowGlassName} renderer.");
+            float y = glass.bounds.center.y;
+            Vector3 axis   = entry.Instance.transform.right;
+            Vector3 centre = game.Grid.GridToWorld(entry.Root);
+            float half = GridManager.CellSize * 0.5f;
+
+            var spans = new System.Collections.Generic.List<(float from, float to)>();
+            foreach (var r in renderers)
+            {
+                Bounds b = r.bounds;
+                if (y < b.min.y || y > b.max.y) continue;
+                float a = Vector3.Dot(b.min - centre, axis), c = Vector3.Dot(b.max - centre, axis);
+                spans.Add((Mathf.Min(a, c), Mathf.Max(a, c)));
+            }
+            Assert.Greater(spans.Count, 0, "No renderer of the window wall reaches glass height.");
+
+            float reach = -half;
+            foreach (var (from, to) in spans.OrderBy(s => s.from))
+            {
+                Assert.LessOrEqual(from - reach, WindowSlitTolerance,
+                                   $"The window wall at {entry.Root} leaves a {from - reach:F3} m gap at {reach:F3} m along its run.");
+                reach = Mathf.Max(reach, to);
+            }
+            Assert.LessOrEqual(half - reach, WindowSlitTolerance,
+                               $"The window wall at {entry.Root} leaves a {half - reach:F3} m gap at its far edge.");
+        }
+
+        /// <summary>Name of a window wall's glass child, whose height is where the side slits would show.</summary>
+        private const string WindowGlassName = "Glass";
+        /// <summary>Widest gap, in metres, a window wall may leave along its cell at glass height.</summary>
+        private const float WindowSlitTolerance = 0.02f;
+
+        /// <summary>Metres two adjacent wall pieces' bounds may stand apart and still count as joined.</summary>
+        private const float JoinTolerance = 0.02f;
+        /// <summary>How far a wall piece's skirting stands proud of its face, in metres.</summary>
+        private const float SkirtingOverhang = 0.025f;
+
+        /// <summary>Every cell of the room's wall ring.</summary>
+        private static System.Collections.Generic.IEnumerable<Vector2Int> RingCells(GameManager game)
+        {
+            RectInt ring = game.Layout.RoomWallCells();
+            foreach (var cell in ring.allPositionsWithin)
+                if (game.Layout.IsRoomWallCell(cell)) yield return cell;
+        }
+
+        private static Vector2Int[] Corners(RectInt ring) => new[]
+        {
+            new Vector2Int(ring.xMin, ring.yMin), new Vector2Int(ring.xMax - 1, ring.yMin),
+            new Vector2Int(ring.xMin, ring.yMax - 1), new Vector2Int(ring.xMax - 1, ring.yMax - 1),
+        };
+
+        /// <summary>Combined bounds of the active renderers of the piece on <paramref name="cell"/>.</summary>
+        private static Bounds PieceBounds(GameManager game, Vector2Int cell)
+        {
+            Assert.IsTrue(game.Grid.TryGetObject(cell, out var entry) && entry.Instance != null, $"No piece at {cell}.");
+            var renderers = entry.Instance.GetComponentsInChildren<Renderer>();
+            Assert.Greater(renderers.Length, 0, $"The piece at {cell} has no renderers.");
+            Bounds b = renderers[0].bounds;
+            foreach (var r in renderers) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        private static void AssertNoCornerFillers()
+        {
             int fillers = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None)
                                 .Count(t => t.name == ShopLayout.RoomWallCornerName);
-            Assert.AreEqual(4, fillers, "The corner fillers should exist exactly once each.");
-            AssertNoUnexpectedErrors();
+            Assert.AreEqual(0, fillers, "Static RoomWallCorner fillers should no longer exist.");
         }
 
         /// <summary>
@@ -191,19 +335,21 @@ namespace PetShop.Tests
         /// </summary>
         private static void AssertCornersClosed(GameManager game)
         {
+            foreach (var corner in Corners(game.Layout.RoomWallCells()))
+                Assert.IsTrue(CornerHit(game, corner), $"The wall corner at cell {corner} is open.");
+        }
+
+        /// <summary>True when a collider fills the strip between corner cell <paramref name="corner"/>'s centre and its room-side X edge.</summary>
+        private static bool CornerHit(GameManager game, Vector2Int corner)
+        {
             Physics.SyncTransforms();
             RectInt ring = game.Layout.RoomWallCells();
             float cs = GridManager.CellSize;
-            foreach (int x in new[] { ring.xMin, ring.xMax - 1 })
-            foreach (int y in new[] { ring.yMin, ring.yMax - 1 })
-            {
-                Vector3 centre = game.Grid.GridToWorld(new Vector2Int(x, y));
-                float inward = x == ring.xMin ? 1f : -1f;
-                var gap = new Vector3(centre.x + inward * (0.12f + (cs * 0.5f - 0.12f) * 0.5f), 1f, centre.z);
-                bool hit = Physics.CheckBox(gap, new Vector3(0.3f, 0.5f, 0.05f), Quaternion.identity,
-                                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-                Assert.IsTrue(hit, $"The wall corner at cell ({x},{y}) is open at {gap}.");
-            }
+            Vector3 centre = game.Grid.GridToWorld(corner);
+            float inward = corner.x == ring.xMin ? 1f : -1f;
+            var gap = new Vector3(centre.x + inward * (0.12f + (cs * 0.5f - 0.12f) * 0.5f), 1f, centre.z);
+            return Physics.CheckBox(gap, new Vector3(0.3f, 0.5f, 0.05f), Quaternion.identity,
+                                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
         }
 
         /// <summary>The doorway piece on the room's wall ring.</summary>

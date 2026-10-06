@@ -177,6 +177,8 @@ namespace PetShop.UI
             var holder = UIFactory.Node("InteractPrompt", canvas,
                                         new Vector2(0.25f, 0.20f), new Vector2(0.75f, 0.26f));
             _prompt = holder.AddComponent<TextMeshProUGUI>();
+            var font = UIFactory.Font();
+            if (font != null) _prompt.font = font;
             _prompt.fontSize  = 21f;
             _prompt.alignment = TextAlignmentOptions.Center;
             _prompt.color     = UIFactory.Accent;

@@ -85,6 +85,21 @@ namespace PetShop.Core
             public static readonly Color AmbientEquator = new(0.58f, 0.52f, 0.44f);
             /// <summary>Ambient ground bounce: warm oak.</summary>
             public static readonly Color AmbientGround = new(0.34f, 0.27f, 0.20f);
+
+            /// <summary>Sky tint overhead (the gradient sky's zenith).</summary>
+            public static readonly Color SkyZenith     = new(0.47f, 0.64f, 0.84f);
+            /// <summary>Hazy sky at the horizon; also the flat clear colour when the sky shader is missing.</summary>
+            public static readonly Color SkyHorizon    = new(0.80f, 0.85f, 0.89f);
+            /// <summary>Below-horizon colour of the gradient sky.</summary>
+            public static readonly Color SkyGround     = new(0.52f, 0.50f, 0.47f);
+            /// <summary>Farthest skyline layer: pale and hazy.</summary>
+            public static readonly Color SkylineFar    = new(0.68f, 0.74f, 0.82f);
+            /// <summary>Middle skyline layer.</summary>
+            public static readonly Color SkylineMid    = new(0.50f, 0.57f, 0.67f);
+            /// <summary>Nearest skyline layer: the darkest blocks.</summary>
+            public static readonly Color SkylineNear   = new(0.34f, 0.38f, 0.48f);
+            /// <summary>A lit window in the skyline: the sunflower accent.</summary>
+            public static readonly Color LitWindow     = Sunflower;
         }
 
         public static readonly Color FloorColor       = Palette.OakFloor;

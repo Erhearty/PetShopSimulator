@@ -5,17 +5,20 @@ using PetShop.Core;
 namespace PetShop.Shop
 {
     /// <summary>
-    /// Builds the shop's flat roof: a slab at <see cref="ShopLayout.WallHeight"/> over the shell footprint,
-    /// plus the cells under and enclosed by player-built walls. Rebuilt whenever a wall is placed or
-    /// removed. The roof is pure visuals: no colliders, on the Scenery layer, so interaction raycasts
-    /// and the NavMesh never see it.
+    /// Builds the shop's flat roof: a slab resting on the wall tops (<see cref="ShopLayout.WallHeight"/>) over
+    /// the shell footprint, plus the cells under and enclosed by wall pieces (plain, window and doorway walls;
+    /// fences carry no roof). Rebuilt whenever a wall piece is placed or removed. The roof is pure visuals: no
+    /// colliders, on the Scenery layer, so interaction raycasts and the NavMesh never see it. The build view
+    /// hides it through <see cref="Instance"/> and <see cref="SetVisible"/>.
     /// </summary>
     public class RoofBuilder : MonoBehaviour
     {
         private const float Thickness = 0.2f;
         private const float Overhang  = 0.3f;
         private const float CellInset = 0.01f;
-        private const string WallType = "wall";
+
+        /// <summary>The live roof, or null when none exists. Set on Awake and Init, cleared on destroy.</summary>
+        public static RoofBuilder Instance { get; private set; }
 
         private ShopLayout   _layout;
         private GridManager  _grid;
@@ -25,11 +28,25 @@ namespace PetShop.Shop
         /// <summary>The roof renderer, for bounds checks.</summary>
         public MeshRenderer Renderer => _renderer;
 
+        private void Awake() => Instance = this;
+
+        /// <summary>True when <paramref name="data"/> is a wall piece the roof rests on: wall, window wall or doorway.</summary>
+        public static bool CarriesRoof(PlacedObjectData data) =>
+            data != null && (data.Type == BuildCatalog.Wall || data.Type == BuildCatalog.WallWindow ||
+                             data.Type == BuildCatalog.WallDoor);
+
+        /// <summary>Shows or hides every renderer of the roof (the build view hides it to see inside).</summary>
+        public void SetVisible(bool visible)
+        {
+            foreach (var r in GetComponentsInChildren<Renderer>(true)) r.enabled = visible;
+        }
+
         /// <summary>Binds to the layout and grid, builds the roof once and follows wall changes.</summary>
         public void Init(ShopLayout layout, GridManager grid)
         {
             _layout = layout;
             _grid   = grid;
+            Instance = this;
 
             if (_filter == null)
             {
@@ -50,6 +67,7 @@ namespace PetShop.Shop
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (_grid == null) return;
             _grid.OnObjectPlaced.RemoveListener(OnPlaced);
             _grid.OnObjectRemoved.RemoveListener(OnRemoved);
@@ -57,7 +75,7 @@ namespace PetShop.Shop
 
         private void OnPlaced(Vector2Int cell, PlacedObjectData data)
         {
-            if (data != null && data.Type == WallType) Rebuild();
+            if (CarriesRoof(data)) Rebuild();
         }
 
         // The removed entry is already gone, so its type is unknown; rebuilding is cheap.
@@ -103,7 +121,7 @@ namespace PetShop.Shop
             if (_grid != null)
                 foreach (var entry in _grid.GetAllPlaced())
                 {
-                    if (entry.Data == null || entry.Data.Type != WallType) continue;
+                    if (!CarriesRoof(entry.Data)) continue;
                     for (int x = 0; x < entry.Size.x; x++)
                         for (int z = 0; z < entry.Size.y; z++)
                             walls.Add(entry.Root + new Vector2Int(x, z));

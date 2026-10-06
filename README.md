@@ -71,7 +71,7 @@ Or open the project in Unity, load `Assets/Scenes/MainScene.unity`, and press Pl
 A fresh clone needs one setup pass (`./build.sh setup`) before the first editor Play session,
 because TextMesh Pro's essential resources are not checked in.
 
-The UI font is Nunito (SIL OFL, `Assets/Fonts/Nunito-Variable.ttf` and `Assets/Fonts/OFL.txt`).
+The UI font is Nunito (SIL OFL, `Assets/Fonts/Nunito-Regular.ttf` and `Assets/Fonts/OFL.txt`).
 Its TextMesh Pro SDF asset, `Assets/Resources/Fonts/Nunito SDF.asset`, is generated rather than
 hand-made: `./build.sh setup` and `./build.sh linux` generate it when it is missing, and
 `./build.sh font` regenerates it in place (keeping its GUID). It holds ASCII, Latin-1 and
