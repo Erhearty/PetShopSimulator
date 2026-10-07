@@ -84,6 +84,7 @@ namespace PetShop.UI
             _penLabel = UIFactory.Label("PenName", panel.transform, "",
                 new Vector2(0.10f, 0.79f), new Vector2(0.41f, 0.865f), 17f, UIFactory.Ink,
                 TextAlignmentOptions.Center);
+            UIFactory.AutoFit(_penLabel);
 
             _listRoot = UIFactory.Node("PetList", panel.transform,
                                        new Vector2(0.03f, 0.18f), new Vector2(0.48f, 0.78f)).transform;

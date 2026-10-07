@@ -90,6 +90,7 @@ namespace PetShop.UI
             _prev.onClick.AddListener(() => ChangePage(-1));
             _pageLabel = UIFactory.Label("Page", panel, "", new Vector2(0.15f, FooterBottom),
                 new Vector2(0.29f, FooterTop), BodyFont, UIFactory.InkMuted, TextAlignmentOptions.Center);
+            UIFactory.AutoFit(_pageLabel);
             _next = UIFactory.ButtonKey("NextPage", panel, "catalog.next", new Vector2(0.30f, FooterBottom),
                 new Vector2(0.41f, FooterTop), ButtonFont);
             _next.onClick.AddListener(() => ChangePage(1));

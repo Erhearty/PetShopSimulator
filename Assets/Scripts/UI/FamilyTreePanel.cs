@@ -192,8 +192,8 @@ namespace PetShop.UI
 
             string sold = IsInPen(e.id) ? "" : $"  ·  {Loc.T("family.sold")}";
             string info = LocNames.Rarity(e.rarity) + "  ·  " + Loc.F("family.generation", e.generation) + sold;
-            UIFactory.Label("Info", box, info,
-                new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.64f), 13f, UIFactory.InkMuted);
+            UIFactory.AutoFit(UIFactory.Label("Info", box, info,
+                new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.64f), 13f, UIFactory.InkMuted));
 
             var coat   = UIFactory.WithAlpha(e.coat, 1f);
             var swatch = UIFactory.Panel("Swatch", box,

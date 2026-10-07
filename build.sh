@@ -15,6 +15,7 @@
 #    ./build.sh spawnverify  check spawned pack models' size and grounding (SKIP without packs)
 #    ./build.sh playtest   spawnverify + playmode + smoke + soak, with a PASS/FAIL/SKIP summary
 #    ./build.sh look       render screenshots of the running game into Screenshots/
+#                          (LOOK_LANG=uk|en renders in that UI language, not saved; unset = saved language)
 #    ./build.sh look-diff  look, then compare against Tests/Baselines/Screenshots (a diff never
 #                          fails; a failed capture or comparison does)
 #    ./build.sh look-approve  copy the current Screenshots/ over the baselines
@@ -505,6 +506,7 @@ do_look() {
     echo "▶ rendering the game (DISPLAY=$DISPLAY)"
     if ! timeout 600 "$UNITY" -batchmode -projectPath "$PROJECT" \
             -executeMethod SceneShot.Capture -tour "$out" \
+            ${LOOK_LANG:+-lang "$LOOK_LANG"} \
             -logFile "$LOG_DIR/look.log"; then
         echo "✘ capture failed — see $LOG_DIR/look.log" >&2
         grep -E "^\[SceneShot\]|^\[Tour\]|error CS" "$LOG_DIR/look.log" | tail -10 >&2 || true

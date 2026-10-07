@@ -8,7 +8,11 @@ using UnityEngine;
 /// Drives <see cref="PetShop.Dev.CameraTour"/> from the editor so the game can be
 /// photographed head-lessly.
 ///
-///   Unity -batchmode -projectPath . -executeMethod SceneShot.Capture -tour Screenshots
+///   Unity -batchmode -projectPath . -executeMethod SceneShot.Capture -tour Screenshots [-lang uk|en]
+///
+/// -lang picks the UI language for this run only (PlayerPrefs are not written): GameBootstrapper.Awake
+/// applies it through PlaytestOptions from the editor's own command line before it builds the UI,
+/// so it survives the play-mode domain reload. Without -lang the saved language is used.
 ///
 /// Note: **no** -nographics. The editor needs a real graphics device to render, and it gets
 /// one from the DRM render node given DISPLAY and XAUTHORITY — even though opening an
@@ -28,6 +32,14 @@ public static class SceneShot
         var args = System.Environment.GetCommandLineArgs();
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "-tour") _outputDir = args[i + 1];
+
+        // Same parse the game uses; applied here too (non-persisting) for when domain reload is off.
+        string language = PetShop.Core.PlaytestOptions.Parse(args).Language;
+        if (!string.IsNullOrEmpty(language))
+        {
+            PetShop.Localization.Loc.SetLanguageWithoutSaving(PetShop.Localization.Loc.FromCode(language));
+            Debug.Log($"[SceneShot] tour language: {language} (not saved).");
+        }
 
         if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
         {
