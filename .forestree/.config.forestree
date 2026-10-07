@@ -26,7 +26,8 @@
                 "Unity Timeline",
                 "Unity Purchasing",
                 "Unity Test Framework",
-                "Localization (en, uk)"
+                "Localization (en, uk)",
+                "Code-defined string tables (en/uk) + Loc lookup"
               ]
             },
             "h": 200,
@@ -240,6 +241,16 @@
                   "desc": "UI language chosen in Settings: en (default) or uk. Saved in PlayerPrefs and applied at startup and when changed.",
                   "example": "uk",
                   "key": "PlayerPrefs: language"
+                },
+                {
+                  "desc": "PlayerPrefs key: UI language, en|uk, default en; set from Settings",
+                  "example": "uk",
+                  "key": "language"
+                },
+                {
+                  "desc": "Playtest CLI flag forcing the UI language for a run (not persisted)",
+                  "example": "-lang uk",
+                  "key": "-lang"
                 }
               ]
             },

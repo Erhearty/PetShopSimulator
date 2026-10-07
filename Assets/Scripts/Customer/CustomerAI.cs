@@ -379,17 +379,76 @@ namespace PetShop.Customer
             // The limit is sized from the planned path once it is ready (see WalkTimeout).
             float elapsed = 0f, limit = MinWalkTimeoutSeconds;
             bool  sized   = false;
-            while (elapsed < limit)
-            {
-                elapsed += Time.deltaTime;
-                if (_agent.pathPending) { yield return null; continue; }
-                if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
-                if (!sized) { sized = true; limit = WalkTimeout(_agent.remainingDistance, _agent.speed); }
-                if (_agent.remainingDistance <= _agent.stoppingDistance) { _lastWalkArrived = true; yield break; }
-                yield return null;
-            }
 
-            ReportNavTimeout(target, leg);
+            // Stall detection: nudge a shopper that is stuck on a valid path (see CustomerAI.WalkTimeout.cs).
+            Vector3 stallRef = transform.position;
+            float   stallTime = 0f;
+            int     nudges = 0;
+            bool    priorityChanged = false;
+            int     originalPriority = _agent.avoidancePriority;
+            Vector3 originalTarget = target;
+            bool    arrived = false;
+            try
+            {
+                while (elapsed < limit)
+                {
+                    elapsed += Time.deltaTime;
+                    if (_agent.pathPending) { yield return null; continue; }
+                    if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
+                    if (!sized) { sized = true; limit = WalkTimeout(_agent.remainingDistance, _agent.speed); }
+                    if (_agent.remainingDistance <= _agent.stoppingDistance) { _lastWalkArrived = true; arrived = true; yield break; }
+
+                    if (nudges < MaxNudges && (State == CustomerState.Browsing || State == CustomerState.Entering)
+                        && _agent.remainingDistance > _agent.stoppingDistance + 0.2f)
+                    {
+                        Vector3 pos = transform.position;
+                        if ((pos - stallRef).sqrMagnitude >= StallMinMove * StallMinMove)
+                        {
+                            stallRef = pos;
+                            stallTime = 0f;
+                        }
+                        else
+                        {
+                            stallTime += Time.deltaTime;
+                            if (stallTime >= StallSeconds)
+                            {
+                                nudges++;
+                                stallTime = 0f;
+                                stallRef = pos;
+
+                                float angle = Random.Range(0f, Mathf.PI * 2f);
+                                float radius = Random.Range(1f, 2f);
+                                Vector3 ring = originalTarget + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                                if (NavMesh.SamplePosition(ring, out var nudgeHit, 4f, NavMesh.AllAreas))
+                                {
+                                    target = nudgeHit.position;
+                                    _agent.SetDestination(target);
+                                }
+
+                                if (!priorityChanged && (State == CustomerState.Browsing || State == CustomerState.Entering))
+                                {
+                                    priorityChanged = true;
+                                    originalPriority = _agent.avoidancePriority;
+                                    _agent.avoidancePriority = Random.Range(20, 40);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        stallRef = transform.position;
+                        stallTime = 0f;
+                    }
+                    yield return null;
+                }
+            }
+            finally
+            {
+                if (priorityChanged) _agent.avoidancePriority = originalPriority;
+            }
+            if (arrived) yield break;
+
+            ReportNavTimeout(originalTarget, leg);
 
             // Deliberately not setting isStopped here: toggling it between legs makes the
             // agent lurch. autoBraking already eases it into each stop.

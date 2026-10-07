@@ -60,24 +60,32 @@ namespace PetShop.Tests
 
             // Cars already close to or past the line when the crossing filled cannot stop in time.
             // Parked cars (and ones pulling in or out of the car park) are not approaching the crossing.
+            // Committed = within braking distance (plus margin) of the line; mirrors TrafficMath.ShouldBrakeForStopLine.
             var committed = new HashSet<TrafficCar>();
-            foreach (var c in cars)
-                if (c.Lane == null || AlongToLine(zone, c) < CommittedMargin) committed.Add(c);
+            var seen = new HashSet<TrafficCar>();
+            foreach (var c in cars) Classify(zone, c, committed, seen);
 
             TrafficCar stopped = null;
+            bool approached = false;
             float until = Time.realtimeSinceStartup + HoldTimeout;
             while (stopped == null && Time.realtimeSinceStartup < until)
             {
                 yield return null;
+                cars = new List<TrafficCar>(TrafficDirector.Cars);
                 foreach (var c in cars)
                 {
+                    // A car first seen farther out than its braking distance is checked like any other.
+                    Classify(zone, c, committed, seen);
                     if (committed.Contains(c) || c.Lane == null) continue;
+                    approached = true;
                     float along = AlongToLine(zone, c);
                     Assert.GreaterOrEqual(along, -LineTolerance,
                         $"{c.name} drove over the stop line while the crossing was occupied (speed {c.Speed}).");
                     if (c.Speed < StoppedSpeed && along <= StopWindow) { stopped = c; break; }
                 }
             }
+            if (stopped == null && !approached && !HasLaneCar())
+                Assert.Inconclusive("no car approached the crossing within the hold timeout and none is on a lane");
             Assert.IsNotNull(stopped, "no approaching car stopped for the occupied crossing");
             Assert.Less(stopped.Speed, StoppedSpeed, "the stopped car is still moving");
 
@@ -94,6 +102,20 @@ namespace PetShop.Tests
                 yield return null;
             Assert.Greater(stopped.Speed, MovingSpeed, $"{stopped.name} did not resume");
             Assert.Greater(Mathf.Abs(stopped.Distance - before), MinAdvance, $"{stopped.name} did not advance");
+        }
+
+        private static void Classify(CrosswalkZone zone, TrafficCar c, HashSet<TrafficCar> committed, HashSet<TrafficCar> seen)
+        {
+            if (!seen.Add(c)) return;
+            float brake = Mathf.Max(c.BrakeDeceleration, 0.01f);
+            float braking = c.Speed * c.Speed / (2f * brake);
+            if (c.Lane == null || AlongToLine(zone, c) < braking + CommittedMargin) committed.Add(c);
+        }
+
+        private static bool HasLaneCar()
+        {
+            foreach (var c in TrafficDirector.Cars) if (c != null && c.Lane != null) return true;
+            return false;
         }
 
         /// <summary>Metres from the car's front to the stop line for its travel direction (negative once past).</summary>

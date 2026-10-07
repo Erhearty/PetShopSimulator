@@ -72,6 +72,9 @@ namespace PetShop.Traffic
         /// <summary>Half the car's length along its travel axis.</summary>
         public float HalfLength => _halfLength;
 
+        /// <summary>Braking deceleration in m/s² (read-only; used by tests to mirror the stop-line brake distance).</summary>
+        public float BrakeDeceleration => brakeDeceleration;
+
         /// <summary>Current speed in metres per second.</summary>
         public float Speed => _speed;
 
