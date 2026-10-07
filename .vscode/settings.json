@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "7badb892-e6ce-4c39-9c77-69f9eb61f81d.slnx"
+    "dotnet.defaultSolution": "c174df35-c9f6-4497-a716-771040a17504.slnx"
 }
