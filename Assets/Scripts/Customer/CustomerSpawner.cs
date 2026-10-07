@@ -85,7 +85,7 @@ namespace PetShop.Customer
         [HideInInspector] public bool HasCounter;
 
         /// <summary>Shown once per day when the doors stay shut for lack of furniture.</summary>
-        public const string NotTradingMessage = "Place a counter and a shelf or pen to open for customers.";
+        public static string NotTradingMessage => Localization.Loc.T("customer.not_trading");
 
         public int  SpawnedToday { get; private set; }
         public int  TargetToday  { get; private set; }

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
 using PetShop.Commerce;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -43,29 +44,38 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
 
-            UIFactory.Label("Header", panel.transform, "Staff",
+            UIFactory.LabelKey("Header", panel.transform, "staffpanel.title",
                 new Vector2(0.03f, 0.89f), new Vector2(0.5f, 0.97f), 24f, UIFactory.Ink);
 
-            var close = UIFactory.Button("Close", panel.transform, "Close  (Esc)",
-                new Vector2(0.79f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
+            var close = UIFactory.ButtonKey("Close", panel.transform, "common.close_esc",
+                new Vector2(0.79f, 0.895f), new Vector2(0.97f, 0.965f), 15f, null, "Esc");
             close.onClick.AddListener(Hide);
 
             _summaryLabel = UIFactory.Label("Summary", panel.transform, "",
                 new Vector2(0.03f, 0.79f), new Vector2(0.97f, 0.875f), 16f, UIFactory.InkMuted);
 
-            UIFactory.Label("Applicants", panel.transform, "Looking for work today",
+            UIFactory.LabelKey("Applicants", panel.transform, "staffpanel.applicants",
                 new Vector2(0.03f, 0.70f), new Vector2(0.60f, 0.77f), 17f, UIFactory.Ink);
 
             _cardRoot = UIFactory.Node("Cards", panel.transform,
                                        new Vector2(0.03f, 0.30f), new Vector2(0.97f, 0.69f)).transform;
 
-            UIFactory.Label("OnShift", panel.transform, "On the payroll",
+            UIFactory.LabelKey("OnShift", panel.transform, "staffpanel.on_payroll",
                 new Vector2(0.03f, 0.22f), new Vector2(0.60f, 0.29f), 17f, UIFactory.Ink);
 
             _payrollRoot = UIFactory.Node("Payroll", panel.transform,
                                           new Vector2(0.03f, 0.03f), new Vector2(0.97f, 0.21f)).transform;
 
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rebuilds the cards and payroll in the new language while the board is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Refresh();
         }
 
         public void Show()
@@ -100,10 +110,8 @@ namespace PetShop.UI
             if (_game == null) return;
 
             var shop = _game.Shop;
-            _summaryLabel.text =
-                $"{RoleCounts()}  ·  wages € {_game.Payroll:N0} tonight  ·  " +
-                $"balance € {(shop != null ? shop.Balance : 0f):N0}  ·  " +
-                $"room for {Mathf.Max(0, StaffRoster.MaxStaff - _game.StaffCount)} more";
+            _summaryLabel.text = Loc.F("staffpanel.summary", RoleCounts(), _game.Payroll,
+                shop != null ? shop.Balance : 0f, Mathf.Max(0, StaffRoster.MaxStaff - _game.StaffCount));
 
             BuildCards();
             BuildPayroll();
@@ -117,15 +125,14 @@ namespace PetShop.UI
             {
                 int n = 0;
                 foreach (var member in _game.Staff) if (member != null && member.Role == role) n++;
-                string word = role.ToString().ToLowerInvariant();
-                parts.Add($"{n} {word}{(n == 1 ? "" : "s")}");
+                parts.Add(Loc.Plural("staffpanel.role_count." + LocNames.ToKey(role.ToString()), n));
             }
             return string.Join("  ·  ", parts);
         }
 
         /// <summary>Role, stars and skill word, e.g. "Cashier  ★★★☆☆ capable".</summary>
         private static string RoleAndSkill(StaffRole role, int skill) =>
-            $"{role}  {StaffCandidate.Stars(skill)} {StaffCandidate.SkillWordFor(skill)}";
+            $"{LocNames.Role(role)}  {StaffCandidate.Stars(skill)} {StaffCandidate.SkillWordFor(skill)}";
 
         /// <summary>The job after <paramref name="role"/>, wrapping round.</summary>
         private static StaffRole NextRole(StaffRole role)
@@ -141,7 +148,7 @@ namespace PetShop.UI
             if (candidates.Count == 0)
             {
                 var none = UIFactory.Label("NoCandidates", _cardRoot,
-                    "Nobody is looking for work today — try again tomorrow.",
+                    Loc.T("staffpanel.no_candidates"),
                     Vector2.zero, Vector2.one, 15f, UIFactory.InkMuted);
                 _spawned.Add(none.gameObject);
                 return;
@@ -166,11 +173,11 @@ namespace PetShop.UI
                 new Vector2(0.06f, 0.64f), new Vector2(0.94f, 0.80f), 14f, UIFactory.Ink);
 
             UIFactory.Label("Speed", card.transform,
-                $"{candidate.SpeedWord}  —  one customer every {candidate.ServiceSeconds:0.#} s",
+                Loc.F("staffpanel.speed", candidate.SpeedWord, candidate.ServiceSeconds),
                 new Vector2(0.06f, 0.48f), new Vector2(0.94f, 0.64f), 13f, UIFactory.Accent);
 
             UIFactory.Label("Terms", card.transform,
-                $"€ {candidate.DailyWage:N0} a day\n€ {candidate.SignOnFee:N0} to sign",
+                Loc.F("staffpanel.terms", candidate.DailyWage, candidate.SignOnFee),
                 new Vector2(0.06f, 0.24f), new Vector2(0.94f, 0.48f), 14f, UIFactory.InkMuted);
 
             BuildHireButton(i, card.transform, candidate);
@@ -189,7 +196,7 @@ namespace PetShop.UI
         {
             bool canHire = _game.CanHire(candidate, out string reason);
             var hire = UIFactory.Button($"Hire_{i}", card,
-                canHire ? "Hire" : reason,
+                canHire ? Loc.T("staffpanel.hire") : ReasonText(reason),
                 new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f),
                 canHire ? HireFontSize : HireReasonFontSize,
                 canHire ? UIFactory.ButtonOn : UIFactory.ButtonBg);
@@ -198,6 +205,15 @@ namespace PetShop.UI
             hire.onClick.AddListener(() => { _game.HireCandidate(candidate); Refresh(); });
         }
 
+        /// <summary>
+        /// The hire refusal <paramref name="reason"/> (an English id from <see cref="StaffRoster"/>) in the
+        /// current language; an unknown reason is shown as given.
+        /// </summary>
+        private static string ReasonText(string reason) =>
+            reason == StaffRoster.NoCounterReason ? Loc.T("staffpanel.reason.no_counter")
+          : reason == StaffRoster.NoRoomReason    ? Loc.T("staffpanel.reason.no_room")
+          : reason;
+
         /// <summary>Who is on shift, with a button to let each of them go.</summary>
         private void BuildPayroll()
         {
@@ -205,7 +221,7 @@ namespace PetShop.UI
             if (staff.Count == 0)
             {
                 var none = UIFactory.Label("NoStaff", _payrollRoot,
-                    "Nobody on the payroll — you will have to serve every customer yourself.",
+                    Loc.T("staffpanel.no_staff"),
                     Vector2.zero, Vector2.one, 14f, UIFactory.Bad);
                 _spawned.Add(none.gameObject);
                 return;
@@ -226,16 +242,16 @@ namespace PetShop.UI
         {
             var row = UIFactory.Label($"Staff_{i}", _payrollRoot,
                 $"{member.StaffName}   ·   {RoleAndSkill(member.Role, member.Skill)}   ·   " +
-                $"€ {member.DailyWage:N0} a day   ·   one customer every {member.ServiceSeconds:0.#} s",
+                $"{Loc.F("staffpanel.wage_day", member.DailyWage)}   ·   {Loc.F("staffpanel.service_every", member.ServiceSeconds)}",
                 new Vector2(0f, bottom), new Vector2(0.62f, top), 13f, UIFactory.Ink);
             _spawned.Add(row.gameObject);
 
-            var role = UIFactory.Button($"Role_{i}", _payrollRoot, $"Make {NextRole(member.Role)}",
+            var role = UIFactory.Button($"Role_{i}", _payrollRoot, Loc.F("staffpanel.make_role", LocNames.Role(NextRole(member.Role))),
                 new Vector2(0.63f, bottom), new Vector2(0.80f, top), 12f);
             role.onClick.AddListener(() => { member.SetRole(NextRole(member.Role)); Refresh(); });
             _spawned.Add(role.gameObject);
 
-            var fire = UIFactory.Button($"Fire_{i}", _payrollRoot, "Let go",
+            var fire = UIFactory.Button($"Fire_{i}", _payrollRoot, Loc.T("staffpanel.let_go"),
                 new Vector2(0.81f, bottom), new Vector2(1f, top), 13f);
             fire.onClick.AddListener(() => { _game.FireAssistant(member); Refresh(); });
             _spawned.Add(fire.gameObject);

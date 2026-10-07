@@ -10,6 +10,9 @@ namespace PetShop.UI
     /// </summary>
     public class InfoPanel : MonoBehaviour
     {
+        /// <summary>Glyph of the fixed key that closes the popup.</summary>
+        private const string EscapeKeyLabel = "Esc";
+
         private GameObject _root;
         private TMP_Text   _body;
 
@@ -29,8 +32,8 @@ namespace PetShop.UI
                 new Vector2(0.06f, 0.16f), new Vector2(0.95f, 0.94f), 16f, UIFactory.Ink,
                 TextAlignmentOptions.TopLeft);
 
-            var close = UIFactory.Button("Close", _root.transform, "Close  (Esc)",
-                new Vector2(0.30f, 0.035f), new Vector2(0.70f, 0.14f), 15f);
+            var close = UIFactory.ButtonKey("Close", _root.transform, "common.close_esc",
+                new Vector2(0.30f, 0.035f), new Vector2(0.70f, 0.14f), 15f, null, EscapeKeyLabel);
             close.onClick.AddListener(Hide);
 
             _root.SetActive(false);

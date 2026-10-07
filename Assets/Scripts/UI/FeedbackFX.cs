@@ -1,6 +1,7 @@
 using UnityEngine;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -37,7 +38,7 @@ namespace PetShop.UI
         public const int DustBurst = 10;
 
         /// <summary>Bubble shown over a served customer.</summary>
-        public const string HappyText = "Thanks!";
+        public static string HappyText => Loc.T("hud.thanks");
 
         private const float PopStart        = 0.9f;
         private const float PopOvershoot    = 1.05f;

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -27,14 +28,14 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Bad, new Vector2(0f, -4f), Vector2.zero);
 
-            UIFactory.Label("Heading", panel.transform, "The shop has closed",
+            UIFactory.LabelKey("Heading", panel.transform, "gameover.title",
                 new Vector2(0.06f, 0.76f), new Vector2(0.94f, 0.93f), 26f, UIFactory.Bad);
 
             _body = UIFactory.Label("Body", panel.transform, "",
                 new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.74f), 18f, UIFactory.Ink,
                 TextAlignmentOptions.Top);
 
-            var again = UIFactory.Button("Restart", panel.transform, "Start over",
+            var again = UIFactory.ButtonKey("Restart", panel.transform, "gameover.restart",
                 new Vector2(0.28f, 0.10f), new Vector2(0.72f, 0.26f), 18f, UIFactory.ButtonOn);
             again.onClick.AddListener(() => _game?.RestartGame());
 
@@ -44,7 +45,7 @@ namespace PetShop.UI
         public void Show(string reason)
         {
             if (_root == null) return;
-            _body.text = reason + "\n\nBetter luck next time.";
+            LocalizedText.Bind(_body, () => Loc.F("gameover.body", reason));
             _root.SetActive(true);
             _game?.SetModalOpen(true);
             AudioManager.Instance?.PlaySfx("game_over");

@@ -1,5 +1,6 @@
 using System.Text;
 using UnityEngine;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -13,9 +14,9 @@ namespace PetShop.UI
 
         private void BuildStaffPage()
         {
-            _staff = AddPage("Staff", "Your assistants, their wages, and hiring.", UIFactory.TextBody);
+            _staff = AddPage("Staff", UIFactory.TextBody);
             // Hiring is a choice between named applicants, so it gets its own board.
-            var board = UIFactory.Button("StaffBoard", _staff.Root.transform, "Open staff board — hire and fire",
+            var board = UIFactory.ButtonKey("StaffBoard", _staff.Root.transform, "staffpanel.open_board",
                 new Vector2(0f, LinkRowBottom), new Vector2(0.5f, LinkRowTop), UIFactory.TextSmall, UIFactory.Accent);
             board.onClick.AddListener(() => HandOff(() => GetComponent<StaffPanel>()?.Show()));
         }
@@ -24,19 +25,17 @@ namespace PetShop.UI
         {
             var shop = _game.Shop;
             var sb   = new StringBuilder();
-            sb.AppendLine($"{_game.StaffCount} assistant(s) on the payroll — € {shop.DailyWages:N0} in wages tonight.");
+            sb.AppendLine(Loc.Plural("staffpanel.payroll_summary", _game.StaffCount, shop.DailyWages));
             foreach (var member in _game.Staff)
                 if (member != null)
-                    sb.AppendLine($"•  {member.StaffName}<pos=40%>€ {member.DailyWage:N0} a day<pos=65%>" +
-                                  $"one customer every {member.ServiceSeconds:0.#} s");
+                    sb.AppendLine($"•  {member.StaffName}<pos=40%>{Loc.F("staffpanel.wage_day", member.DailyWage)}<pos=65%>" +
+                                  Loc.F("staffpanel.service_every", member.ServiceSeconds));
             sb.AppendLine();
             sb.AppendLine(_game.StaffCount == 0
-                ? UIFactory.Tint("Nobody on the till — you must serve every customer yourself.", UIFactory.Warning)
-                : UIFactory.Tint("Assistants work the till on their own, slower than you; you can still help clear the queue.",
-                                 UIFactory.InkMuted));
+                ? UIFactory.Tint(Loc.T("staffpanel.nobody_till"), UIFactory.Warning)
+                : UIFactory.Tint(Loc.T("staffpanel.assistants_note"), UIFactory.InkMuted));
             sb.AppendLine();
-            sb.AppendLine($"Tonight's bill: rent € {shop.DailyRent:N2} + wages € {shop.DailyWages:N2} = " +
-                          $"<b>€ {shop.DailyOutgoings:N2}</b>, against € {shop.Balance:N2} in hand.");
+            sb.AppendLine(Loc.F("staffpanel.bill", shop.DailyRent, shop.DailyWages, shop.DailyOutgoings, shop.Balance));
             _staff.Body.text = sb.ToString();
         }
     }

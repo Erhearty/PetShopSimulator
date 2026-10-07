@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -52,12 +53,22 @@ namespace PetShop.UI
             var panel = UIFactory.ModalPanel("Reorder", _root.transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), UIFactory.PanelBg,
                 new Vector2(-420f, -260f), new Vector2(420f, 260f));
-            UIFactory.Header(panel.transform, "Auto-reorder", new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f));
-            UIFactory.Button("Close", panel.transform, "Close",
+            UIFactory.Localize(UIFactory.Header(panel.transform, "", new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f)),
+                "reorder.title");
+            UIFactory.ButtonKey("Close", panel.transform, "common.close",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f).onClick.AddListener(Hide);
             BuildHeadings(panel.transform);
             BuildRows(panel.transform);
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rewrites the on/off labels in the new language while the panel is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Refresh();
         }
 
         public void Show()
@@ -78,7 +89,7 @@ namespace PetShop.UI
         /// <summary>The ledger's way in: a button in slot <paramref name="x"/> of the order row.</summary>
         internal static GameObject OpenButton(Transform parent, float x, float width, Action onClick)
         {
-            var btn = UIFactory.Button("AutoReorder", parent, "Auto-reorder…",
+            var btn = UIFactory.ButtonKey("AutoReorder", parent, "reorder.open",
                 new Vector2(x, 0.015f), new Vector2(x + width, 0.075f), 14f, UIFactory.ButtonOn);
             btn.onClick.AddListener(() => onClick());
             return btn.gameObject;
@@ -99,15 +110,15 @@ namespace PetShop.UI
 
         private static void BuildHeadings(Transform panel)
         {
-            Heading(panel, "Aisle",             0.02f, 0.16f);
-            Heading(panel, "Auto",              0.17f, 0.28f);
-            Heading(panel, "Order when below",  0.30f, 0.52f);
-            Heading(panel, "Order size",        0.54f, 0.77f);
-            Heading(panel, "Cost per order",    0.79f, 0.98f);
+            Heading(panel, "Aisle",            "reorder.col.aisle",     0.02f, 0.16f);
+            Heading(panel, "Auto",             "reorder.col.auto",      0.17f, 0.28f);
+            Heading(panel, "Order when below", "reorder.col.threshold", 0.30f, 0.52f);
+            Heading(panel, "Order size",       "reorder.col.units",     0.54f, 0.77f);
+            Heading(panel, "Cost per order",   "reorder.col.cost",      0.79f, 0.98f);
         }
 
-        private static void Heading(Transform panel, string text, float x0, float x1) =>
-            UIFactory.Label($"Head_{text}", panel, text, new Vector2(x0, 0.80f),
+        private static void Heading(Transform panel, string name, string key, float x0, float x1) =>
+            UIFactory.LabelKey($"Head_{name}", panel, key, new Vector2(x0, 0.80f),
                 new Vector2(x1, 0.86f), 13f, UIFactory.InkMuted, TextAlignmentOptions.Center);
 
         private void BuildRows(Transform panel)
@@ -124,8 +135,10 @@ namespace PetShop.UI
         private Row BuildRow(Transform panel, ProductCategory category, float y0, float y1)
         {
             var row = new Row { Rule = _game.AutoReorder.Rule(category) };
-            UIFactory.Label($"Name_{category}", panel, category.ToString(),
+            var name = UIFactory.Label($"Name_{category}", panel, "",
                 new Vector2(0.02f, y0), new Vector2(0.16f, y1), 16f);
+            UIFactory.AutoFit(name);
+            LocalizedText.Bind(name, () => LocNames.CategoryTitle(category));
 
             var toggle = UIFactory.Button($"Toggle_{category}", panel, "", new Vector2(0.17f, y0),
                 new Vector2(0.28f, y1), 15f);
@@ -176,7 +189,7 @@ namespace PetShop.UI
         {
             var rule = row.Rule;
             row.Toggle.color      = rule.Enabled ? ToggleOn : UIFactory.ButtonBg;
-            row.ToggleLabel.text  = rule.Enabled ? "On" : "Off";
+            row.ToggleLabel.text  = Loc.T(rule.Enabled ? "reorder.on" : "reorder.off");
             row.Threshold.text    = rule.Threshold.ToString();
             row.Units.text        = rule.Units.ToString();
             row.Cost.text         = $"€ {EstimateCost(_game, rule.Category, rule.Units):N2}";

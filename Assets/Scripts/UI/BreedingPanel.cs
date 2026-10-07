@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 
 namespace PetShop.UI
@@ -60,14 +61,14 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
 
-            UIFactory.Label("Header", panel.transform, "Breeding",
+            UIFactory.LabelKey("Header", panel.transform, "breeding.title",
                 new Vector2(0.03f, 0.89f), new Vector2(0.5f, 0.97f), 24f, UIFactory.Ink);
 
-            var close = UIFactory.Button("Close", panel.transform, "Close  (Esc)",
-                new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
+            var close = UIFactory.ButtonKey("Close", panel.transform, "common.close_esc",
+                new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f, null, "Esc");
             close.onClick.AddListener(Hide);
 
-            var show = UIFactory.Button("PetShow", panel.transform, "Pet show",
+            var show = UIFactory.ButtonKey("PetShow", panel.transform, "showcase.title",
                 new Vector2(0.55f, 0.895f), new Vector2(0.75f, 0.965f), 15f);
             show.onClick.AddListener(() => _showcase?.Show());
 
@@ -83,11 +84,12 @@ namespace PetShop.UI
             _penLabel = UIFactory.Label("PenName", panel.transform, "",
                 new Vector2(0.10f, 0.79f), new Vector2(0.41f, 0.865f), 17f, UIFactory.Ink,
                 TextAlignmentOptions.Center);
+            UIFactory.AutoFit(_penLabel);
 
             _listRoot = UIFactory.Node("PetList", panel.transform,
                                        new Vector2(0.03f, 0.18f), new Vector2(0.48f, 0.78f)).transform;
 
-            UIFactory.Label("PreviewCaption", panel.transform, "Tonight's pairing",
+            UIFactory.LabelKey("PreviewCaption", panel.transform, "breeding.tonight_pairing",
                 new Vector2(0.52f, 0.79f), new Vector2(0.97f, 0.865f), 17f, UIFactory.InkMuted);
 
             _statusLabel = UIFactory.Label("Status", panel.transform, "",
@@ -98,17 +100,26 @@ namespace PetShop.UI
                 new Vector2(0.52f, 0.26f), new Vector2(0.97f, 0.58f), 15f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
 
-            _pairButton = UIFactory.Button("Pair", panel.transform, "Pair for tonight",
+            _pairButton = UIFactory.ButtonKey("Pair", panel.transform, "breeding.pair",
                 new Vector2(0.52f, 0.11f), new Vector2(0.74f, 0.19f), 15f, UIFactory.ButtonOn);
             _pairButton.onClick.AddListener(ConfirmPair);
 
-            _clearButton = UIFactory.Button("ClearPair", panel.transform, "Clear pairing",
+            _clearButton = UIFactory.ButtonKey("ClearPair", panel.transform, "breeding.clear",
                 new Vector2(0.75f, 0.11f), new Vector2(0.97f, 0.19f), 15f);
             _clearButton.onClick.AddListener(ClearPair);
 
             _target.Build(panel.transform, Refresh);
 
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Redraws the pen and pairing text in the new language while the panel is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Refresh();
         }
 
         // ── Open / close ────────────────────────────────────────────────────────
@@ -192,7 +203,7 @@ namespace PetShop.UI
             if (pen == null || !BreedingSystem.CanPair(_pickA, _pickB)) return;
 
             pen.SetPlannedPair(_pickA, _pickB);
-            _game?.Notify($"{_pickA.DisplayName()} and {_pickB.DisplayName()} are paired for tonight.");
+            _game?.Notify(Loc.F("breeding.paired_notice", _pickA.DisplayName(), _pickB.DisplayName()));
             Refresh();
         }
 
@@ -214,16 +225,15 @@ namespace PetShop.UI
 
             if (pen == null)
             {
-                _penLabel.text      = "no pens with two adults";
-                _statusLabel.text   = "Breeding needs two fully grown animals in the same pen.\n" +
-                                      "Buy another adult at a pen, or wait for a baby to grow up.";
+                _penLabel.text      = Loc.T("breeding.no_pens");
+                _statusLabel.text   = Loc.T("breeding.no_pens_help");
                 _expectedLabel.text = string.Empty;
                 SetInteractable(_pairButton, false, UIFactory.ButtonOn);
                 SetInteractable(_clearButton, false, UIFactory.ButtonBg);
                 return;
             }
 
-            _penLabel.text = $"{pen.PenSpecies} pen  ({_penIndex + 1} of {_breedablePens.Count})";
+            _penLabel.text = Loc.F("breeding.pen_label", LocNames.Species(pen.PenSpecies), _penIndex + 1, _breedablePens.Count);
 
             // One row per adult; babies and juveniles are listed greyed so the player can see
             // what is coming rather than wondering where an animal went.
@@ -240,11 +250,11 @@ namespace PetShop.UI
             string b = _pickB != null ? _pickB.DisplayName() : "—";
 
             _statusLabel.text = planned && _pickA == pen.PlannedA && _pickB == pen.PlannedB
-                ? $"<color=#73DB95>Paired tonight:</color>\n{a}  ×  {b}"
-                : $"Selected:\n{a}  ×  {b}";
+                ? $"<color=#73DB95>{Loc.T("breeding.paired_tonight")}</color>\n{a}  ×  {b}"
+                : $"{Loc.T("breeding.selected")}\n{a}  ×  {b}";
 
             if (!pen.HasSpace)
-                _statusLabel.text += "\n<color=#F0A07A>The pen is full — no room for a baby.</color>";
+                _statusLabel.text += $"\n<color=#F0A07A>{Loc.T("breeding.pen_full")}</color>";
 
             _expectedLabel.text = _target.ExpectedWithChance(
                 BreedingSystem.DescribeExpected(_pickA, _pickB), _pickA, _pickB);
@@ -267,8 +277,8 @@ namespace PetShop.UI
         private void DrawYoungRow(Pet pet, int i, float bottom, float top)
         {
             var note = UIFactory.Label($"Young_{i}", _listRoot,
-                $"     {pet.petName}   ·   {pet.growthStage.ToString().ToLowerInvariant()}, " +
-                $"grown in {Mathf.Max(0, pet.daysToMature - pet.ageDays)} days",
+                $"     {pet.petName}   ·   {LocNames.Of("growth", pet.growthStage).ToLowerInvariant()}, " +
+                Loc.Plural("breeding.grown_in", Mathf.Max(0, pet.daysToMature - pet.ageDays)),
                 new Vector2(0f, bottom), new Vector2(0.82f, top), 14f, UIFactory.InkMuted);
             _petRows.Add(note.gameObject);
         }
@@ -279,7 +289,7 @@ namespace PetShop.UI
             string slot = pet == _pickA ? "A" : pet == _pickB ? "B" : "·";
 
             var btn = UIFactory.Button($"Pet_{i}", _listRoot,
-                $"{slot}   {pet.petName}   ·   {pet.rarity}   ·   {pet.Condition}" +
+                $"{slot}   {pet.petName}   ·   {LocNames.Rarity(pet.rarity)}   ·   {pet.Condition}" +
                 _target.BestPartnerSuffix(pet, residents),
                 new Vector2(0f, bottom), new Vector2(0.82f, top), 13f,
                 picked ? UIFactory.ButtonOn : UIFactory.ButtonBg);
@@ -291,7 +301,7 @@ namespace PetShop.UI
 
         private void AddTreeButton(Pet pet, int i, float bottom, float top)
         {
-            var tree = UIFactory.Button($"Tree_{i}", _listRoot, "Tree",
+            var tree = UIFactory.Button($"Tree_{i}", _listRoot, Loc.T("breeding.tree"),
                 new Vector2(0.84f, bottom), new Vector2(1f, top), 13f);
             tree.onClick.AddListener(() => _tree?.Show(pet));
             _petRows.Add(tree.gameObject);

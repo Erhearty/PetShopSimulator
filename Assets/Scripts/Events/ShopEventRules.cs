@@ -121,18 +121,18 @@ namespace PetShop.Events
         /// <summary>Player-facing name of <paramref name="kind"/>.</summary>
         public static string DisplayName(ShopEventKind kind) => kind switch
         {
-            ShopEventKind.SupplierSale   => "Supplier sale",
-            ShopEventKind.Heatwave       => "Heatwave",
-            ShopEventKind.StreetFestival => "Street festival",
-            _                            => "No event",
+            ShopEventKind.SupplierSale   => Localization.Loc.T("event.name.supplier_sale"),
+            ShopEventKind.Heatwave       => Localization.Loc.T("event.name.heatwave"),
+            ShopEventKind.StreetFestival => Localization.Loc.T("event.name.street_festival"),
+            _                            => Localization.Loc.T("event.name.none"),
         };
 
         /// <summary>Player-facing morning announcement for <paramref name="kind"/>.</summary>
         public static string Announcement(ShopEventKind kind) => kind switch
         {
-            ShopEventKind.SupplierSale   => "Supplier sale today — wholesale orders cost 25% less!",
-            ShopEventKind.Heatwave       => "Heatwave! Pens will need feed and bedding topped up more often.",
-            ShopEventKind.StreetFestival => "Street festival outside — expect a busy day!",
+            ShopEventKind.SupplierSale   => Localization.Loc.T("event.announce.supplier_sale"),
+            ShopEventKind.Heatwave       => Localization.Loc.T("event.announce.heatwave"),
+            ShopEventKind.StreetFestival => Localization.Loc.T("event.announce.street_festival"),
             _                            => "",
         };
     }

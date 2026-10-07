@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -93,6 +94,7 @@ namespace PetShop.UI
             for (int i = 0; i < MaxSlots; i++) _slots.Add(BuildSlot(i));
 
             if (_supply != null) _supply.OnChanged += Refresh;
+            Loc.LanguageChanged += OnLanguageChanged;
             Refresh();
             RefreshStock(true);
         }
@@ -116,7 +118,7 @@ namespace PetShop.UI
             slot.Letter = UIFactory.Label("Letter", swatchGo.transform, "", Vector2.zero, Vector2.one, 16f,
                                           UIFactory.NoTint, TextAlignmentOptions.Center);
 
-            slot.Key = UIFactory.Label("Key", card.transform, $"{index + 1}", new Vector2(0.55f, 0.55f), new Vector2(0.96f, 0.96f),
+            slot.Key = UIFactory.Label("Key", card.transform, (index + 1).ToString(), new Vector2(0.55f, 0.55f), new Vector2(0.96f, 0.96f),
                                        13f, UIFactory.InkMuted, TextAlignmentOptions.TopRight);
             slot.Count = UIFactory.Label("Count", card.transform, "", new Vector2(0.45f, 0.40f), new Vector2(0.96f, 0.70f),
                                          17f, UIFactory.Accent, TextAlignmentOptions.MidlineRight);
@@ -132,6 +134,14 @@ namespace PetShop.UI
         private void OnDestroy()
         {
             if (_supply != null) _supply.OnChanged -= Refresh;
+            Loc.LanguageChanged -= OnLanguageChanged;
+        }
+
+        /// <summary>Re-reads the slot names and stockroom strip in the new language.</summary>
+        private void OnLanguageChanged()
+        {
+            Refresh();
+            RefreshStock(true);
         }
 
         /// <summary>Rebuilds the slots from the supply's owned furniture.</summary>
@@ -164,9 +174,10 @@ namespace PetShop.UI
                 rt.anchoredPosition = new Vector2(start + i * step, 0f);
 
                 slot.Swatch.color = def.Tint;
-                slot.Letter.text  = def.DisplayName.Length > 0 ? def.DisplayName.Substring(0, 1) : "?";
-                slot.Name.text    = def.DisplayName;
-                slot.Count.text   = $"\u00d7{_supply.OwnedCount(_ids[i])}";
+                string name = def.LocalizedName ?? "";
+                slot.Letter.text  = name.Length > 0 ? name.Substring(0, 1) : "?";
+                slot.Name.text    = name;
+                slot.Count.text   = "×" + _supply.OwnedCount(_ids[i]);
             }
         }
 
@@ -199,13 +210,13 @@ namespace PetShop.UI
         {
             if (_stock == null) return;
 
-            var sb = new StringBuilder("Stockroom  ");
+            var sb = new StringBuilder(Loc.T("inventory.stockroom")).Append("  ");
             bool any = false;
             foreach (ProductCategory c in Enum.GetValues(typeof(ProductCategory)))
             {
                 int units = _shop != null ? _shop.Warehouse(c) : 0;
                 if (any) sb.Append("  \u00b7  ");
-                sb.Append(c).Append(' ').Append(units);
+                sb.Append(LocNames.CategoryTitle(c)).Append(' ').Append(units);
                 any = true;
             }
             string text = sb.ToString();

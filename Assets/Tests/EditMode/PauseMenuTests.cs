@@ -14,17 +14,23 @@ namespace PetShop.Tests
     {
         private GameObject _root;
         private PauseMenu  _menu;
+        private LocTestScope _loc;
 
         [SetUp]
         public void SetUp()
         {
+            _loc  = LocTestScope.Begin();
             _root = new GameObject("Canvas", typeof(RectTransform));
             _menu = _root.AddComponent<PauseMenu>();
             _menu.Build(_root.transform, null, null);
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_root);
+        public void TearDown()
+        {
+            Object.DestroyImmediate(_root);
+            _loc.End();
+        }
 
         private Button Find(string name)
         {

@@ -2,6 +2,7 @@ using UnityEngine;
 using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Shop;
+using PetShop.Localization;
 
 namespace PetShop.Core
 {
@@ -38,12 +39,12 @@ namespace PetShop.Core
             var order = shop.PlaceOrder(category, units, unitCost, _game.DayProgress);
             if (order == null)
             {
-                _game.Notify("Not enough money for that order.");
+                _game.Notify(Loc.T("order.no_money"));
                 _game.Audio?.PlaySfx("deny");
                 return false;
             }
 
-            _game.Notify($"Ordered {units} {category} units for €{order.Cost:N2} — the van is on its way.");
+            _game.Notify(Loc.F("order.placed", units, LocNames.Category(category), order.Cost));
             _game.Audio?.PlaySfx("restock");
             return true;
         }
@@ -54,8 +55,8 @@ namespace PetShop.Core
             ByTruck(() =>
             {
                 DeliveryCrate.Spawn(ForecourtSpot(), order.Category, order.Units);
-                _game.Notify($"Delivery: {order.Units} {order.Category} units are on the forecourt. " +
-                             $"Press {InputBindings.Label(GameAction.Interact)} to collect.");
+                _game.Notify(Loc.F("delivery.stock", order.Units, LocNames.Category(order.Category),
+                                   InputBindings.Label(GameAction.Interact)));
                 _game.Audio?.PlaySfx("restock");
             });
         }
@@ -86,19 +87,19 @@ namespace PetShop.Core
             if (def == null) return false;
             if (_game.Shop == null)
             {
-                _game.Notify($"Cannot order a {def.DisplayName} — there is no shop to pay for it.");
+                _game.Notify(Loc.F("order.furniture.no_shop", def.LocalizedName));
                 _game.Audio?.PlaySfx("deny");
                 return false;
             }
 
             if (_game.Furniture.Order(catalogId, _game.Shop, _game.DayProgress) == null)
             {
-                _game.Notify($"Not enough money for a {def.DisplayName} (€{def.Cost:N0}).");
+                _game.Notify(Loc.F("order.furniture.no_money", def.LocalizedName, def.Cost));
                 _game.Audio?.PlaySfx("deny");
                 return false;
             }
 
-            _game.Notify($"Ordered a {def.DisplayName} for €{def.Cost:N0} — it arrives on the forecourt later today.");
+            _game.Notify(Loc.F("order.furniture.placed", def.LocalizedName, def.Cost));
             _game.Audio?.PlaySfx("click");
             return true;
         }
@@ -112,8 +113,8 @@ namespace PetShop.Core
             {
                 var crate = DeliveryCrate.SpawnFurniture(ForecourtSpot(), order);
                 if (crate == null) return;
-                _game.Notify($"Delivery: a {crate.FurnitureName} crate is on the forecourt. " +
-                             $"Press {InputBindings.Label(GameAction.Interact)} to unpack it.");
+                _game.Notify(Loc.F("delivery.furniture", FurnitureLabel(crate),
+                                   InputBindings.Label(GameAction.Interact)));
                 _game.Audio?.PlaySfx("restock");
             });
         }
@@ -121,17 +122,21 @@ namespace PetShop.Core
         /// <summary>Unpacks a furniture crate into the furniture inventory.</summary>
         private void CollectFurnitureCrate(DeliveryCrate crate)
         {
-            string name = crate.FurnitureName;
+            string name = FurnitureLabel(crate);
             if (!crate.CollectFurniture(_game.Furniture))
             {
-                _game.Notify("There is nothing left in that crate.");
+                _game.Notify(Loc.T("crate.empty"));
                 _game.Audio?.PlaySfx("deny");
                 return;
             }
-            _game.Notify($"Unpacked the {name} — it is in your furniture inventory. " +
-                         $"Press {InputBindings.Label(GameAction.BuildMode)} to place it.");
+            _game.Notify(Loc.F("crate.unpacked", name, InputBindings.Label(GameAction.BuildMode)));
             _game.Audio?.PlaySfx("restock");
         }
+
+        /// <summary>The crate's furniture name in the current language.</summary>
+        private static string FurnitureLabel(DeliveryCrate crate) =>
+            crate.FurnitureOrder?.CatalogId is string id ? BuildCatalog.Get(id)?.LocalizedName ?? crate.FurnitureName
+                                                         : crate.FurnitureName;
 
         /// <summary>Carries a delivered pallet into the stockroom, or unpacks a furniture crate.</summary>
         public void CollectDelivery(DeliveryCrate crate)
@@ -140,7 +145,7 @@ namespace PetShop.Core
             if (crate.IsFurniture) { CollectFurnitureCrate(crate); return; }
 
             int units = crate.Collect(_game.Shop);
-            _game.Notify($"Collected {units} units — they are in the stockroom, ready to shelve.");
+            _game.Notify(Loc.F("delivery.collected", units));
             _game.Audio?.PlaySfx("restock");
         }
 
@@ -152,16 +157,15 @@ namespace PetShop.Core
             var result = shelf.Restock(shop, _game.Catalog);
 
             if (result.Units <= 0)
-                _game.Notify(shelf.HasSpace ? "Not enough money to restock." : "Shelf is already full.");
+                _game.Notify(Loc.T(shelf.HasSpace ? "restock.no_money" : "restock.full"));
             else if (result.Spent <= 0.01f)
-                _game.Notify($"Shelved {result.Units} {shelf.Category} units from the stockroom " +
-                             $"({shop.Warehouse(shelf.Category)} left).");
+                _game.Notify(Loc.F("restock.from_stockroom", result.Units, LocNames.Category(shelf.Category),
+                                   shop.Warehouse(shelf.Category)));
             else if (result.FromWarehouse > 0)
-                _game.Notify($"Shelved {result.FromWarehouse} from the stockroom and bought {result.Units - result.FromWarehouse} " +
-                             $"at the cash-and-carry for €{result.Spent:N2}.");
+                _game.Notify(Loc.F("restock.mixed", result.FromWarehouse, result.Units - result.FromWarehouse, result.Spent));
             else
-                _game.Notify($"Restocked {shelf.Category} for €{result.Spent:N2} at cash-and-carry prices " +
-                             $"— ordering ahead is {(1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f:0}% cheaper.");
+                _game.Notify(Loc.F("restock.cash_and_carry", LocNames.Category(shelf.Category), result.Spent,
+                                   (1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f));
 
             _game.Audio?.PlaySfx(result.Units > 0 ? "restock" : "deny");
             _game.OnInfoPanel.Invoke(shelf.Describe());
@@ -184,12 +188,12 @@ namespace PetShop.Core
                 if (shop.ChangeBalance(-cost, "Pen upkeep"))
                 {
                     pen.Service();
-                    _game.Notify($"Fed and mucked out the {pen.PenSpecies} pen — €{cost:N2}");
+                    _game.Notify(Loc.F("pen.serviced", LocNames.Species(pen.PenSpecies), cost));
                     _game.Audio?.PlaySfx("restock");
                 }
                 else
                 {
-                    _game.Notify($"Servicing that pen costs €{cost:N2} — not enough money.");
+                    _game.Notify(Loc.F("pen.service_no_money", cost));
                     _game.Audio?.PlaySfx("deny");
                 }
                 _game.OnInfoPanel.Invoke(pen.Describe());
@@ -205,12 +209,12 @@ namespace PetShop.Core
                     pet.growthStage = Pet.GrowthStage.Juvenile;
                     pet.ageDays     = 1;
                     pen.AddPet(pet);
-                    _game.Notify($"Bought {pet.DisplayName()} for €{price:N2}");
+                    _game.Notify(Loc.F("pen.bought", pet.DisplayName(), price));
                     _game.Audio?.PlaySfx("restock");
                 }
                 else
                 {
-                    _game.Notify($"A {pen.PenSpecies} costs €{price:N2} — not enough money.");
+                    _game.Notify(Loc.F("pen.buy_no_money", LocNames.Species(pen.PenSpecies), price));
                     _game.Audio?.PlaySfx("deny");
                 }
             }
@@ -223,7 +227,7 @@ namespace PetShop.Core
         }
 
         /// <summary>Shown when the counter is used with nobody in line, so E never seems dead.</summary>
-        public const string NobodyWaitingNotice = "Nobody is waiting at the till.";
+        public static string NobodyWaitingNotice => Loc.T("counter.nobody");
 
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
@@ -239,7 +243,7 @@ namespace PetShop.Core
             }
             if (!queue.FrontReady)
             {
-                _game.Notify("The next customer is still on their way to the till.");
+                _game.Notify(Loc.T("counter.not_ready"));
                 return;
             }
 
@@ -249,10 +253,10 @@ namespace PetShop.Core
 
             queue.ServeFront();
             _game.Audio?.PlaySfx("sale");
-            _game.Notify($"Served {shopper.ShopperName} — {items} item(s), €{value:N2}");
+            _game.Notify(Loc.Plural("counter.served", items, shopper.ShopperName, value));
 
             if (queue.AnyWaiting)
-                _game.Notify($"{queue.Length} still waiting (€{queue.WaitingValue:N0}).");
+                _game.Notify(Loc.F("counter.still_waiting", queue.Length, queue.WaitingValue));
         }
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -44,7 +45,22 @@ namespace PetShop.UI
         private GameObject _crosshair;
         private Image      _repFill;
 
-        private string   _buildHintBase = string.Empty;
+        /// <summary>Glyphs of the fixed mouse button / key named in the build hint.</summary>
+        private const string LeftMouseLabel = "LMB";
+        private const string EscapeKeyLabel = "Esc";
+
+        private bool             _buildHintShown;
+        private PlacedObjectData _buildHintItem;
+
+        // Cached build hint and the inputs it was built from; rebuilt only when one changes.
+        private string           _buildHintText;
+        private bool             _buildHintDirty = true;
+        private PlacedObjectData _hintHeldItem;
+        private float            _hintRotation;
+        private bool             _hintHolding;
+        private bool             _hintActive;
+        private KeyCode          _hintRemoveKey;
+        private KeyCode          _hintRotateKey;
 
         /// <summary>The furniture catalogue; set by GameUI.</summary>
         public FurnitureCatalogPanel Catalogue { get; set; }
@@ -78,8 +94,20 @@ namespace PetShop.UI
             build.OnBuildModeEntered.AddListener(OnBuildEntered);
             build.OnBuildModeExited.AddListener(OnBuildExited);
 
+            Loc.LanguageChanged += OnLanguageChanged;
             RefreshStatus();
             OnBuildExited();
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Re-reads every cached line in the new language.</summary>
+        private void OnLanguageChanged()
+        {
+            RefreshStatus();
+            _buildHintDirty = true;
+            RefreshBuildHint();
+            _alertTimer = 0f;
         }
 
         // ── Construction ────────────────────────────────────────────────────────
@@ -99,22 +127,24 @@ namespace PetShop.UI
             _balanceLabel.fontStyle = FontStyles.Bold;
             _balanceTicker = _balanceLabel.gameObject.AddComponent<BalanceTicker>();
             // Live running total for the day — the thing players check most often.
-            _tickerLabel = UIFactory.Label("Ticker", money.transform, "today  +€ 0  /  −€ 0",
+            _tickerLabel = UIFactory.Label("Ticker", money.transform, "",
                 new Vector2(0.06f, 0.05f), new Vector2(0.96f, 0.42f), 13f, UIFactory.InkMuted);
+            UIFactory.AutoFit(_tickerLabel);
 
             // Day / clock pill, top-centre.
             var day = UIFactory.Card("DayCard", canvas, tc, tc, UIFactory.CardBg,
                                      new Vector2(-250f, CardBottom), new Vector2(250f, CardTop));
-            _dayLabel = UIFactory.Label("Day", day.transform, "Day 1",
+            _dayLabel = UIFactory.Label("Day", day.transform, "",
                 new Vector2(0.05f, 0.34f), new Vector2(0.32f, 0.96f), 20f, UIFactory.Accent);
             _dayLabel.fontStyle = FontStyles.Bold;
             _clockLabel = UIFactory.Label("Clock", day.transform, "09:00",
                 new Vector2(0.32f, 0.30f), new Vector2(0.68f, 0.98f), 30f, UIFactory.Ink,
                 TextAlignmentOptions.Center);
             _clockLabel.fontStyle = FontStyles.Bold;
-            _rentLabel = UIFactory.Label("Rent", day.transform, "Rent € 0",
+            _rentLabel = UIFactory.Label("Rent", day.transform, "",
                 new Vector2(0.60f, 0.34f), new Vector2(0.96f, 0.96f), 14f, UIFactory.InkMuted,
                 TextAlignmentOptions.MidlineRight);
+            UIFactory.AutoFit(_rentLabel);
 
             var clockTrack = UIFactory.Card("ClockTrack", day.transform, new Vector2(0.05f, 0.12f),
                                             new Vector2(0.95f, 0.26f), UIFactory.TrackBg);
@@ -124,7 +154,7 @@ namespace PetShop.UI
             // Reputation meter, top-right.
             var rep = UIFactory.Card("ReputationCard", canvas, tr, tr, UIFactory.CardBg,
                                      new Vector2(-(Margin + 300f), CardBottom), new Vector2(-Margin, CardTop));
-            UIFactory.Label("RepCaption", rep.transform, "Reputation",
+            UIFactory.LabelKey("RepCaption", rep.transform, "hud.reputation",
                 new Vector2(0.06f, 0.50f), new Vector2(0.60f, 0.95f), 14f, UIFactory.InkMuted);
             _repLabel = UIFactory.Label("RepValue", rep.transform, "0",
                 new Vector2(0.60f, 0.46f), new Vector2(0.94f, 0.97f), 26f, UIFactory.Ink,
@@ -182,6 +212,8 @@ namespace PetShop.UI
             _prompt.fontSize  = 21f;
             _prompt.alignment = TextAlignmentOptions.Center;
             _prompt.color     = UIFactory.Accent;
+            _prompt.textWrappingMode = TextWrappingModes.Normal;
+            UIFactory.AutoFit(_prompt);
             _prompt.raycastTarget = false;
             _prompt.enabled   = false;
         }
@@ -239,7 +271,7 @@ namespace PetShop.UI
             if (_shopperLabel != null && _game != null)
             {
                 int inShop = _game.CustomersInShop;
-                _shopperLabel.text = inShop > 0 ? $"shoppers  {inShop}" : "";
+                _shopperLabel.text = inShop > 0 ? Loc.F("hud.shoppers", inShop) : "";
                 if (_shopperChip != null) _shopperChip.SetActive(inShop > 0);
             }
 
@@ -247,7 +279,7 @@ namespace PetShop.UI
             {
                 int waiting = _game.Queue.Length;
                 _queueLabel.text = waiting > 0
-                    ? $"till: {waiting} waiting  €{_game.Queue.WaitingValue:N0}"
+                    ? Loc.F("hud.queue", waiting, _game.Queue.WaitingValue)
                     : "";
                 if (_queueChip != null) _queueChip.SetActive(waiting > 0);
             }
@@ -270,31 +302,67 @@ namespace PetShop.UI
 
         private void OnBuildEntered(PlacedObjectData item)
         {
-            if (_buildHint != null && item == null)
-            {
-                // The Remove tool carries no item.
-                _buildHintBase     = $"Remove tool — LMB / middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
-                _buildHint.text    = _buildHintBase;
-                _buildHint.enabled = true;
-            }
-            else if (_buildHint != null)
-            {
-                _buildHintBase     = $"Placing {item.DisplayName} — LMB place · " +
-                                     $"middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
-                _buildHint.text    = $"{_buildHintBase}\n{_build.PlacementHint}";
-                _buildHint.enabled = true;
-            }
+            if (_buildHint == null) return;
+            // The Remove tool carries no item.
+            _buildHintItem     = item;
+            _buildHintShown    = true;
+            _buildHint.enabled = true;
+            _buildHintDirty    = true;
+            RefreshBuildHint();
         }
 
-        /// <summary>The angle changes as the player rotates, so the placement hint is rebuilt each frame.</summary>
+        /// <summary>The hint for the current tool, followed by the live placement line.</summary>
+        private string BuildHintText()
+        {
+            string remove = InputBindings.Label(GameAction.BuildRemove);
+            string line = _buildHintItem == null
+                ? Loc.F("hud.build_hint.remove", LeftMouseLabel, remove, EscapeKeyLabel)
+                : Loc.F("hud.build_hint.place", _buildHintItem.LocalizedName, LeftMouseLabel, remove, EscapeKeyLabel);
+            return _build != null ? line + "\n" + _build.PlacementHint : line;
+        }
+
+        /// <summary>
+        /// Rebuilds the hint only when an input to it changed (tool, held item, angle, key bindings,
+        /// language) and assigns the label only when the text actually differs.
+        /// </summary>
         private void RefreshBuildHint()
         {
-            if (_buildHint != null && _buildHint.enabled && _build != null)
-                _buildHint.text = $"{_buildHintBase}\n{_build.PlacementHint}";
+            if (_buildHint == null || !_buildHint.enabled || !_buildHintShown) return;
+            if (!BuildHintInputsChanged()) return;
+            _buildHintDirty = false;
+            string text = BuildHintText();
+            if (text == _buildHintText) return;
+            _buildHintText  = text;
+            _buildHint.text = text;
+        }
+
+        /// <summary>Records the current hint inputs; true when any differs from the last build.</summary>
+        private bool BuildHintInputsChanged()
+        {
+            KeyCode removeKey = InputBindings.Get(GameAction.BuildRemove);
+            KeyCode rotateKey = InputBindings.Get(GameAction.BuildRotate);
+            PlacedObjectData held = _build != null ? _build.CurrentItem : null;
+            float rotation = _build != null ? _build.CurrentRotation : 0f;
+            bool holding   = _build != null && _build.IsHolding;
+            bool active    = _build != null && _build.IsActive;
+
+            bool changed = _buildHintDirty
+                || removeKey != _hintRemoveKey || rotateKey != _hintRotateKey
+                || held != _hintHeldItem || rotation != _hintRotation
+                || holding != _hintHolding || active != _hintActive;
+
+            _hintRemoveKey = removeKey;
+            _hintRotateKey = rotateKey;
+            _hintHeldItem  = held;
+            _hintRotation  = rotation;
+            _hintHolding   = holding;
+            _hintActive    = active;
+            return changed;
         }
 
         private void OnBuildExited()
         {
+            _buildHintShown = false;
             if (_buildHint != null) _buildHint.enabled = false;
         }
 
@@ -318,26 +386,26 @@ namespace PetShop.UI
 
             if (crates > 0)
                 message = crates == 1
-                    ? $"A delivery is waiting on the forecourt — press {e} at it to take it in."
-                    : $"{crates} deliveries are waiting on the forecourt.";
+                    ? Loc.F("hud.alert.delivery", e)
+                    : Loc.Plural("hud.alert.deliveries", crates);
             else if (_game.Queue != null && _game.Queue.Length > 0)
                 message = _game.Queue.Length == 1
-                    ? $"Someone is waiting at the till — press {e} behind the counter to serve them."
-                    : $"{_game.Queue.Length} people are waiting at the till.";
+                    ? Loc.F("hud.alert.queue_one", e)
+                    : Loc.Plural("hud.alert.queue", _game.Queue.Length);
             else if (_game.PensNeedingService > 0)
                 message = _game.PensNeedingService == 1
-                    ? $"A pen needs feeding — press {e} at it."
-                    : $"{_game.PensNeedingService} pens need feeding and mucking out.";
+                    ? Loc.F("hud.alert.feed_one", e)
+                    : Loc.Plural("hud.alert.feed", _game.PensNeedingService);
             else if (_shop.Balance < _shop.DailyRent)
-                message = $"Rent tonight is € {_shop.DailyRent:N0} and you have € {_shop.Balance:N0} — sell something.";
+                message = Loc.F("hud.alert.rent", _shop.DailyRent, _shop.Balance);
             else if (emptyShelves > 0)
                 message = emptyShelves == 1
-                    ? $"A shelf is empty — walk up to it and press {e} to restock."
-                    : $"{emptyShelves} shelves are empty — press {e} at each one to restock.";
+                    ? Loc.F("hud.alert.shelf_one", e)
+                    : Loc.Plural("hud.alert.shelves", emptyShelves, e);
             else if (emptyPens > 0)
-                message = $"{emptyPens} pen(s) are empty — press {e} at a pen to buy from the breeder.";
+                message = Loc.Plural("hud.alert.pens_empty", emptyPens, e);
             else if (_shop.Reputation < 30f)
-                message = "Reputation is low; keep the shelves stocked to bring customers back.";
+                message = Loc.T("hud.alert.low_rep");
 
             _alertLabel.text    = message ?? string.Empty;
             _alertLabel.enabled = message != null;
@@ -356,11 +424,11 @@ namespace PetShop.UI
                 float net = _shop.EarnedToday - _shop.SpentToday;
                 string netTag = net >= 0f ? $"<color=#{ColorUtility.ToHtmlStringRGB(UIFactory.Good)}>+€ {net:N0}</color>"
                                           : $"<color=#{ColorUtility.ToHtmlStringRGB(UIFactory.Bad)}>−€ {-net:N0}</color>";
-                _tickerLabel.text = $"today  +€ {_shop.EarnedToday:N0}  /  −€ {_shop.SpentToday:N0}   =  {netTag}";
+                _tickerLabel.text = Loc.F("hud.today", _shop.EarnedToday, _shop.SpentToday, netTag);
             }
-            if (_dayLabel  != null) _dayLabel.text  = $"Day {_shop.Day}";
-            if (_rentLabel != null) _rentLabel.text = $"Rent tonight  € {_shop.DailyRent:N0}";
-            if (_repLabel  != null) _repLabel.text  = $"{_shop.Reputation:0}";
+            if (_dayLabel  != null) _dayLabel.text  = Loc.F("common.day", _shop.Day);
+            if (_rentLabel != null) _rentLabel.text = Loc.F("hud.rent", _shop.DailyRent);
+            if (_repLabel  != null) _repLabel.text  = _shop.Reputation.ToString("0");
             if (_repFill   != null)
             {
                 var rt = _repFill.rectTransform;

@@ -2,18 +2,25 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
     /// <summary>Escape menu. Freezes the clock while it is up.</summary>
     public class PauseMenu : MonoBehaviour
     {
+        /// <summary>Glyph of the fixed key that resumes / cancels.</summary>
+        private const string EscapeKeyLabel = "Esc";
+
+        private const string AbandonKey        = "pause.abandon";
+        private const string AbandonConfirmKey = "pause.abandon_confirm";
+
         /// <summary>Label of the destructive restart button before it is armed.</summary>
-        public const string AbandonLabel        = "Abandon shop";
+        public static string AbandonLabel        => Loc.T(AbandonKey);
         /// <summary>Label of the destructive restart button once armed: a second press confirms.</summary>
-        public const string AbandonConfirmLabel = "Press again to abandon";
+        public static string AbandonConfirmLabel => Loc.T(AbandonConfirmKey);
         /// <summary>Status line shown while the abandon button is armed.</summary>
-        public const string AbandonWarning      = "Unsaved progress will be lost. Esc to cancel.";
+        public static string AbandonWarning      => Loc.F("pause.abandon_warning", EscapeKeyLabel);
 
         private GameObject  _root;
         private GameManager _game;
@@ -64,16 +71,17 @@ namespace PetShop.UI
                                              new Vector2(-PanelHalfWidth, -PanelHalfHeight),
                                              new Vector2(PanelHalfWidth, PanelHalfHeight));
 
-            UIFactory.Header(panel.transform, "Paused", new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f));
+            UIFactory.Localize(UIFactory.Header(panel.transform, "", new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f)),
+                               "pause.title");
 
             _status = UIFactory.Label("Status", panel.transform, "",
                 new Vector2(0.08f, 0.76f), new Vector2(0.92f, 0.85f), UIFactory.TextSmall, UIFactory.InkMuted);
 
             BuildButtons(panel.transform);
 
-            UIFactory.Label("Version", panel.transform, "Esc to resume",
+            UIFactory.LabelKey("Version", panel.transform, "pause.esc_resume",
                 new Vector2(0.08f, 0.04f), new Vector2(0.92f, 0.10f), UIFactory.TextSmall, UIFactory.InkMuted,
-                TextAlignmentOptions.Center);
+                TextAlignmentOptions.Center, EscapeKeyLabel);
 
             _root.SetActive(false);
         }
@@ -81,35 +89,38 @@ namespace PetShop.UI
         /// <summary>The button column: Resume (primary), utilities, then Abandon (destructive) and Quit.</summary>
         private void BuildButtons(Transform panel)
         {
-            _resume = Row(panel, "Resume", "Resume", 0, UIFactory.Accent);
+            _resume = Row(panel, "Resume", "pause.resume", 0, UIFactory.Accent);
             _resume.onClick.AddListener(Close);
 
-            Row(panel, "Save", "Save game", 1).onClick.AddListener(() =>
+            Row(panel, "Save", "pause.save", 1).onClick.AddListener(() =>
             {
                 bool saved = _game.SaveGame();
-                if (_status != null) _status.text = saved ? "Saved." : "Save failed — see log.";
+                if (_status != null) _status.text = Loc.T(saved ? "pause.saved" : "pause.save_failed");
             });
 
-            var music = Row(panel, "Music", "", 2);
+            var music = Row(panel, "Music", null, 2);
             _musicLabel = music.GetComponentInChildren<TMP_Text>();
             music.onClick.AddListener(() => { _audio?.ToggleMusic(); RefreshMusicLabel(); });
 
-            Row(panel, "Settings", "Settings", 3).onClick.AddListener(() => _settings?.Show());
-            Row(panel, "Guide", "Guide", 4).onClick.AddListener(() => _guide?.Show());
+            Row(panel, "Settings", "settings.title", 3).onClick.AddListener(() => _settings?.Show());
+            Row(panel, "Guide", "action.guide", 4).onClick.AddListener(() => _guide?.Show());
 
-            var restart = Row(panel, "Restart", AbandonLabel, 5, UIFactory.DestructiveFill);
+            var restart = Row(panel, "Restart", AbandonKey, 5, UIFactory.DestructiveFill);
             _abandonLabel = restart.GetComponentInChildren<TMP_Text>();
             restart.onClick.AddListener(PressAbandon);
 
-            Row(panel, "Quit", "Save and quit", 6).onClick.AddListener(() =>
+            Row(panel, "Quit", "pause.save_quit", 6).onClick.AddListener(() =>
             {
                 if (_game.SaveGame()) { Application.Quit(); return; }
-                if (_status != null) _status.text = "Save failed — not quitting.";
+                if (_status != null) _status.text = Loc.T("pause.quit_failed");
             });
         }
 
-        private static Button Row(Transform panel, string name, string text, int row, Color? fill = null) =>
-            UIFactory.Button(name, panel, text, RowMin(row), RowMax(row), UIFactory.TextBody, fill);
+        /// <summary>A button-column row showing localisation key <paramref name="key"/>; a null key leaves the label for code to fill.</summary>
+        private static Button Row(Transform panel, string name, string key, int row, Color? fill = null) =>
+            key == null
+                ? UIFactory.Button(name, panel, "", RowMin(row), RowMax(row), UIFactory.TextBody, fill)
+                : UIFactory.ButtonKey(name, panel, key, RowMin(row), RowMax(row), UIFactory.TextBody, fill);
 
         /// <summary>First press arms the button; the second abandons the shop and restarts.</summary>
         public void PressAbandon()
@@ -117,7 +128,7 @@ namespace PetShop.UI
             if (!IsConfirmingAbandon)
             {
                 IsConfirmingAbandon = true;
-                if (_abandonLabel != null) _abandonLabel.text = AbandonConfirmLabel;
+                if (_abandonLabel != null) UIFactory.Localize(_abandonLabel, AbandonConfirmKey);
                 if (_status != null) _status.text = AbandonWarning;
                 return;
             }
@@ -131,7 +142,7 @@ namespace PetShop.UI
         {
             if (!IsConfirmingAbandon) return false;
             IsConfirmingAbandon = false;
-            if (_abandonLabel != null) _abandonLabel.text = AbandonLabel;
+            if (_abandonLabel != null) UIFactory.Localize(_abandonLabel, AbandonKey);
             if (_status != null) _status.text = StatusLine();
             return true;
         }
@@ -172,7 +183,7 @@ namespace PetShop.UI
         private string StatusLine()
         {
             if (_game == null || _game.Shop == null) return string.Empty;
-            return $"Slot {SaveSystem.ActiveSlot} · Day {_game.Shop.Day} · € {_game.Shop.Balance:N0}";
+            return Loc.F("pause.status", SaveSystem.ActiveSlot, _game.Shop.Day, _game.Shop.Balance);
         }
 
         private static Vector2 RowMin(int row) => new(RowLeft, RowTop - row * RowStep - RowHeight);
@@ -182,7 +193,19 @@ namespace PetShop.UI
         private void RefreshMusicLabel()
         {
             if (_musicLabel == null) return;
-            _musicLabel.text = _audio != null && _audio.IsMusicPlaying ? "Music: on" : "Music: off";
+            bool on = _audio != null && _audio.IsMusicPlaying;
+            _musicLabel.text = Loc.F("pause.music", Loc.T(on ? "common.on" : "common.off"));
+        }
+
+        private void OnEnable()  => Loc.LanguageChanged += OnLanguageChanged;
+
+        private void OnDisable() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Re-reads the code-built texts: the music toggle and the status line.</summary>
+        private void OnLanguageChanged()
+        {
+            RefreshMusicLabel();
+            if (_status != null && IsOpen) _status.text = IsConfirmingAbandon ? AbandonWarning : StatusLine();
         }
     }
 }

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Commerce;
 using PetShop.Progression;
 using PetShop.Shop;
@@ -87,10 +89,12 @@ namespace PetShop.UI
         private void AddTool(int index, int count, string id, KeyCode key)
         {
             var def   = BuildCatalog.Get(id);
-            string text = def != null ? $"{def.DisplayName}  €{def.Cost:N0}\n[{KeyLabel(key)}]" : $"Remove\n[{KeyLabel(key)}]";
-            var btn = UIFactory.Button($"Tool_{id ?? "remove"}", _root.transform, text,
+            var btn = UIFactory.Button($"Tool_{id ?? "remove"}", _root.transform, "",
                                        new Vector2(index / (float)count, 0f), new Vector2((index + 1) / (float)count, 1f),
                                        FontSize);
+            LocalizedText.Bind(btn.GetComponentInChildren<TMP_Text>(), () => def != null
+                ? $"{def.LocalizedName}  €{def.Cost:N0}\n[{KeyLabel(key)}]"
+                : Loc.F("toolbar.remove", KeyLabel(key)));
             var rt = (RectTransform)btn.transform;
             rt.offsetMin = new Vector2(UIFactory.Gap * 0.5f, 0f);
             rt.offsetMax = new Vector2(-UIFactory.Gap * 0.5f, 0f);
@@ -113,12 +117,12 @@ namespace PetShop.UI
             if (def == null || _build == null) return false;
             if (!ProgressionRules.IsPenUnlocked(catalogId, Tier))
             {
-                Notify($"{def.DisplayName} is not unlocked yet.");
+                Notify(Loc.F("toolbar.locked", def.LocalizedName));
                 return false;
             }
             if (_shop != null && _shop.Balance < def.Cost)
             {
-                Notify($"Not enough money — {def.DisplayName} costs €{def.Cost:N0}.");
+                Notify(Loc.F("toolbar.no_money", def.LocalizedName, def.Cost));
                 return false;
             }
             _build.EnterBuildMode(def);

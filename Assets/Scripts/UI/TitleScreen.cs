@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -16,9 +17,9 @@ namespace PetShop.UI
     /// </summary>
     public class TitleScreen : MonoBehaviour
     {
-        private const string OverwritePrompt = "Overwrite?";
-        private const string NewShopText     = "New shop";
-        private const string ContinueText    = "Continue";
+        private const string OverwriteKey = "title.overwrite";
+        private const string NewShopKey   = "title.new_shop";
+        private const string ContinueKey  = "title.continue";
 
         // Slot blocks stack downwards from SlotTop, one SlotStep apart: a caption line, then buttons.
         private const float SlotTop       = 0.385f;
@@ -36,7 +37,6 @@ namespace PetShop.UI
 
         private const float SkipLeftX   = 0.76f;
         private const float SkipMinFont = 10f;
-        private const string SkipPrefix = "Skip tutorial: ";
 
         private const float SlotFont    = 15f;
         private const float ButtonFont  = 17f;
@@ -90,16 +90,14 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", slab, new Vector2(1f, 0f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(-4f, 0f), Vector2.zero);
 
-            UIFactory.Label("Kicker", slab, "A COSY MANAGEMENT SIM",
+            UIFactory.LabelKey("Kicker", slab, "title.kicker",
                 new Vector2(LeftX, 0.74f), new Vector2(TextRightX, 0.78f), 15f, UIFactory.Accent);
 
-            UIFactory.Label("Title", slab, "Paws &\nWhiskers",
+            UIFactory.LabelKey("Title", slab, "title.name",
                 new Vector2(LeftX, 0.55f), new Vector2(TextRightX, 0.74f), 58f, UIFactory.Ink,
                 TextAlignmentOptions.TopLeft);
 
-            UIFactory.Label("Blurb", slab,
-                "Run the pet shop on the corner.\n" +
-                "Keep the shelves full, raise the animals,\nand make rent.",
+            UIFactory.LabelKey("Blurb", slab, "title.blurb",
                 new Vector2(LeftX, 0.40f), new Vector2(TextRightX, 0.53f), 17f, UIFactory.InkMuted,
                 TextAlignmentOptions.TopLeft);
             return slab;
@@ -109,16 +107,17 @@ namespace PetShop.UI
         private void BuildSlotRow(Transform slab, int slot, float top)
         {
             var summary = SaveSystem.Peek(slot);
-            UIFactory.Label($"Slot{slot}", slab, SlotCaption(slot, summary),
+            var caption = UIFactory.Label($"Slot{slot}", slab, "",
                 new Vector2(LeftX, top - CaptionHeight), new Vector2(TextRightX, top), SlotFont,
                 summary != null ? UIFactory.Ink : UIFactory.InkMuted);
+            LocalizedText.Bind(caption, () => SlotCaption(slot, summary));
 
             float buttonTop = top - CaptionHeight - ButtonGap;
             var min = new Vector2(LeftX, buttonTop - ButtonHeight);
             var row = new List<Selectable>();
             if (summary != null)
             {
-                var cont = UIFactory.Button($"Continue{slot}", slab, ContinueText,
+                var cont = UIFactory.ButtonKey($"Continue{slot}", slab, ContinueKey,
                     min, new Vector2(MidLeftX, buttonTop), ButtonFont, UIFactory.ButtonOn);
                 cont.onClick.AddListener(() => BeginSlot(slot, true));
                 row.Add(cont);
@@ -131,8 +130,8 @@ namespace PetShop.UI
         /// <summary>A New shop button; on an occupied slot the first click only asks "Overwrite?".</summary>
         private Button BuildNewShopButton(Transform slab, int slot, bool occupied, Vector2 min, Vector2 max)
         {
-            var button = UIFactory.Button($"NewGame{slot}", slab, NewShopText, min, max, ButtonFont,
-                                          occupied ? UIFactory.ButtonBg : UIFactory.ButtonOn);
+            var button = UIFactory.ButtonKey($"NewGame{slot}", slab, NewShopKey, min, max, ButtonFont,
+                                             occupied ? UIFactory.ButtonBg : UIFactory.ButtonOn);
             var label = button.GetComponentInChildren<TMP_Text>();
             bool armed = false;
             button.onClick.AddListener(() =>
@@ -140,7 +139,7 @@ namespace PetShop.UI
                 if (occupied && !armed)
                 {
                     armed = true;
-                    label.text = OverwritePrompt;
+                    UIFactory.Localize(label, OverwriteKey);
                     return;
                 }
                 BeginSlot(slot, false);
@@ -152,16 +151,16 @@ namespace PetShop.UI
         private void BuildFooter(Transform slab, Action onSettings, Action onGuide)
         {
             var min = new Vector2(LeftX, FooterBottom);
-            var quit = UIFactory.Button("Quit", slab, "Quit",
+            var quit = UIFactory.ButtonKey("Quit", slab, "title.quit",
                 min, new Vector2(MidLeftX, FooterBottom + ButtonHeight), ButtonFont);
             quit.onClick.AddListener(Application.Quit);
 
             float split = (MidRightX + ButtonRightX) * 0.5f;
-            var settings = UIFactory.Button("Settings", slab, "Settings",
+            var settings = UIFactory.ButtonKey("Settings", slab, "settings.title",
                 new Vector2(MidRightX, FooterBottom), new Vector2(split - ButtonGap, FooterBottom + ButtonHeight), ButtonFont);
             settings.onClick.AddListener(() => onSettings?.Invoke());
 
-            var guide = UIFactory.Button("Guide", slab, "Guide",
+            var guide = UIFactory.ButtonKey("Guide", slab, "action.guide",
                 new Vector2(split + ButtonGap, FooterBottom), new Vector2(ButtonRightX, FooterBottom + ButtonHeight), ButtonFont);
             guide.onClick.AddListener(() => onGuide?.Invoke());
             _navRows.Add(new Selectable[] { quit, settings, guide, BuildSkipToggle(slab) });
@@ -183,15 +182,15 @@ namespace PetShop.UI
 
         private void RefreshSkip(Button button, TMP_Text label)
         {
-            label.text = SkipPrefix + (SkipTutorial ? "on" : "off");
+            LocalizedText.Bind(label, () => Loc.F("title.skip_tutorial", Loc.T(SkipTutorial ? "common.on" : "common.off")));
             UIFactory.SetSelected(button, SkipTutorial);
         }
 
         /// <summary>"Slot i — Day N · €balance · saved date", or "Slot i — empty".</summary>
         private static string SlotCaption(int slot, SlotSummary summary)
         {
-            if (summary == null) return $"Slot {slot} — empty";
-            return $"Slot {slot} — Day {summary.Day} · €{summary.Balance:N0} · saved {FormatSavedAt(summary.SavedAt)}";
+            if (summary == null) return Loc.F("title.slot.empty", slot);
+            return Loc.F("title.slot.saved", slot, summary.Day, summary.Balance, FormatSavedAt(summary.SavedAt));
         }
 
         /// <summary>The save time in local time, or the raw string when it does not parse.</summary>
@@ -236,7 +235,7 @@ namespace PetShop.UI
         public void RefreshKeyHints()
         {
             if (_hint == null) return;
-            _hint.text = HotkeyHelp.TitleHint();
+            LocalizedText.Bind(_hint, HotkeyHelp.TitleHint);
         }
 
         private void BeginSlot(int slot, bool continueSave)

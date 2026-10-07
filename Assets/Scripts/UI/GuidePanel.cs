@@ -4,6 +4,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -59,18 +60,28 @@ namespace PetShop.UI
                 UIFactory.Surface, new Vector2(-PanelHalfWidth, -PanelHalfHeight),
                 new Vector2(PanelHalfWidth, PanelHalfHeight)).transform;
 
-            UIFactory.Label("Heading", panel, "Guide", new Vector2(ListLeft, TitleBottom),
+            UIFactory.LabelKey("Heading", panel, "guide.heading", new Vector2(ListLeft, TitleBottom),
                 new Vector2(ListRight, TitleTop), UIFactory.TextHeading, UIFactory.Ink);
             for (int i = 0; i < _sections.Count; i++) _rows.Add(MakeRow(panel, i));
             BuildText(panel);
             BuildPager(panel);
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rebuilds the section text in the new language and redraws the open section.</summary>
+        private void OnLanguageChanged()
+        {
+            _sections = GuideContent.Sections();
+            if (IsOpen) ShowSection(CurrentSection);
         }
 
         private Button MakeRow(Transform panel, int index)
         {
             float top = ListTop - index * (RowHeight + RowGap);
-            var btn = UIFactory.Button($"Section_{index}", panel, _sections[index].Title,
+            var btn = UIFactory.ButtonKey($"Section_{index}", panel, _sections[index].TitleKey,
                 new Vector2(ListLeft, top - RowHeight), new Vector2(ListRight, top), UIFactory.TextSmall);
             btn.navigation = NoNavigation;
             var label = btn.GetComponentInChildren<TMP_Text>();
@@ -88,19 +99,19 @@ namespace PetShop.UI
                 new Vector2(TextRight, BodyTop), UIFactory.TextBody, UIFactory.Ink, TextAlignmentOptions.TopLeft);
             _body.overflowMode = TextOverflowModes.Page;
 
-            var close = UIFactory.Button("Close", panel, "Close  (Esc)", new Vector2(CloseLeft, TitleBottom + RowGap),
-                new Vector2(TextRight, TitleTop), UIFactory.TextSmall);
+            var close = UIFactory.ButtonKey("Close", panel, "common.close_esc", new Vector2(CloseLeft, TitleBottom + RowGap),
+                new Vector2(TextRight, TitleTop), UIFactory.TextSmall, null, "Esc");
             close.navigation = NoNavigation;
             close.onClick.AddListener(Hide);
         }
 
         private void BuildPager(Transform panel)
         {
-            _prev = UIFactory.Button("Prev", panel, "Previous", new Vector2(TextLeft, PagerBottom),
+            _prev = UIFactory.ButtonKey("Prev", panel, "guide.prev", new Vector2(TextLeft, PagerBottom),
                 new Vector2(TextLeft + PagerButtonWidth, PagerTop), UIFactory.TextSmall);
             _prev.navigation = NoNavigation;
             _prev.onClick.AddListener(() => TurnPage(-1));
-            _next = UIFactory.Button("Next", panel, "Next", new Vector2(TextRight - PagerButtonWidth, PagerBottom),
+            _next = UIFactory.ButtonKey("Next", panel, "guide.next", new Vector2(TextRight - PagerButtonWidth, PagerBottom),
                 new Vector2(TextRight, PagerTop), UIFactory.TextSmall);
             _next.navigation = NoNavigation;
             _next.onClick.AddListener(() => TurnPage(1));
@@ -180,7 +191,7 @@ namespace PetShop.UI
         {
             CurrentPage = Mathf.Clamp(page, 1, PageCount);
             _body.pageToDisplay = CurrentPage;
-            _pageLabel.text = $"Page {CurrentPage} of {PageCount}";
+            _pageLabel.text = Loc.F("guide.page", CurrentPage, PageCount);
             _prev.interactable = CurrentPage > 1;
             _next.interactable = CurrentPage < PageCount;
         }

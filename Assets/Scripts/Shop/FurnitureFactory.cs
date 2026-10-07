@@ -162,7 +162,7 @@ namespace PetShop.Shop
         /// <summary>The pen entry for <paramref name="species"/>: base pen plus its breeding pair.</summary>
         private static PlacedObjectData SpeciesPen(Pet.Species species) => new()
         {
-            Id = PenIdFor(species), DisplayName = $"{species} Pen", Type = PenType,
+            Id = PenIdFor(species), DisplayName = $"{species} Pen", Type = PenType, PenSpecies = species,
             Category = BuildCategory.Furniture,
             Description = $"Four stalls for {species}s. Ships with a breeding pair of adult {species}s.",
             Size = new Vector2Int(2, 2),

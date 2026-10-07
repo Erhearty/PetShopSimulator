@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -22,9 +23,9 @@ namespace PetShop.UI
 
         private void BuildGuidePage()
         {
-            _guide = AddPage("Guide", "How every part of running the shop works.", UIFactory.TextBody);
+            _guide = AddPage("Guide", UIFactory.TextBody);
             RefreshGuidePage();
-            var open = UIFactory.Button("OpenGuide", _guide.Root.transform, "Open the guide",
+            var open = UIFactory.ButtonKey("OpenGuide", _guide.Root.transform, "guide.book.open",
                 new Vector2(0f, LinkRowBottom), new Vector2(LinkWidth, LinkRowTop), UIFactory.TextSmall, UIFactory.Accent);
             open.onClick.AddListener(() => HandOff(OpenGuide));
         }
@@ -34,7 +35,7 @@ namespace PetShop.UI
         {
             if (_guide == null) return;
             var topics = new System.Text.StringBuilder();
-            topics.AppendLine($"Press {InputBindings.Label(GameAction.Guide)} at any time to open it. It covers:");
+            topics.AppendLine(Loc.F("guide.book.intro", InputBindings.Label(GameAction.Guide)));
             foreach (var section in GuideContent.Sections()) topics.AppendLine($"•  {section.Title}");
             _guide.Body.text = topics.ToString();
         }

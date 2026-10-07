@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using PetShop.Localization;
 using PetShop.Pets;
 using PetShop.Shop;
 
@@ -75,6 +76,11 @@ namespace PetShop.Progression
             CornerShopName, LocalFavouriteName, TrustedNameName, TownLandmarkName,
         };
 
+        private static readonly string[] NameKeys =
+        {
+            "tier.corner_shop", "tier.local_favourite", "tier.trusted_name", "tier.town_landmark",
+        };
+
         // Only species with real models — the same set the starter layout uses.
         private static readonly Pet.Species[] StarterPenSpecies =
         {
@@ -116,8 +122,15 @@ namespace PetShop.Progression
         /// <summary>Reputation needed to reach <paramref name="tier"/> (clamped to 0..MaxTier).</summary>
         public static float ThresholdForTier(int tier) => Thresholds[ClampTier(tier)];
 
-        /// <summary>Display name of <paramref name="tier"/> (clamped to 0..MaxTier).</summary>
-        public static string TierName(int tier) => Names[ClampTier(tier)];
+        /// <summary>
+        /// Display name of <paramref name="tier"/> (clamped to 0..MaxTier) in the current language;
+        /// the English name when the table has no entry.
+        /// </summary>
+        public static string TierName(int tier)
+        {
+            int t = ClampTier(tier);
+            return Loc.Has(NameKeys[t]) ? Loc.T(NameKeys[t]) : Names[t];
+        }
 
         /// <summary>The lot stage a tier unlocks: 0 for tier 0, 1 for tiers 1–2, 2 for tier 3.</summary>
         public static int LotStageForTier(int tier)

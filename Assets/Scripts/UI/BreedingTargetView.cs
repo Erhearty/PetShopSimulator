@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using PetShop.Localization;
 using PetShop.Pets;
 
 namespace PetShop.UI
@@ -44,7 +45,9 @@ namespace PetShop.UI
                 TextAlignmentOptions.Center);
             Stepper(panel, "TierNext", ">", 0.70f, 0.74f, () => StepTier(1));
 
-            RefreshLabels();
+            // The producers re-run on a language change; RefreshLabels covers selection changes.
+            LocalizedText.Bind(_coatLabel, CoatText);
+            LocalizedText.Bind(_tierLabel, TierText);
         }
 
         private static void Stepper(Transform panel, string name, string text,
@@ -76,9 +79,15 @@ namespace PetShop.UI
 
         private void RefreshLabels()
         {
-            _coatLabel.text = $"Aim for: {Coat ?? "Any"}";
-            _tierLabel.text = $"min rarity {(MinRarity.HasValue ? MinRarity.Value.ToString() : "Any")}";
+            _coatLabel.text = CoatText();
+            _tierLabel.text = TierText();
         }
+
+        private string CoatText() =>
+            Loc.F("breeding.aim_for", Coat != null ? CoatColours.DisplayName(Coat) : Loc.T("breeding.any_coat"));
+
+        private string TierText() =>
+            Loc.F("breeding.min_rarity", MinRarity.HasValue ? LocNames.Rarity(MinRarity.Value) : Loc.T("breeding.any_rarity"));
 
         // ── Odds ────────────────────────────────────────────────────────────────
 
@@ -112,7 +121,7 @@ namespace PetShop.UI
         public string ExpectedWithChance(string expected, Pet a, Pet b)
         {
             if (!HasTarget || !BreedingSystem.CanPair(a, b)) return expected;
-            return $"{expected}\n\nChance of target: {Percent(Chance(a, b))}";
+            return $"{expected}\n\n{Loc.F("breeding.target_chance", Percent(Chance(a, b)))}";
         }
 
         /// <summary>"  ·  best ~NN%" for the strongest partner of <paramref name="pet"/>, or empty.</summary>
@@ -124,7 +133,7 @@ namespace PetShop.UI
             foreach (var other in residents)
                 if (BreedingSystem.CanPair(pet, other)) best = Mathf.Max(best, Chance(pet, other));
 
-            return best < 0f ? string.Empty : $"   ·   best {Percent(best)}";
+            return best < 0f ? string.Empty : $"   ·   {Loc.F("breeding.best", Percent(best))}";
         }
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 
 namespace PetShop.UI
@@ -50,22 +51,31 @@ namespace PetShop.UI
             UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
 
-            _title = UIFactory.Label("Header", panel.transform, "Family tree",
+            _title = UIFactory.Label("Header", panel.transform, Loc.T("family.title"),
                 new Vector2(0.03f, 0.89f), new Vector2(0.52f, 0.97f), 24f, UIFactory.Ink);
 
-            var back = UIFactory.Button("Back", panel.transform, "Back",
+            var back = UIFactory.ButtonKey("Back", panel.transform, "family.back",
                 new Vector2(0.55f, 0.895f), new Vector2(0.75f, 0.965f), 15f);
             back.onClick.AddListener(GoBack);
 
-            var close = UIFactory.Button("Close", panel.transform, "Close",
+            var close = UIFactory.ButtonKey("Close", panel.transform, "common.close",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f);
             close.onClick.AddListener(Hide);
 
-            UIFactory.Label("Hint", panel.transform, "Click an ancestor to centre the tree on them.",
+            UIFactory.LabelKey("Hint", panel.transform, "family.hint",
                 new Vector2(0.64f, 0.06f), new Vector2(0.97f, 0.30f), 13f, UIFactory.InkMuted);
 
             _content = UIFactory.Node("Content", panel.transform, Vector2.zero, Vector2.one).transform;
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Redraws the tree in the new language while the panel is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Redraw();
         }
 
         // ── Open / close ────────────────────────────────────────────────────────
@@ -143,7 +153,7 @@ namespace PetShop.UI
 
             var focus = Resolve(_focusId);
             _title.text = focus != null && !string.IsNullOrEmpty(focus.petName)
-                ? $"Family tree — {focus.petName}" : "Family tree";
+                ? Loc.F("family.title_named", focus.petName) : Loc.T("family.title");
 
             DrawBox(focus, 0.39f, 0.06f, 0.30f, true);
             for (int i = 0; i < 2; i++)
@@ -162,7 +172,7 @@ namespace PetShop.UI
 
             if (e == null)
             {
-                var none = UIFactory.Label("Unknown", _content, "unknown", min, max, 14f,
+                var none = UIFactory.Label("Unknown", _content, Loc.T("family.unknown"), min, max, 14f,
                                            UIFactory.InkMuted, TextAlignmentOptions.Center);
                 _spawned.Add(none.gameObject);
                 return;
@@ -180,14 +190,15 @@ namespace PetShop.UI
             UIFactory.Label("Name", box, e.petName,
                 new Vector2(0.05f, 0.66f), new Vector2(0.95f, 0.95f), 16f, UIFactory.Ink);
 
-            string sold = IsInPen(e.id) ? "" : "  ·  sold";
-            UIFactory.Label("Info", box, $"{e.rarity}  ·  gen {e.generation}{sold}",
-                new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.64f), 13f, UIFactory.InkMuted);
+            string sold = IsInPen(e.id) ? "" : $"  ·  {Loc.T("family.sold")}";
+            string info = LocNames.Rarity(e.rarity) + "  ·  " + Loc.F("family.generation", e.generation) + sold;
+            UIFactory.AutoFit(UIFactory.Label("Info", box, info,
+                new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.64f), 13f, UIFactory.InkMuted));
 
             var coat   = UIFactory.WithAlpha(e.coat, 1f);
             var swatch = UIFactory.Panel("Swatch", box,
                 new Vector2(0.05f, 0.06f), new Vector2(0.95f, 0.36f), coat);
-            UIFactory.Label("CoatName", swatch.transform, CoatColours.Classify(e.coat),
+            UIFactory.Label("CoatName", swatch.transform, CoatColours.DisplayName(CoatColours.Classify(e.coat)),
                 Vector2.zero, Vector2.one, 13f, SwatchTextColour(coat), TextAlignmentOptions.Center);
         }
 

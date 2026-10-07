@@ -19,6 +19,14 @@ namespace PetShop.Tests
         private const string ThreeShelves  = "early_three_shelves";
         private const string Breed         = "mid_breed";
 
+        private LocTestScope _loc;
+
+        [SetUp]
+        public void SetUp() => _loc = LocTestScope.Begin();
+
+        [TearDown]
+        public void TearDown() => _loc.End();
+
         private static Dictionary<string, int> Counts(params (string key, int n)[] entries)
         {
             var d = new Dictionary<string, int>();

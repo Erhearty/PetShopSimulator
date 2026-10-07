@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -15,7 +16,7 @@ namespace PetShop.UI
     /// </summary>
     public class SettingsPanel : MonoBehaviour
     {
-        private const string CapturePrompt = "Press a key… (Esc to cancel)";
+        private const string EscapeKeyLabel = "Esc";
         private const string CaptureMarker = "…";
         private const float  HeaderFont    = 24f;
         private const float  SectionFont   = 17f;
@@ -42,6 +43,9 @@ namespace PetShop.UI
         private TMP_Text    _trackerLabel;
         private Button      _motionButton;
         private TMP_Text    _motionLabel;
+        private Button      _languageButton;
+        private TMP_Text    _languageLabel;
+        private readonly Dictionary<GameAction, TMP_Text> _nameLabels = new();
 
         private readonly Dictionary<GameAction, TMP_Text> _keyLabels = new();
         private readonly List<Button> _rebindButtons = new();
@@ -78,8 +82,21 @@ namespace PetShop.UI
             BuildControls(panel);
             BuildGeneral(panel);
             WireNavigation();
+            Loc.LanguageChanged += OnLanguageChanged;
 
             _root.SetActive(false);
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Re-reads every text built from code rather than a bound key.</summary>
+        private void OnLanguageChanged()
+        {
+            foreach (var pair in _nameLabels) pair.Value.text = InputBindings.ActionName(pair.Key);
+            RefreshAutosaveLabel();
+            RefreshTrackerLabel();
+            RefreshMotionLabel();
+            RefreshLanguageLabel();
         }
 
         /// <summary>Opens the panel on top of everything and selects the first rebind button.</summary>
@@ -99,6 +116,7 @@ namespace PetShop.UI
             RefreshAutosaveLabel();
             RefreshTrackerLabel();
             RefreshMotionLabel();
+            RefreshLanguageLabel();
             _root.SetActive(true);
             _root.transform.SetAsLastSibling();
             SelectFirstRow();
@@ -121,16 +139,17 @@ namespace PetShop.UI
         /// <summary>Accent strip, header, close button, status line and reset button.</summary>
         private void BuildChrome(Transform panel)
         {
-            UIFactory.Header(panel, "Settings", new Vector2(0.03f, 0.90f), new Vector2(0.5f, 0.97f));
+            UIFactory.Localize(UIFactory.Header(panel, "", new Vector2(0.03f, 0.90f), new Vector2(0.5f, 0.97f)),
+                               "settings.title");
 
-            _closeButton = UIFactory.Button("Close", panel, "Close  (Esc)",
-                new Vector2(0.79f, 0.905f), new Vector2(0.97f, 0.965f), RowFont);
+            _closeButton = UIFactory.ButtonKey("Close", panel, "common.close_esc",
+                new Vector2(0.79f, 0.905f), new Vector2(0.97f, 0.965f), RowFont, null, EscapeKeyLabel);
             _closeButton.onClick.AddListener(Hide);
 
             _status = UIFactory.Label("Status", panel, "",
                 new Vector2(0.03f, 0.02f), new Vector2(0.70f, 0.09f), StatusFont, UIFactory.Accent);
 
-            _resetButton = UIFactory.Button("Reset", panel, "Reset to defaults",
+            _resetButton = UIFactory.ButtonKey("Reset", panel, "settings.reset",
                 new Vector2(0.72f, 0.025f), new Vector2(0.97f, 0.09f), RowFont);
             _resetButton.onClick.AddListener(ResetAll);
         }
@@ -138,7 +157,7 @@ namespace PetShop.UI
         /// <summary>The "Controls" section: one row per action.</summary>
         private void BuildControls(Transform panel)
         {
-            UIFactory.Label("ControlsHeader", panel, "Controls",
+            UIFactory.LabelKey("ControlsHeader", panel, "settings.controls",
                 new Vector2(0.03f, 0.83f), new Vector2(0.60f, 0.89f), SectionFont, UIFactory.Ink);
 
             var rows = UIFactory.Node("Controls", panel,
@@ -156,14 +175,15 @@ namespace PetShop.UI
         /// <summary>Action name, current key and a Rebind button, between <paramref name="bottom"/> and <paramref name="top"/>.</summary>
         private void BuildRow(Transform rows, GameAction action, float bottom, float top)
         {
-            UIFactory.Label($"Name_{action}", rows, InputBindings.ActionName(action),
+            _nameLabels[action] = UIFactory.Label($"Name_{action}", rows, InputBindings.ActionName(action),
                 new Vector2(0f, bottom), new Vector2(0.52f, top), RowFont, UIFactory.InkMuted);
+            UIFactory.AutoFit(_nameLabels[action]);
 
             _keyLabels[action] = UIFactory.Label($"Key_{action}", rows, "",
                 new Vector2(0.52f, bottom), new Vector2(0.74f, top), RowFont, UIFactory.Ink,
                 TextAlignmentOptions.Center);
 
-            var rebind = UIFactory.Button($"Rebind_{action}", rows, "Rebind",
+            var rebind = UIFactory.ButtonKey($"Rebind_{action}", rows, "settings.rebind",
                 new Vector2(0.76f, bottom), new Vector2(1f, top), RowFont);
             rebind.onClick.AddListener(() => BeginCapture(action));
             _rebindButtons.Add(rebind);
@@ -172,7 +192,7 @@ namespace PetShop.UI
         /// <summary>The "General" section: the autosave toggle; further options parent to <see cref="GeneralSection"/>.</summary>
         private void BuildGeneral(Transform panel)
         {
-            UIFactory.Label("GeneralHeader", panel, "General",
+            UIFactory.LabelKey("GeneralHeader", panel, "settings.general",
                 new Vector2(0.64f, 0.83f), new Vector2(0.97f, 0.89f), SectionFont, UIFactory.Ink);
 
             GeneralSection = UIFactory.Node("General", panel,
@@ -185,7 +205,41 @@ namespace PetShop.UI
             RefreshAutosaveLabel();
             BuildTrackerToggle();
             BuildMotionToggle();
+            BuildLanguageToggle();
         }
+
+        /// <summary>The language switcher, three rows under the autosave toggle: cycles English ↔ Ukrainian.</summary>
+        private void BuildLanguageToggle()
+        {
+            const int rowIndex = 3;
+            float top = 1f - rowIndex * (GeneralRowHeight + GeneralRowGap);
+            _languageButton = UIFactory.Button("Language", GeneralSection, "",
+                new Vector2(0f, top - GeneralRowHeight), new Vector2(1f, top), RowFont);
+            _languageLabel = _languageButton.GetComponentInChildren<TMP_Text>();
+            _languageButton.onClick.AddListener(ToggleLanguage);
+            RefreshLanguageLabel();
+        }
+
+        /// <summary>Switches to the next language; the whole open UI re-reads its text and the choice is saved.</summary>
+        private void ToggleLanguage()
+        {
+            var next = Loc.Current == Language.En ? Language.Uk : Language.En;
+            Loc.SetLanguage(next);
+            RefreshLanguageLabel();
+            _status.text = Loc.F("settings.language.changed", LanguageName(next));
+        }
+
+        /// <summary>Shows the current language, in its own name, on its button.</summary>
+        private void RefreshLanguageLabel()
+        {
+            if (_languageLabel == null) return;
+            _languageLabel.text = Loc.F("settings.language", LanguageName(Loc.Current));
+        }
+
+        private static string LanguageName(Language language) =>
+            Loc.T(language == Language.Uk ? "common.language.uk" : "common.language.en");
+
+        private static string OnOff(bool on) => Loc.T(on ? "common.on" : "common.off");
 
         /// <summary>The "Reduce motion" toggle, two rows under the autosave toggle.</summary>
         private void BuildMotionToggle()
@@ -204,14 +258,14 @@ namespace PetShop.UI
         {
             GameSettings.ReduceMotion = !GameSettings.ReduceMotion;
             RefreshMotionLabel();
-            _status.text = GameSettings.ReduceMotion ? "Reduce motion on." : "Reduce motion off.";
+            _status.text = Loc.T(GameSettings.ReduceMotion ? "settings.reduce_motion.on" : "settings.reduce_motion.off");
         }
 
         /// <summary>Shows the current reduce-motion setting on its button.</summary>
         private void RefreshMotionLabel()
         {
             if (_motionLabel == null) return;
-            _motionLabel.text = $"Reduce motion: {(GameSettings.ReduceMotion ? "on" : "off")}";
+            _motionLabel.text = Loc.F("settings.reduce_motion", OnOff(GameSettings.ReduceMotion));
         }
 
         /// <summary>The "Show quest tracker" toggle, one row under the autosave toggle.</summary>
@@ -232,14 +286,14 @@ namespace PetShop.UI
             RefreshTrackerLabel();
             if (_ui == null) _ui = FindAnyObjectByType<GameUI>();
             if (_ui != null && _ui.HUD != null && _ui.HUD.Tracker != null) _ui.HUD.Tracker.Refresh();
-            _status.text = GameSettings.ShowQuestTracker ? "Quest tracker on." : "Quest tracker off.";
+            _status.text = Loc.T(GameSettings.ShowQuestTracker ? "settings.tracker.on" : "settings.tracker.off");
         }
 
         /// <summary>Shows the current quest tracker setting on its button.</summary>
         private void RefreshTrackerLabel()
         {
             if (_trackerLabel == null) return;
-            _trackerLabel.text = $"Show quest tracker: {(GameSettings.ShowQuestTracker ? "on" : "off")}";
+            _trackerLabel.text = Loc.F("settings.tracker", OnOff(GameSettings.ShowQuestTracker));
         }
 
         /// <summary>Flips the morning autosave setting and reports it.</summary>
@@ -247,20 +301,20 @@ namespace PetShop.UI
         {
             GameSettings.AutosaveEachMorning = !GameSettings.AutosaveEachMorning;
             RefreshAutosaveLabel();
-            _status.text = GameSettings.AutosaveEachMorning ? "Autosave each morning on." : "Autosave each morning off.";
+            _status.text = Loc.T(GameSettings.AutosaveEachMorning ? "settings.autosave.on" : "settings.autosave.off");
         }
 
         /// <summary>Shows the current morning autosave setting on its button.</summary>
         private void RefreshAutosaveLabel()
         {
             if (_autosaveLabel == null) return;
-            _autosaveLabel.text = $"Autosave each morning: {(GameSettings.AutosaveEachMorning ? "on" : "off")}";
+            _autosaveLabel.text = Loc.F("settings.autosave", OnOff(GameSettings.AutosaveEachMorning));
         }
 
         /// <summary>Explicit up/down navigation: rebind rows top to bottom, then the autosave and quest tracker toggles, Reset, Close.</summary>
         private void WireNavigation()
         {
-            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _trackerButton, _motionButton, _resetButton, _closeButton };
+            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _trackerButton, _motionButton, _languageButton, _resetButton, _closeButton };
             for (int i = 0; i < chain.Count; i++)
             {
                 chain[i].navigation = new Navigation
@@ -299,7 +353,7 @@ namespace PetShop.UI
             // re-click Rebind, so those keys reach PollCapture and can be bound.
             EventSystem.current?.SetSelectedGameObject(null);
             SetRowsInteractable(false);
-            _status.text       = CapturePrompt;
+            _status.text       = Loc.F("settings.capture_prompt", EscapeKeyLabel);
             _keyLabels[action].text = CaptureMarker;
         }
 
@@ -309,7 +363,7 @@ namespace PetShop.UI
             // The Enter/Space that pressed the Rebind button must not become the new binding.
             if (Time.frameCount == _captureStartFrame) return;
 
-            if (Input.GetKeyDown(KeyCode.Escape)) { EndCapture("Rebind cancelled."); return; }
+            if (Input.GetKeyDown(KeyCode.Escape)) { EndCapture(Loc.T("settings.rebind_cancelled")); return; }
 
             foreach (var key in AllKeys)
             {
@@ -323,10 +377,10 @@ namespace PetShop.UI
         private void Apply(GameAction action, KeyCode key)
         {
             GameAction? displaced = InputBindings.Set(action, key);
-            string message = $"{InputBindings.ActionName(action)} is now {InputBindings.KeyLabel(key)}.";
+            string message = Loc.F("settings.bound", InputBindings.ActionName(action), InputBindings.KeyLabel(key));
             if (displaced.HasValue)
-                message += $" {InputBindings.ActionName(displaced.Value)} moved to " +
-                           $"{InputBindings.Label(displaced.Value)}.";
+                message += " " + Loc.F("settings.bound_moved", InputBindings.ActionName(displaced.Value),
+                                       InputBindings.Label(displaced.Value));
             EndCapture(message);
             OnBindingsChanged();
         }
@@ -346,7 +400,7 @@ namespace PetShop.UI
         {
             _capturing = null;
             InputBindings.ResetAll();
-            _status.text = "Controls reset to defaults.";
+            _status.text = Loc.T("settings.controls_reset");
             OnBindingsChanged();
         }
 
@@ -365,6 +419,7 @@ namespace PetShop.UI
             if (_autosaveButton != null) _autosaveButton.interactable = interactable;
             if (_trackerButton != null) _trackerButton.interactable = interactable;
             if (_motionButton  != null) _motionButton.interactable  = interactable;
+            if (_languageButton != null) _languageButton.interactable = interactable;
             if (_resetButton != null) _resetButton.interactable = interactable;
         }
 

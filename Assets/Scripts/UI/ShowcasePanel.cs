@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 
 namespace PetShop.UI
@@ -36,14 +37,24 @@ namespace PetShop.UI
             var panel = UIFactory.ModalPanel("Showcase", _root.transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), UIFactory.PanelBg,
                 new Vector2(-400f, -260f), new Vector2(400f, 260f));
-            UIFactory.Header(panel.transform, "Pet show", new Vector2(0.03f, 0.89f), new Vector2(0.5f, 0.97f));
-            UIFactory.Button("Close", panel.transform, "Close",
+            UIFactory.Localize(UIFactory.Header(panel.transform, "", new Vector2(0.03f, 0.89f), new Vector2(0.5f, 0.97f)),
+                "showcase.title");
+            UIFactory.ButtonKey("Close", panel.transform, "common.close",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f).onClick.AddListener(Hide);
-            _withdraw = UIFactory.Button("Withdraw", panel.transform, "Withdraw",
+            _withdraw = UIFactory.ButtonKey("Withdraw", panel.transform, "showcase.withdraw",
                 new Vector2(0.55f, 0.895f), new Vector2(0.75f, 0.965f), 15f);
             _withdraw.onClick.AddListener(Withdraw);
             BuildBody(panel.transform);
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rebuilds the text in the new language while the panel is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Refresh();
         }
 
         private void BuildBody(Transform panel)
@@ -81,7 +92,7 @@ namespace PetShop.UI
         private void Enter(Pet pet, ShowTheme theme)
         {
             if (!_game.Show.Enter(pet, _game.Shop, theme))
-                _game.Notify($"Cannot enter the show (fee €{PetShow.EntryFee:N0}).");
+                _game.Notify(Loc.F("showcase.cannot_enter", PetShow.EntryFee));
             Refresh();
         }
 
@@ -104,14 +115,11 @@ namespace PetShop.UI
         private string InfoText(int today, int day, ShowTheme theme, List<Pet> pets)
         {
             int left = PetShow.DaysUntilShow(today);
-            string when = left == 0 ? "tonight" : $"in {left} day(s)";
+            string when = left == 0 ? Loc.T("showcase.tonight") : Loc.Plural("showcase.in_days", left);
             var entry = pets.Find(p => p != null && p.id == _game.Show.EntryPetId);
-            string mine = entry != null ? $"<color=#73DB95>{entry.DisplayName()}</color>" : "none";
-            return $"Next show: day {day} ({when})\n" +
-                   $"Judges want: <b>{theme.species}</b> with a <b>{theme.coatName}</b> coat\n" +
-                   $"Entry fee: €{PetShow.EntryFee:N0} (not refunded if you withdraw)\n" +
-                   $"Your entry: {mine}\n" +
-                   "The theme species is drawn from the pets you own at closing time.";
+            string mine = entry != null ? $"<color=#73DB95>{entry.DisplayName()}</color>" : Loc.T("showcase.none");
+            return Loc.F("showcase.info", day, when, LocNames.Species(theme.species),
+                         CoatColours.DisplayName(theme.coatName), PetShow.EntryFee, mine);
         }
 
         private void DrawRows(int day, ShowTheme theme, List<Pet> pets)
@@ -119,7 +127,7 @@ namespace PetShop.UI
             var eligible = pets.FindAll(p => p != null && p.IsAdult && p.species == theme.species);
             if (eligible.Count == 0)
             {
-                AddRow(UIFactory.Label("None", _list, $"No adult {theme.species} to enter.",
+                AddRow(UIFactory.Label("None", _list, Loc.F("showcase.no_adults", LocNames.Species(theme.species)),
                     Vector2.zero, new Vector2(1f, 0.12f), 15f, UIFactory.InkMuted).gameObject);
                 return;
             }
@@ -133,9 +141,10 @@ namespace PetShop.UI
             float top = 1f - i * h, bottom = top - h * 0.88f;
             var r = _game.Show.Judge(day, pet, theme);
             AddRow(UIFactory.Label($"Pet_{i}", _list,
-                $"{pet.DisplayName()}  ·  {pet.rarity}  ·  {pet.CoatName}  ·  est. #{r.placement}, prize €{r.prize:N0}",
+                $"{pet.DisplayName()}  ·  {LocNames.Rarity(pet.rarity)}  ·  {pet.CoatDisplayName}  ·  " +
+                Loc.F("showcase.estimate", r.placement, r.prize),
                 new Vector2(0f, bottom), new Vector2(0.78f, top), 14f).gameObject);
-            var btn = UIFactory.Button($"Enter_{i}", _list, "Enter",
+            var btn = UIFactory.Button($"Enter_{i}", _list, Loc.T("showcase.enter"),
                 new Vector2(0.80f, bottom), new Vector2(1f, top), 14f, UIFactory.ButtonOn);
             btn.interactable = _game.Show.EntryPetId == null;
             Pet captured = pet;
@@ -148,9 +157,9 @@ namespace PetShop.UI
         private string LastText()
         {
             var r = _game.Show.LastResult;
-            if (!r.HasValue) return "Last show: no result yet.";
-            if (r.Value.disqualified) return "Last show: disqualified.";
-            return $"Last show: placed #{r.Value.placement}, prize €{r.Value.prize:N0}.";
+            if (!r.HasValue) return Loc.T("showcase.last.none");
+            if (r.Value.disqualified) return Loc.T("showcase.last.disqualified");
+            return Loc.F("showcase.last.placed", r.Value.placement, r.Value.prize);
         }
     }
 }

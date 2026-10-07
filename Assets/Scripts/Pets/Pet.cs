@@ -1,4 +1,5 @@
 using UnityEngine;
+using PetShop.Localization;
 
 namespace PetShop.Pets
 {
@@ -71,25 +72,28 @@ namespace PetShop.Pets
             return Mathf.Round(basePrice * m * 100f) / 100f;
         }
 
-        /// <summary>Short word for the pen panel: how this animal is doing.</summary>
-        public string Condition =>
-            health > 0.85f && happiness > 0.7f ? "thriving"
-          : health > 0.6f                      ? "well"
-          : health > 0.35f                     ? "poorly"
-          :                                      "suffering";
+        /// <summary>Short word for the pen panel: how this animal is doing (current language).</summary>
+        public string Condition => Loc.T(
+            health > 0.85f && happiness > 0.7f ? "pet.condition.thriving"
+          : health > 0.6f                      ? "pet.condition.well"
+          : health > 0.35f                     ? "pet.condition.poorly"
+          :                                      "pet.condition.suffering");
 
-        /// <summary>Human-readable name of the coat colour.</summary>
+        /// <summary>English name of the coat colour: an identifier for comparisons and saves.</summary>
         public string CoatName => CoatColours.Classify(coat);
+
+        /// <summary>The coat colour's name in the current language; display only.</summary>
+        public string CoatDisplayName => CoatColours.DisplayName(CoatName);
 
         public bool NeedsAttention => hunger > 0.55f || health < 0.6f;
 
         public string DisplayName()
         {
-            string r = rarity.ToString().ToUpper();
-            string g = growthStage.ToString();
-            string s = SpeciesLabel(species);
+            string r = LocNames.Rarity(rarity).ToUpperInvariant();
+            string g = LocNames.Of("growth", growthStage);
+            string s = LocNames.Species(species);
             string n = petName.Length > 0 ? $" ({petName})" : "";
-            return $"[{r}] {g} {s}{n}";
+            return Loc.F("pet.display_name", r, g, s, n);
         }
 
         // ── Aging ────────────────────────────────────────────────────

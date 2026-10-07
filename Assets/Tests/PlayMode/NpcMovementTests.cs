@@ -138,7 +138,10 @@ namespace PetShop.Tests
         /// <summary>Checkouts further than this (metres, XZ) from the till count as stranded.</summary>
         public const float TillReach = 3f;
 
-        private const float StuckWindow    = 6f;
+        // A brief crowd jam (several shoppers converging on one spot, all with valid paths) is cleared by the
+        // game's own walk timeout. Only a shopper still frozen after that limit has really been abandoned,
+        // so the window sits just past it instead of flagging transient congestion (was 6 s, which flaked).
+        private const float StuckWindow    = CustomerAI.MinWalkTimeoutSeconds + 5f;
         private const float StuckMinMove   = 0.1f;
         private const float StuckSlack     = 0.2f;
         private const float OffMeshRadius  = 0.5f;

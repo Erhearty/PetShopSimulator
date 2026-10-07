@@ -1,4 +1,5 @@
 using UnityEngine;
+using PetShop.Localization;
 
 namespace PetShop.Shop
 {
@@ -10,7 +11,7 @@ namespace PetShop.Shop
     public partial class BuildMode
     {
         /// <summary>Notice shown when a counter is aimed where its cashier would have no room behind it.</summary>
-        public const string CounterNoRoomNotice = "Leave room behind the counter for the cashier";
+        public static string CounterNoRoomNotice => Loc.T("build.counter_no_room");
 
         /// <summary>
         /// True when <paramref name="def"/> is a counter rooted at <paramref name="cell"/> with footprint

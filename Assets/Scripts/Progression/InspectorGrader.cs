@@ -1,3 +1,5 @@
+using PetShop.Localization;
+
 namespace PetShop.Progression
 {
     /// <summary>The inspector's verdict and its reputation and cash consequences.</summary>
@@ -91,7 +93,7 @@ namespace PetShop.Progression
             Grade           = grade,
             ReputationDelta = reputation,
             CashDelta       = cash,
-            Summary         = $"Inspector's visit: grade {grade} — reputation {reputation:+0;-0}, cash {CashText(cash)}",
+            Summary         = Loc.F("inspection.summary", grade, reputation, CashText(cash)),
         };
 
         private static string CashText(float delta) =>

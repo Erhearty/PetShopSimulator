@@ -104,20 +104,17 @@ namespace PetShop.Commerce
 
         /// <summary>Plain-language skill level, for cards and the payroll.</summary>
         public static string SkillWordFor(int skill) =>
-            SkillWords[Mathf.Clamp(skill, MinSkill, MaxSkill) - MinSkill];
-
-        /// <summary>Display word per skill level, indexed from <see cref="MinSkill"/>.</summary>
-        private static readonly string[] SkillWords = { "green", "learning", "capable", "skilled", "expert" };
+            Localization.Loc.T($"staff.skill.{Mathf.Clamp(skill, MinSkill, MaxSkill)}");
 
         /// <summary>Plain-language skill level of this applicant.</summary>
         public string SkillWord => SkillWordFor(Skill);
 
         /// <summary>Plain-language speed, so the player need not reason about seconds.</summary>
         public string SpeedWord =>
-            ServiceSeconds <= 3.0f ? "very quick"
-          : ServiceSeconds <= 4.0f ? "quick"
-          : ServiceSeconds <= 5.2f ? "steady"
-          :                          "slow";
+            Localization.Loc.T(ServiceSeconds <= 3.0f ? "staff.speed.very_quick"
+                             : ServiceSeconds <= 4.0f ? "staff.speed.quick"
+                             : ServiceSeconds <= 5.2f ? "staff.speed.steady"
+                             :                          "staff.speed.slow");
 
         /// <summary>
         /// Customers served per minute of *game* time. A trading day is compressed into a few

@@ -1,6 +1,7 @@
 using System.Text;
 using UnityEngine;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 
 namespace PetShop.UI
@@ -19,17 +20,17 @@ namespace PetShop.UI
 
         private void BuildAnimalsPage()
         {
-            _animals = AddPage("Animals", "Your pens, how the animals are cared for, and breeding.", UIFactory.TextSmall);
+            _animals = AddPage("Animals", UIFactory.TextSmall);
             var page = _animals.Root.transform;
-            AddLink(page, 0, "Plan tonight's breeding", true, () => HandOff(() => GetComponent<BreedingPanel>()?.Show()));
-            AddLink(page, 1, "Family tree", false, OpenFamilyTree);
-            AddLink(page, 2, "Showcase", false, () => HandOff(() => GetComponent<ShowcasePanel>()?.Show()));
+            AddLink(page, 0, "Plan tonight's breeding", "animals.link.breeding", true, () => HandOff(() => GetComponent<BreedingPanel>()?.Show()));
+            AddLink(page, 1, "Family tree", "animals.link.family_tree", false, OpenFamilyTree);
+            AddLink(page, 2, "Showcase", "animals.link.showcase", false, () => HandOff(() => GetComponent<ShowcasePanel>()?.Show()));
         }
 
-        private void AddLink(Transform page, int slot, string text, bool primary, UnityEngine.Events.UnityAction onClick)
+        private void AddLink(Transform page, int slot, string id, string key, bool primary, UnityEngine.Events.UnityAction onClick)
         {
             float x = slot * LinkStep;
-            var btn = UIFactory.Button($"Link_{text}", page, text, new Vector2(x, LinkRowBottom),
+            var btn = UIFactory.ButtonKey($"Link_{id}", page, key, new Vector2(x, LinkRowBottom),
                 new Vector2(x + LinkWidth, LinkRowTop), UIFactory.TextSmall,
                 primary ? UIFactory.Accent : UIFactory.Raised);
             btn.onClick.AddListener(onClick);
@@ -45,7 +46,7 @@ namespace PetShop.UI
                         HandOff(() => GetComponent<FamilyTreePanel>()?.Show(pet));
                         return;
                     }
-            _game.Notify("No animals yet — buy one at a pen first.");
+            _game.Notify(Loc.T("animals.no_animals"));
         }
 
         private static string PenRow(string a, string b, string c, string d, string e) =>
@@ -54,35 +55,36 @@ namespace PetShop.UI
         private void RefreshAnimals()
         {
             var sb = new StringBuilder();
-            if (_game.Pens.Count == 0) sb.AppendLine("No pens yet. Order one on the Build page.");
+            if (_game.Pens.Count == 0) sb.AppendLine(Loc.T("animals.no_pens"));
             else
             {
-                sb.AppendLine(UIFactory.Tint(PenRow("Pen", "Animals", "Feed", "Bedding", "Note"), UIFactory.InkMuted));
+                sb.AppendLine(UIFactory.Tint(PenRow(Loc.T("animals.col.pen"), Loc.T("animals.col.animals"),
+                    Loc.T("animals.col.feed"), Loc.T("animals.col.bedding"), Loc.T("animals.col.note")), UIFactory.InkMuted));
                 foreach (var pen in _game.Pens)
                     if (pen != null) sb.AppendLine(PenLine(pen));
             }
             sb.AppendLine();
-            sb.AppendLine(UIFactory.Tint("New animals cost", UIFactory.InkMuted));
+            sb.AppendLine(UIFactory.Tint(Loc.T("animals.prices"), UIFactory.InkMuted));
             foreach (Pet.Species species in System.Enum.GetValues(typeof(Pet.Species)))
-                sb.Append($"{species} € {Pet.WholesalePrice(species):N0}    ");
+                sb.Append($"{LocNames.Species(species)} € {Pet.WholesalePrice(species):N0}    ");
             _animals.Body.text = sb.ToString();
         }
 
         private string PenLine(PetPen pen)
         {
             string care = UIFactory.Tint($"{pen.FoodLevel * 100f:0}%", pen.NeedsFeeding ? UIFactory.Destructive : UIFactory.Ink);
-            return PenRow(pen.PenSpecies.ToString(), $"{pen.Count}/{pen.Capacity}", care,
+            return PenRow(LocNames.Species(pen.PenSpecies), $"{pen.Count}/{pen.Capacity}", care,
                           $"{pen.Cleanliness * 100f:0}%", PenNote(pen));
         }
 
         private static string PenNote(PetPen pen)
         {
             string key = InputBindings.Label(GameAction.Interact);
-            if (pen.Count == 0) return UIFactory.Tint($"Empty — press {key} at the pen to buy one", UIFactory.Warning);
-            if (pen.NeedsService) return UIFactory.Tint($"Needs care — {key} at the pen, € {pen.ServiceCost:N2}", UIFactory.Destructive);
-            if (pen.AdultCount >= AdultsToBreed && pen.HasSpace) return UIFactory.Tint("May breed tonight", UIFactory.Positive);
-            if (pen.AdultCount < AdultsToBreed) return UIFactory.Tint("Needs two adults to breed", UIFactory.InkMuted);
-            return UIFactory.Tint("Full — no room for young", UIFactory.InkMuted);
+            if (pen.Count == 0) return UIFactory.Tint(Loc.F("animals.note.empty", key), UIFactory.Warning);
+            if (pen.NeedsService) return UIFactory.Tint(Loc.F("animals.note.needs_care", key, pen.ServiceCost), UIFactory.Destructive);
+            if (pen.AdultCount >= AdultsToBreed && pen.HasSpace) return UIFactory.Tint(Loc.T("animals.note.may_breed"), UIFactory.Positive);
+            if (pen.AdultCount < AdultsToBreed) return UIFactory.Tint(Loc.T("animals.note.needs_adults"), UIFactory.InkMuted);
+            return UIFactory.Tint(Loc.T("animals.note.full"), UIFactory.InkMuted);
         }
     }
 }

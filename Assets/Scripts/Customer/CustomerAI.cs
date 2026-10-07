@@ -172,11 +172,13 @@ namespace PetShop.Customer
         /// </summary>
         private void BuildBubble()
         {
-            string want = WantsPet ? "wants a pet" : PreferredCategory.ToString().ToLowerInvariant();
+            string want = WantsPet ? Localization.Loc.T("customer.wants_pet") : Localization.LocNames.Category(PreferredCategory);
             Color colour = WantsPet ? new Color(0.98f, 0.78f, 0.38f) : UIFactory.Ink;
 
             _bubble = WorldLabel.Create(transform, new Vector3(0f, 2.15f, 0f),
-                                        $"<size=80%><b>{Profile.Label}</b>: {want}</size>", 0.085f, colour, width: 1.4f);
+                                        Localization.Loc.F("customer.bubble",
+                                            Localization.LocNames.Of("customer.type", Profile.Archetype), want),
+                                        0.085f, colour, width: 1.4f);
             _bubble.MaxVisibleDistance = 22f;
         }
 
@@ -264,7 +266,7 @@ namespace PetShop.Customer
             }
 
             Queue.Join(this, Profile.PatienceMultiplier);
-            SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
+            SetBubble(Localization.Loc.T("customer.waiting_to_pay"), new Color(0.98f, 0.82f, 0.4f));
             // People standing in line hold their ground; shoppers walking past steer round them.
             _walkingPriority = _agent.avoidancePriority;
             _agent.avoidancePriority = QueueAvoidancePriority;
@@ -309,10 +311,11 @@ namespace PetShop.Customer
             {
                 // Abandon the basket: stock is lost from the shelf either way, and the
                 // shop's standing takes a real hit.
-                ShopManager?.ChangeReputation(-3.5f);
-                GameManager.Instance?.Notify($"{name} gave up waiting and walked out.");
-                SetBubble("gave up!", UIFactory.Bad);
-                FloatingText.Spawn(transform.position + Vector3.up * 2.4f, "−3.5 rep", UIFactory.Bad, 0.26f);
+                ShopManager?.ChangeReputation(-GaveUpReputationLoss);
+                GameManager.Instance?.Notify(Localization.Loc.F("customer.gave_up_notice", name));
+                SetBubble(Localization.Loc.T("customer.gave_up"), UIFactory.Bad);
+                FloatingText.Spawn(transform.position + Vector3.up * 2.4f,
+                                   Localization.Loc.F("customer.rep_loss", GaveUpReputationLoss), UIFactory.Bad, 0.26f);
                 _basket.Clear();
                 GaveUp?.Invoke(this);
             }
@@ -320,6 +323,9 @@ namespace PetShop.Customer
 
         /// <summary>Avoidance priority while standing in line: lower numbers are given way to.</summary>
         private const int QueueAvoidancePriority = 10;
+
+        /// <summary>Reputation the shop loses when a shopper gives up and walks out.</summary>
+        private const float GaveUpReputationLoss = 3.5f;
 
         /// <summary>
         /// Avoidance priority from leaving the line until stepped aside off it: below
@@ -373,17 +379,76 @@ namespace PetShop.Customer
             // The limit is sized from the planned path once it is ready (see WalkTimeout).
             float elapsed = 0f, limit = MinWalkTimeoutSeconds;
             bool  sized   = false;
-            while (elapsed < limit)
-            {
-                elapsed += Time.deltaTime;
-                if (_agent.pathPending) { yield return null; continue; }
-                if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
-                if (!sized) { sized = true; limit = WalkTimeout(_agent.remainingDistance, _agent.speed); }
-                if (_agent.remainingDistance <= _agent.stoppingDistance) { _lastWalkArrived = true; yield break; }
-                yield return null;
-            }
 
-            ReportNavTimeout(target, leg);
+            // Stall detection: nudge a shopper that is stuck on a valid path (see CustomerAI.WalkTimeout.cs).
+            Vector3 stallRef = transform.position;
+            float   stallTime = 0f;
+            int     nudges = 0;
+            bool    priorityChanged = false;
+            int     originalPriority = _agent.avoidancePriority;
+            Vector3 originalTarget = target;
+            bool    arrived = false;
+            try
+            {
+                while (elapsed < limit)
+                {
+                    elapsed += Time.deltaTime;
+                    if (_agent.pathPending) { yield return null; continue; }
+                    if (_agent.pathStatus == NavMeshPathStatus.PathInvalid) yield break;
+                    if (!sized) { sized = true; limit = WalkTimeout(_agent.remainingDistance, _agent.speed); }
+                    if (_agent.remainingDistance <= _agent.stoppingDistance) { _lastWalkArrived = true; arrived = true; yield break; }
+
+                    if (nudges < MaxNudges && (State == CustomerState.Browsing || State == CustomerState.Entering)
+                        && _agent.remainingDistance > _agent.stoppingDistance + 0.2f)
+                    {
+                        Vector3 pos = transform.position;
+                        if ((pos - stallRef).sqrMagnitude >= StallMinMove * StallMinMove)
+                        {
+                            stallRef = pos;
+                            stallTime = 0f;
+                        }
+                        else
+                        {
+                            stallTime += Time.deltaTime;
+                            if (stallTime >= StallSeconds)
+                            {
+                                nudges++;
+                                stallTime = 0f;
+                                stallRef = pos;
+
+                                float angle = Random.Range(0f, Mathf.PI * 2f);
+                                float radius = Random.Range(1f, 2f);
+                                Vector3 ring = originalTarget + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                                if (NavMesh.SamplePosition(ring, out var nudgeHit, 4f, NavMesh.AllAreas))
+                                {
+                                    target = nudgeHit.position;
+                                    _agent.SetDestination(target);
+                                }
+
+                                if (!priorityChanged && (State == CustomerState.Browsing || State == CustomerState.Entering))
+                                {
+                                    priorityChanged = true;
+                                    originalPriority = _agent.avoidancePriority;
+                                    _agent.avoidancePriority = Random.Range(20, 40);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        stallRef = transform.position;
+                        stallTime = 0f;
+                    }
+                    yield return null;
+                }
+            }
+            finally
+            {
+                if (priorityChanged) _agent.avoidancePriority = originalPriority;
+            }
+            if (arrived) yield break;
+
+            ReportNavTimeout(originalTarget, leg);
 
             // Deliberately not setting isStopped here: toggling it between legs makes the
             // agent lurch. autoBraking already eases it into each stop.
@@ -437,13 +502,13 @@ namespace PetShop.Customer
             if (price <= BudgetCap)
             {
                 _basket.Add((product.id, product.displayName, price));
-                SetBubble($"got {product.displayName}", UIFactory.Good);
+                SetBubble(Localization.Loc.F("customer.got", product.LocalizedName), UIFactory.Good);
                 return;
             }
             // Too dear: put it back, and let the player see why.
             _missedTooExpensive = true;
             shelf.AddStock(product, 1);
-            SetBubble("too expensive", UIFactory.Bad);
+            SetBubble(Localization.Loc.T("customer.too_expensive"), UIFactory.Bad);
         }
 
         /// <summary>
@@ -463,7 +528,7 @@ namespace PetShop.Customer
                 {
                     float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice) : product.basePrice;
                     _basket.Add((product.id, product.displayName, price));
-                    SetBubble($"got {product.displayName}", UIFactory.Good);
+                    SetBubble(Localization.Loc.F("customer.got", product.LocalizedName), UIFactory.Good);
                     return;
                 }
             }
@@ -478,7 +543,7 @@ namespace PetShop.Customer
             float petPrice = ShopManager != null ? ShopManager.PriceOf(pet.SellPrice()) : pet.SellPrice();
             _basket.Add(($"pet_{pet.species}", pet.DisplayName(), petPrice));
             _boughtPet = true;
-            SetBubble($"buying a {pet.species}", UIFactory.Good);
+            SetBubble(Localization.Loc.F("customer.buying_pet", Localization.LocNames.Species(pet.species)), UIFactory.Good);
         }
 
         /// <summary>Adults only, filtered by the profile's rarity; price checked against PetBudget first.</summary>
@@ -497,13 +562,13 @@ namespace PetShop.Customer
             {
                 // Skip this pet but keep browsing: shelf items may still sell (as before archetypes).
                 _missedTooExpensive = true;
-                SetBubble($"{pet.species}? too pricey", UIFactory.Bad);
+                SetBubble(Localization.Loc.F("customer.pet_too_pricey", Localization.LocNames.Species(pet.species)), UIFactory.Bad);
                 return;
             }
             if (!pen.RemovePet(pet)) return;
             _basket.Add(($"pet_{pet.species}", pet.DisplayName(), price));
             _boughtPet = true;
-            SetBubble($"buying a {pet.species}", UIFactory.Good);
+            SetBubble(Localization.Loc.F("customer.buying_pet", Localization.LocNames.Species(pet.species)), UIFactory.Good);
         }
 
         /// <summary>Rep hits for an empty basket, or for never seeing an acceptable animal.</summary>
@@ -532,8 +597,8 @@ namespace PetShop.Customer
             if (_basket.Count >= 3) _visual?.PlayTrigger("happy_dance");
 
             // The "+€" float is FeedbackFX's, at the till; the customer only says thanks.
-            SetBubble("thanks!", UIFactory.Good);
-            GameManager.Instance?.Notify($"Sold {_basket.Count} item(s) for €{total:N2}");
+            SetBubble(Localization.Loc.T("customer.thanks"), UIFactory.Good);
+            GameManager.Instance?.Notify(Localization.Loc.Plural("customer.sold", _basket.Count, total));
             AudioManager.Instance?.PlaySfx("sale");
 
             DistanceToTillAtCheckout = HorizontalDistanceToTill();

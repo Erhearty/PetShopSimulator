@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using PetShop.Localization;
 
 namespace PetShop.Core
 {
@@ -188,17 +189,19 @@ namespace PetShop.Core
         /// <summary>Human-readable name of an action for the settings panel.</summary>
         public static string ActionName(GameAction action) => action switch
         {
-            GameAction.MoveForward => "Move forward",
-            GameAction.MoveBack    => "Move back",
-            GameAction.MoveLeft    => "Move left",
-            GameAction.MoveRight   => "Move right",
-            GameAction.EndDay      => "Close up for the day",
-            GameAction.QuickSave   => "Quick save",
-            GameAction.Ledger      => "Shop book",
-            GameAction.BuildMode   => "Build mode",
-            GameAction.BuildRotate => "Rotate (build)",
-            GameAction.BuildRemove => "Remove (build)",
-            GameAction.Guide       => "Guide",
+            GameAction.MoveForward => Loc.T("action.move_forward"),
+            GameAction.MoveBack    => Loc.T("action.move_back"),
+            GameAction.MoveLeft    => Loc.T("action.move_left"),
+            GameAction.MoveRight   => Loc.T("action.move_right"),
+            GameAction.Jump        => Loc.T("action.jump"),
+            GameAction.Interact    => Loc.T("action.interact"),
+            GameAction.EndDay      => Loc.T("action.end_day"),
+            GameAction.QuickSave   => Loc.T("action.quick_save"),
+            GameAction.Ledger      => Loc.T("action.ledger"),
+            GameAction.BuildMode   => Loc.T("action.build_mode"),
+            GameAction.BuildRotate => Loc.T("action.build_rotate"),
+            GameAction.BuildRemove => Loc.T("action.build_remove"),
+            GameAction.Guide       => Loc.T("action.guide"),
             _                      => action.ToString(),
         };
 

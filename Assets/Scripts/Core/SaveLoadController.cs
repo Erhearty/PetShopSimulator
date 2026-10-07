@@ -2,6 +2,7 @@ using UnityEngine;
 using PetShop.Shop;
 using PetShop.Commerce;
 using PetShop.Pets;
+using PetShop.Localization;
 
 namespace PetShop.Core
 {
@@ -37,9 +38,8 @@ namespace PetShop.Core
             _game.Furniture.Clear();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
             SeedRoomWallsOnce(false);
-            _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
-                         $"{InputBindings.Label(GameAction.Interact)} to interact, " +
-                         $"{InputBindings.Label(GameAction.EndDay)} to close up.");
+            _game.Notify(Loc.F("game.welcome", InputBindings.Label(GameAction.BuildMode),
+                               InputBindings.Label(GameAction.Interact), InputBindings.Label(GameAction.EndDay)));
         }
 
         /// <summary>
@@ -65,10 +65,10 @@ namespace PetShop.Core
         {
             if (SaveSystem.Save(BuildSaveData()))
             {
-                _game.Notify(quiet ? "Autosaved." : "Game saved.");
+                _game.Notify(Loc.T(quiet ? "save.autosaved" : "save.saved"));
                 return true;
             }
-            _game.Notify("Save FAILED — progress not written. Check disk space/permissions.");
+            _game.Notify(Loc.T("save.failed"));
             return false;
         }
 
@@ -192,7 +192,7 @@ namespace PetShop.Core
             _game.RestoreStaff(data);
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);
 
-            _game.Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");
+            _game.Notify(Loc.F("save.loaded", data.Day, data.Balance));
             if (migration.HasChanges) _game.Notify(migration.Notice());
             if (migration.RefundedPets.Count > 0) _game.Notify(migration.RefundNotice());
         }

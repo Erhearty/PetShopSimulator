@@ -16,6 +16,15 @@ namespace PetShop.Customer
         /// <summary>Longest walk limit in game seconds, so a genuinely stuck shopper is still freed.</summary>
         public const float MaxWalkTimeoutSeconds = 90f;
 
+        /// <summary>Seconds without real progress on a valid path before a shopper is nudged.</summary>
+        public const float StallSeconds = 2f;
+
+        /// <summary>Metres a shopper must move within <see cref="StallSeconds"/> to not count as stalled.</summary>
+        public const float StallMinMove = 0.1f;
+
+        /// <summary>Most re-targets per walk; after that the normal timeout applies.</summary>
+        public const int MaxNudges = 3;
+
         /// <summary>
         /// Multiplier on the ideal path time covering acceleration, braking, corners and steering round
         /// other shoppers.

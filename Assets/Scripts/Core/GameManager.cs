@@ -297,8 +297,8 @@ namespace PetShop.Core
             Events?.BeginDay(Shop.Day);
             Spawner?.StartDay();
             OnDayStarted.Invoke(Shop.Day);
-            Notify($"Day {Shop.Day} — open. Tonight: rent €{Shop.DailyRent:N0}" +
-                   (Shop.DailyWages > 0f ? $" + wages €{Shop.DailyWages:N0}" : ""));
+            Notify(PetShop.Localization.Loc.F("day.open", Shop.Day, Shop.DailyRent) +
+                   (Shop.DailyWages > 0f ? PetShop.Localization.Loc.F("day.open_wages", Shop.DailyWages) : ""));
             Audio?.PlaySfx("day_start");
         }
 
@@ -313,7 +313,7 @@ namespace PetShop.Core
             _endingDay  = true;
             IsDayRunning = false;
 
-            Notify("Closing up for the night...");
+            Notify(PetShop.Localization.Loc.T("day.closing"));
             Spawner?.EndDay();
             yield return new WaitForSeconds(0.6f);
 
@@ -415,7 +415,7 @@ namespace PetShop.Core
         public void AdjustPrices(float delta)
         {
             Shop.SetPriceMultiplier(Shop.PriceMultiplier + delta);
-            Notify($"Prices now {Shop.PriceMultiplier * 100f:0}% of list — demand {Shop.DemandFactor * 100f:0}%.");
+            Notify(PetShop.Localization.Loc.F("prices.now", Shop.PriceMultiplier * 100f, Shop.DemandFactor * 100f));
         }
 
         /// <summary>Pens that want feeding or mucking out.</summary>

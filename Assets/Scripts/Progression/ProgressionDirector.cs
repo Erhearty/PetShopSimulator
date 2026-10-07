@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 using PetShop.Shop;
 
@@ -82,7 +83,7 @@ namespace PetShop.Progression
             if (Shop == null || !_rules.TryAdvance(Shop.Reputation, out int newTier)) return;
 
             ApplyLotStage();
-            string headline = $"Milestone: {ProgressionRules.TierName(newTier)} — {UnlockText(newTier)}";
+            string headline = Loc.F("milestone.headline", ProgressionRules.TierName(newTier), UnlockText(newTier));
             Debug.Log($"[Progression] {headline}");
             _latestMilestones.Add(headline);
             _game.Notify(headline);
@@ -164,9 +165,9 @@ namespace PetShop.Progression
 
         private static string UnlockText(int tier)
         {
-            if (tier >= ProgressionRules.TigerTier)          return "tiger pens and the whole yard are unlocked!";
-            if (tier >= ProgressionRules.HorseTier)          return "horse pens are now available (Q in build mode)!";
-            return "the back of the lot is yours to build on!";
+            if (tier >= ProgressionRules.TigerTier)          return Loc.T("milestone.unlock.tigers");
+            if (tier >= ProgressionRules.HorseTier)          return Loc.F("milestone.unlock.horses", BuildMode.PenVariantKeyLabel);
+            return Loc.T("milestone.unlock.back_strip");
         }
     }
 }

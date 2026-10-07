@@ -154,6 +154,28 @@ namespace PetShop.Shop
         public Color         Tint = Color.white;
         /// <summary>Kept loadable for old saves but left out of catalogue listings.</summary>
         public bool          Hidden;
+        /// <summary>Species of a per-species pen, named in its localized title; null for everything else.</summary>
+        [System.NonSerialized] public PetShop.Pets.Pet.Species? PenSpecies;
+
+        /// <summary>
+        /// <see cref="DisplayName"/> in the current language, for display only — ids, saves and
+        /// ledger comparisons keep the English <see cref="DisplayName"/>.
+        /// </summary>
+        public string LocalizedName =>
+            PenSpecies.HasValue
+                ? PetShop.Localization.Loc.F("furniture.species_pen.name", PetShop.Localization.Loc.T(SpeciesKey))
+                : LocalizedOr("furniture." + Id + ".name", DisplayName);
+
+        /// <summary><see cref="Description"/> in the current language.</summary>
+        public string LocalizedDescription =>
+            PenSpecies.HasValue
+                ? PetShop.Localization.Loc.F("furniture.species_pen.desc", PetShop.Localization.Loc.T(SpeciesKey))
+                : LocalizedOr("furniture." + Id + ".desc", Description);
+
+        private string SpeciesKey => "species." + PenSpecies.Value.ToString().ToLowerInvariant();
+
+        private static string LocalizedOr(string key, string fallback) =>
+            PetShop.Localization.Loc.Has(key) ? PetShop.Localization.Loc.T(key) : fallback;
     }
 
     public class GridEntry

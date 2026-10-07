@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.UI;
 
 namespace PetShop.Pets
@@ -168,17 +169,18 @@ namespace PetShop.Pets
 
         public string Describe()
         {
-            if (_residents.Count == 0) return $"{PenSpecies} pen — empty";
+            string species = LocNames.Species(PenSpecies);
+            if (_residents.Count == 0) return Loc.F("pen.describe.empty", species);
 
-            var sb = new System.Text.StringBuilder($"{PenSpecies} pen  ({_residents.Count}/{Capacity})\n");
-            sb.AppendLine($"  Feed {FoodLevel * 100f:0}%   ·   Bedding {Cleanliness * 100f:0}%" +
-                          (NeedsService ? $"   ·   servicing costs €{ServiceCost:N2}" : ""));
+            var sb = new System.Text.StringBuilder(Loc.F("pen.describe.header", species, _residents.Count, Capacity) + "\n");
+            sb.AppendLine(Loc.F("pen.describe.upkeep", FoodLevel * 100f, Cleanliness * 100f) +
+                          (NeedsService ? Loc.F("pen.describe.service", ServiceCost) : ""));
             sb.AppendLine();
             foreach (var p in _residents)
-                sb.AppendLine($"  {p.DisplayName(),-34}{p.Condition,-11}€{p.SellPrice():0.00}");
-            if (AdultCount >= 2 && HasSpace)      sb.AppendLine("  Two adults — they may breed tonight.");
-            else if (AdultCount < 2 && HasSpace)   sb.AppendLine("  Needs two adults to breed.");
-            if (!HasSpace)                         sb.AppendLine("  Pen is full.");
+                sb.AppendLine(Loc.F("pen.describe.row", p.DisplayName(), p.Condition, p.SellPrice()));
+            if (AdultCount >= 2 && HasSpace)      sb.AppendLine(Loc.T("pen.describe.may_breed"));
+            else if (AdultCount < 2 && HasSpace)   sb.AppendLine(Loc.T("pen.describe.needs_adults"));
+            if (!HasSpace)                         sb.AppendLine(Loc.T("pen.describe.full"));
             return sb.ToString().TrimEnd();
         }
 
@@ -189,6 +191,16 @@ namespace PetShop.Pets
             BuildPenSign();
             RefreshDecor();
             RefreshLabel();
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Re-reads the gate sign and the stall name plaques in the new language.</summary>
+        private void OnLanguageChanged()
+        {
+            RefreshLabel();
+            RefreshStalls();
         }
 
         /// <summary>
@@ -270,7 +282,7 @@ namespace PetShop.Pets
 
             if (_residents.Count == 0)
             {
-                _signLabel.SetText($"{PenSpecies} pen\n<size=75%>empty</size>");
+                _signLabel.SetText(Loc.F("pen.sign.empty", LocNames.Species(PenSpecies)));
                 _signLabel.SetColour(UIFactory.InkMuted);
                 return;
             }
@@ -282,9 +294,9 @@ namespace PetShop.Pets
             var shop  = GameManager.Instance != null ? GameManager.Instance.Shop : null;
             float ask = shop != null ? shop.PriceOf(best.SellPrice()) : best.SellPrice();
 
-            string plan = HasValidPlan ? "  ·  paired tonight" : string.Empty;
-            _signLabel.SetText($"{PenSpecies}   € {ask:0.00}\n" +
-                               $"<size=75%>{_residents.Count} / {Capacity}  ·  {best.rarity}{plan}</size>");
+            string plan = HasValidPlan ? Loc.T("pen.sign.paired") : string.Empty;
+            _signLabel.SetText(Loc.F("pen.sign.stocked", LocNames.Species(PenSpecies), ask,
+                                     _residents.Count, Capacity, LocNames.Rarity(best.rarity), plan));
             _signLabel.SetColour(RarityColour(best.rarity));
         }
 

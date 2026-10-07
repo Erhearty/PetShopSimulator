@@ -12,7 +12,7 @@ namespace PetShop.Shop
     public partial class BuildMode
     {
         /// <summary>Shown when the Remove tool is picked.</summary>
-        public const string RemoveToolNotice = "Remove tool — click a piece to take it away. Esc to stop.";
+        public static string RemoveToolNotice => PetShop.Localization.Loc.F("build.remove_tool", "Esc");
 
         /// <summary>
         /// The top-down build view. While it shows, RMB is the camera's and does not cancel the

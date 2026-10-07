@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Pets;
 using PetShop.Shop;
 
@@ -106,7 +107,7 @@ namespace PetShop.Progression.Quests
         private void Reward(QuestDefinition quest)
         {
             if (quest.Reward > 0f) _game.Shop.ChangeBalance(quest.Reward, RewardReason);
-            string headline = $"Quest complete: {quest.Title} — +€{quest.Reward:N0}";
+            string headline = Loc.F("quest.complete", quest.LocalizedTitle, quest.Reward);
             Debug.Log($"{LogTag} Completed '{quest.Id}' ({quest.Chapter}) — reward €{quest.Reward:N0}");
             _latestHeadlines.Add(headline);
             _game.Notify(headline);

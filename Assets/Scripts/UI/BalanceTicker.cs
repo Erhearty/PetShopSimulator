@@ -64,7 +64,7 @@ namespace PetShop.UI
             if (rounded != _lastShownRounded)
             {
                 _lastShownRounded = rounded;
-                _label.text = $"€ {_shown:N0}";
+                _label.text = "€ " + _shown.ToString("N0");
             }
             _label.color = Color.Lerp(_baseColour, UIFactory.Accent, _flash / FlashSeconds);
         }

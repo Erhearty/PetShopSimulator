@@ -54,10 +54,10 @@ namespace PetShop.Commerce
                                                   shop.DailyRent + shop.DailyWages).ToList();
             foreach (var (category, units) in orders)
                 if (_game.OrderStock(category, units))
-                    _game.Notify($"Auto-reorder: {units} {category} units ordered.");
+                    _game.Notify(Localization.Loc.F("autoreorder.ordered", units, Localization.LocNames.Category(category)));
             foreach (var category in _game.AutoReorder.LastSkipped)
                 if (_cantAffordNotified.Add(category))
-                    _game.Notify($"Auto-reorder: can't afford {category} without touching tonight's rent and wages.");
+                    _game.Notify(Localization.Loc.F("autoreorder.cant_afford", Localization.LocNames.Category(category)));
         }
 
         private int OnHand(ProductCategory c)

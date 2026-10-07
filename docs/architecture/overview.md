@@ -9,7 +9,7 @@
 
 Single-player, first-person 3D shop-management sim. The world (shop room and street) is authored in the editor in MainScene.unity; the one runtime-generated exception is the shop roof, which RoofBuilder builds as a collider-free mesh (Scenery layer) over the shell footprint and the cells under/enclosed by player-built walls, rebuilding whenever a wall is placed or removed. GameBootstrapper is the whole entry point: it builds the grid/shop/build/spawner/audio/manager systems (including the Roof) on top of the authored scene, assembles the player and UI, then hands control to GameManager for the day loop (customers, stocking, breeding, rent). No backend/server - everything runs client-side in one Unity process; all furniture placement funnels through BuildMode.Place() -> FurnitureFactory.Spawn() and audio is synthesised at startup (no sound files).
 
-**Tech:** Unity 6000.6.2f1, C#, Built-in Render Pipeline, UGUI (com.unity.ugui), AI Navigation / NavMesh (com.unity.ai.navigation), Unity Timeline, Unity Purchasing, Unity Test Framework, Localization (en, uk)
+**Tech:** Unity 6000.6.2f1, C#, Built-in Render Pipeline, UGUI (com.unity.ugui), AI Navigation / NavMesh (com.unity.ai.navigation), Unity Timeline, Unity Purchasing, Unity Test Framework, Localization (en, uk), Code-defined string tables (en/uk) + Loc lookup
 
 **Internal structure:**
 

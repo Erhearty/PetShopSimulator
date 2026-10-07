@@ -10,6 +10,14 @@ namespace PetShop.Tests
         private const float JustBelow = 0.01f;
         private const float MaxReputation = 100f;
 
+        private LocTestScope _loc;
+
+        [SetUp]
+        public void SetUp() => _loc = LocTestScope.Begin();
+
+        [TearDown]
+        public void TearDown() => _loc.End();
+
         [Test]
         public void TierForReputation_BelowFirstThreshold_IsZero()
         {

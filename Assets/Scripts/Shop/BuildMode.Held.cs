@@ -46,8 +46,8 @@ namespace PetShop.Shop
             {
                 if (!IsActive || CurrentItem == null) return string.Empty;
                 string key   = InputBindings.Label(GameAction.BuildRotate);
-                string wheel = IsHolding ? " / wheel" : string.Empty;
-                return $"{_rotation:0}° — {key} / Shift+{key}{wheel} to rotate";
+                string wheel = IsHolding ? PetShop.Localization.Loc.T("build.rotate_wheel") : string.Empty;
+                return PetShop.Localization.Loc.F("build.rotate", _rotation, key, wheel);
             }
         }
 

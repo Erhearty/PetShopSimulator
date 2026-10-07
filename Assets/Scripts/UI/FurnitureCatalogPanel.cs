@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 using PetShop.Progression;
 
@@ -101,11 +102,13 @@ namespace PetShop.UI
             BuildRows(page);
             BuildFooter(page);
             if (Supply != null) Supply.OnChanged += RefreshIfOpen;
+            Loc.LanguageChanged += RefreshIfOpen;
         }
 
         private void OnDestroy()
         {
             if (Supply != null) Supply.OnChanged -= RefreshIfOpen;
+            Loc.LanguageChanged -= RefreshIfOpen;
         }
 
         // ── Open / close ────────────────────────────────────────────────────────
@@ -164,13 +167,13 @@ namespace PetShop.UI
             if (def == null || _game == null) return false;
             if (!ProgressionRules.IsPenUnlocked(def.Id, Tier))
             {
-                SetStatus($"{def.DisplayName} {LockedText(def)}.", false);
+                SetStatus($"{def.LocalizedName} {LockedText(def)}.", false);
                 return false;
             }
             if (BuildCatalog.IsBuildingPiece(def.Id)) return StartBuilding(def);
 
             bool ok = _game.OrderFurniture(catalogId);
-            SetStatus(ok ? $"Ordered a {def.DisplayName} — it arrives on the forecourt later today."
+            SetStatus(ok ? Loc.F("catalog.ordered", def.LocalizedName)
                          : OrderFailure(def), ok);
             Refresh();
             return ok;
@@ -194,14 +197,14 @@ namespace PetShop.UI
         {
             int tier = ProgressionRules.CornerShopTier;
             while (tier < ProgressionRules.MaxTier && !ProgressionRules.IsPenUnlocked(def.Id, tier)) tier++;
-            return $"unlocks at {ProgressionRules.TierName(tier)}";
+            return Loc.F("catalog.unlocks_at", ProgressionRules.TierName(tier));
         }
 
         /// <summary>Why ordering <paramref name="def"/> failed: no shop to pay, or not enough money.</summary>
         private string OrderFailure(PlacedObjectData def) =>
             _game.Shop == null
-                ? $"Cannot order a {def.DisplayName} — there is no shop to pay for it."
-                : $"Not enough money for a {def.DisplayName} (€ {def.Cost:N0}).";
+                ? Loc.F("catalog.no_shop", def.LocalizedName)
+                : Loc.F("catalog.no_money", def.LocalizedName, def.Cost);
 
         /// <summary>
         /// Closes the panel and takes one owned <paramref name="catalogId"/> into the hand for
@@ -214,7 +217,7 @@ namespace PetShop.UI
             if (def == null || _build == null || Supply == null) return false;
             if (Supply.OwnedCount(catalogId) <= 0)
             {
-                SetStatus($"You have no {def.DisplayName} — order one first.", false);
+                SetStatus(Loc.F("catalog.none_owned", def.LocalizedName), false);
                 return false;
             }
 
@@ -225,7 +228,7 @@ namespace PetShop.UI
                 return true;
             }
             Show();
-            SetStatus($"Could not pick up the {def.DisplayName}.", false);
+            SetStatus(Loc.F("catalog.pickup_failed", def.LocalizedName), false);
             return false;
         }
 
@@ -270,10 +273,10 @@ namespace PetShop.UI
             for (int i = 0; i < _tabButtons.Count; i++)
                 UIFactory.SetSelected(_tabButtons[i], Tabs[i] == Tab);
 
-            _pageLabel.text  = $"Page {Page + 1} / {PageCount}";
+            _pageLabel.text  = Loc.F("catalog.page", Page + 1, PageCount);
             _prev.interactable = Page > 0;
             _next.interactable = Page < PageCount - 1;
-            _balance.text = _game != null && _game.Shop != null ? $"Balance € {_game.Shop.Balance:N0}" : string.Empty;
+            _balance.text = _game != null && _game.Shop != null ? Loc.F("catalog.balance", _game.Shop.Balance) : string.Empty;
         }
 
         private void FillRow(Row row, PlacedObjectData def)
@@ -284,13 +287,13 @@ namespace PetShop.UI
 
             int  owned    = Supply != null ? Supply.OwnedCount(def.Id) : 0;
             bool unlocked = ProgressionRules.IsPenUnlocked(def.Id, Tier);
-            row.Name.text        = unlocked ? def.DisplayName : $"{def.DisplayName} — {LockedText(def)}";
+            row.Name.text        = unlocked ? def.LocalizedName : $"{def.LocalizedName} — {LockedText(def)}";
             row.Name.color       = unlocked ? UIFactory.Ink : UIFactory.InkMuted;
             row.Order.interactable = unlocked;
-            row.Description.text = def.Description;
+            row.Description.text = def.LocalizedDescription;
             row.Cost.text        = $"€ {def.Cost:N0}";
             row.Cost.color       = CanAfford(def) ? UIFactory.Ink : UIFactory.Bad;
-            row.Counts.text      = $"owned {owned}\non order {PendingCount(def.Id)}";
+            row.Counts.text      = Loc.F("catalog.counts", owned, PendingCount(def.Id));
             row.Place.interactable = owned > 0;
         }
 

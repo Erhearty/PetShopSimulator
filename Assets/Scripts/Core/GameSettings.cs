@@ -15,6 +15,12 @@ namespace PetShop.Core
         /// <summary>Persisted key for <see cref="ReduceMotion"/>.</summary>
         public const string ReduceMotionKey = "settings.reduceMotion";
 
+        /// <summary>Persisted key for <see cref="Language"/>.</summary>
+        public const string LanguageKey = "language";
+
+        private const string LanguageEn = "en";
+        private const string LanguageUk = "uk";
+
         private const bool   ReduceMotionDefault = false;
         private const bool   ShowQuestTrackerDefault = true;
         private const bool   AutosaveMorningDefault = true;
@@ -49,6 +55,16 @@ namespace PetShop.Core
         {
             get => ReadBool(ReduceMotionKey, ReduceMotionDefault);
             set => _store.Write(ReduceMotionKey, value ? TrueValue : FalseValue);
+        }
+
+        /// <summary>
+        /// The UI language code: "en" or "uk". Defaults to "en"; any other stored value reads as "en".
+        /// Use PetShop.Localization.Loc.SetLanguage to switch so open UI refreshes.
+        /// </summary>
+        public static string Language
+        {
+            get => _store.Read(LanguageKey) == LanguageUk ? LanguageUk : LanguageEn;
+            set => _store.Write(LanguageKey, value == LanguageUk ? LanguageUk : LanguageEn);
         }
 
         /// <summary>The stored flag under <paramref name="key"/>, or <paramref name="fallback"/> when unset.</summary>

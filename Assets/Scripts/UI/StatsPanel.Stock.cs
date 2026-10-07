@@ -1,7 +1,9 @@
 using System.Text;
 using UnityEngine;
+using TMPro;
 using PetShop.Commerce;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -29,7 +31,7 @@ namespace PetShop.UI
 
         private void BuildStockPage()
         {
-            _stock = AddPage("Stock", "What is on the shelves and in the stockroom, and ordering more.", UIFactory.TextSmall);
+            _stock = AddPage("Stock", UIFactory.TextSmall);
             BuildPriceControls(_stock.Root.transform);
             BuildOrderControls(_stock.Root.transform);
         }
@@ -48,8 +50,10 @@ namespace PetShop.UI
             {
                 ProductCategory category = categories[i];
                 float x = RowStart + i * w;
-                var btn = UIFactory.Button($"Order_{category}", page, $"Order {OrderSize} {category}",
+                var btn = UIFactory.Button($"Order_{category}", page, "",
                     new Vector2(x, OrderRowBottom), new Vector2(x + w - ButtonGap, OrderRowTop), UIFactory.TextSmall);
+                LocalizedText.Bind(btn.GetComponentInChildren<TMP_Text>(),
+                    () => Loc.F("stock.order", OrderSize, LocNames.Category(category)));
                 btn.onClick.AddListener(() => { _game.OrderStock(category, OrderSize); Refresh(); });
             }
             ReorderPanel.OpenButton(page, RowStart + categories.Length * w, w - ButtonGap,
@@ -59,11 +63,11 @@ namespace PetShop.UI
         /// <summary>Price controls — one of the levers the player actually pulls.</summary>
         private void BuildPriceControls(Transform page)
         {
-            var cheaper = UIFactory.Button("PriceDown", page, "Prices  −10%",
+            var cheaper = UIFactory.ButtonKey("PriceDown", page, "stock.prices_down",
                 new Vector2(0f, PriceRowBottom), new Vector2(0.24f, PriceRowTop), UIFactory.TextSmall);
             cheaper.onClick.AddListener(() => { _game.AdjustPrices(-PriceStep); Refresh(); });
 
-            var dearer = UIFactory.Button("PriceUp", page, "Prices  +10%",
+            var dearer = UIFactory.ButtonKey("PriceUp", page, "stock.prices_up",
                 new Vector2(0.25f, PriceRowBottom), new Vector2(0.49f, PriceRowTop), UIFactory.TextSmall);
             dearer.onClick.AddListener(() => { _game.AdjustPrices(PriceStep); Refresh(); });
         }
@@ -76,8 +80,7 @@ namespace PetShop.UI
             AppendWholesale(sb);
             sb.AppendLine();
             var shop = _game.Shop;
-            sb.AppendLine($"Prices are at <b>{shop.PriceMultiplier * 100f:0}%</b> of list; shoppers are " +
-                          $"<b>{shop.DemandFactor * 100f:0}%</b> as likely to buy as at list price.");
+            sb.AppendLine(Loc.F("stock.prices_line", shop.PriceMultiplier * 100f, shop.DemandFactor * 100f));
             _stock.Body.text = sb.ToString();
         }
 
@@ -89,37 +92,38 @@ namespace PetShop.UI
             var shelves = _game.Shelves;
             if (shelves.Count == 0)
             {
-                sb.AppendLine("No shelves yet. Order one on the Build page.");
+                sb.AppendLine(Loc.T("stock.no_shelves"));
                 return;
             }
-            sb.AppendLine(UIFactory.Tint(Row("Shelf", "On shelf", "In stockroom", "Refill cost"), UIFactory.InkMuted));
+            sb.AppendLine(UIFactory.Tint(Row(Loc.T("stock.col.shelf"), Loc.T("stock.col.on_shelf"),
+                Loc.T("stock.col.in_stockroom"), Loc.T("stock.col.refill_cost")), UIFactory.InkMuted));
             foreach (var shelf in shelves)
             {
                 if (shelf == null) continue;
                 Color colour = shelf.IsEmpty ? UIFactory.Destructive
                              : shelf.TotalUnits < LowStockUnits ? UIFactory.Warning : UIFactory.Ink;
-                sb.AppendLine(UIFactory.Tint(Row(shelf.Category.ToString(), $"{shelf.TotalUnits} units",
+                sb.AppendLine(UIFactory.Tint(Row(LocNames.CategoryTitle(shelf.Category), Loc.Plural("stock.units", shelf.TotalUnits),
                     $"{_game.Shop.Warehouse(shelf.Category)}", $"€ {shelf.RestockCost():N2}"), colour));
             }
-            sb.AppendLine(UIFactory.Tint($"Walk up to a shelf and press {InputBindings.Label(GameAction.Interact)} to refill it " +
-                                         "from the stockroom.", UIFactory.InkMuted));
+            sb.AppendLine(UIFactory.Tint(Loc.F("stock.refill_hint", InputBindings.Label(GameAction.Interact)), UIFactory.InkMuted));
         }
 
         private void AppendWholesale(StringBuilder sb)
         {
             var shop = _game.Shop;
             var catalog = _game.Catalog;
-            sb.AppendLine(UIFactory.Tint(Row("Category", "In stockroom", $"Order of {OrderSize}", "At the shelf"), UIFactory.InkMuted));
+            sb.AppendLine(UIFactory.Tint(Row(Loc.T("stock.col.category"), Loc.T("stock.col.in_stockroom"),
+                Loc.F("stock.col.order_of", OrderSize), Loc.T("stock.col.at_shelf")), UIFactory.InkMuted));
             foreach (ProductCategory category in System.Enum.GetValues(typeof(ProductCategory)))
             {
                 float unit  = catalog != null ? catalog.AverageUnitCost(category) : FallbackUnitCost;
                 float order = unit * ShopManager.WholesaleDiscount * shop.SupplierPriceMultiplier * OrderSize;
-                sb.AppendLine(Row(category.ToString(), $"{shop.Warehouse(category)}", $"€ {order:N2}",
+                sb.AppendLine(Row(LocNames.CategoryTitle(category), $"{shop.Warehouse(category)}", $"€ {order:N2}",
                     $"€ {unit * ShopManager.EmergencyMarkup * OrderSize:N2}"));
             }
             foreach (var order in shop.Orders)
-                sb.AppendLine(UIFactory.Tint($"On the van: {order.Units} {order.Category} — arriving in about " +
-                                             $"{ArrivalSeconds(order.ArrivalProgress)} s", UIFactory.Warning));
+                sb.AppendLine(UIFactory.Tint(Loc.F("stock.on_van", order.Units, LocNames.Category(order.Category),
+                                                   ArrivalSeconds(order.ArrivalProgress)), UIFactory.Warning));
         }
 
         private int ArrivalSeconds(float arrivalProgress) =>

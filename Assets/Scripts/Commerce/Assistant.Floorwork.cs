@@ -110,7 +110,7 @@ namespace PetShop.Commerce
         private void ReportRestock(ShelfUnit shelf, int units)
         {
             if (units > 0)
-                Notify($"{DisplayName} put {units} {shelf.Category} on the shelf from the stockroom.");
+                Notify(Localization.Loc.F("assistant.shelved", DisplayName, units, Localization.LocNames.Category(shelf.Category)));
         }
 
         // ── Feeder ───────────────────────────────────────────────────────────────────────────
@@ -154,11 +154,11 @@ namespace PetShop.Commerce
             float cost = pen.ServiceCost;
             if (!Shop.ChangeBalance(-cost, "Pen upkeep"))
             {
-                Notify($"{DisplayName} could not afford €{cost:N0} to look after the {pen.PenSpecies} pen.");
+                Notify(Localization.Loc.F("assistant.pen_unaffordable", DisplayName, cost, Localization.LocNames.Species(pen.PenSpecies)));
                 return;
             }
             pen.Service();
-            Notify($"{DisplayName} fed and cleaned the {pen.PenSpecies} pen — €{cost:N0}.");
+            Notify(Localization.Loc.F("assistant.pen_serviced", DisplayName, Localization.LocNames.Species(pen.PenSpecies), cost));
         }
 
         // ── Walking ──────────────────────────────────────────────────────────────────────────
