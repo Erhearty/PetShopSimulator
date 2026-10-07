@@ -181,6 +181,8 @@ namespace PetShop.Core
             _game.Events?.Restore(data);
 
             var migration = RestorePlacedObjects(data, loadedPets);
+            // The migration credited data.Balance after the shop's balance was set from it: pass the refund on.
+            if (migration.RefundTotal > 0f) shop.SetBalance(shop.Balance + migration.RefundTotal);
             SaveLineage.Apply(data, loadedPets, data.Day);
             SaveReorder.Apply(data, _game.AutoReorder);
             SaveFurniture.Apply(data, _game.Furniture);
@@ -192,6 +194,7 @@ namespace PetShop.Core
 
             _game.Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");
             if (migration.HasChanges) _game.Notify(migration.Notice());
+            if (migration.RefundedPets.Count > 0) _game.Notify(migration.RefundNotice());
         }
 
         /// <summary>
@@ -221,7 +224,8 @@ namespace PetShop.Core
         /// <summary>
         /// Settles the contents of a piece the layout migration packed away instead of placing (it would have
         /// stood off the yard): shelf stock goes to the warehouse, as when the Remove tool packs a shelf. A packed
-        /// pen is always empty: the migration relocates or empties an occupied pen rather than pack its pets.
+        /// pen is always empty: the migration relocates or empties an occupied pen (rehoming its pets, or selling
+        /// them back when no pen can hold them) rather than pack its pets.
         /// </summary>
         private void SettleEvicted(SaveData.PlacedItem item)
         {

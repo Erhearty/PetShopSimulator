@@ -37,7 +37,7 @@ namespace PetShop.Dev
         }
 
         private readonly List<DayRecord> _history = new();
-        private DayRecord   _current = new();
+        private DayRecord   _current = new DayLine();
         private GameManager _game;
         private ShopManager _shop;
         private string      _path;
@@ -59,6 +59,7 @@ namespace PetShop.Dev
             CustomerAI.WalkedOutEmpty     += OnWalkedOutEmpty;
             CustomerAI.GaveUp             += OnGaveUp;
             CustomerAI.NavigationTimedOut += OnNavigationTimedOut;
+            HookQueue();
         }
 
         private void OnDestroy()
@@ -72,6 +73,7 @@ namespace PetShop.Dev
             CustomerAI.WalkedOutEmpty     -= OnWalkedOutEmpty;
             CustomerAI.GaveUp             -= OnGaveUp;
             CustomerAI.NavigationTimedOut -= OnNavigationTimedOut;
+            UnhookQueue();
         }
 
         // ── Customer outcomes ──────────────────────────────────────────────────────────
@@ -92,11 +94,13 @@ namespace PetShop.Dev
             if (_finished || summary == null) return;
 
             DayRecord record = CompleteRecord(summary);
+            bool[] eligibleHours = TakeEligibleHours();
             _history.Add(record);
-            _current = new DayRecord();
+            _current = new DayLine();
 
             AppendLine(JsonUtility.ToJson(record));
             ReportViolations(SoakBands.Check(record));
+            ReportViolations(QueueJoinViolations((record as DayLine)?.queueJoinsByHour, eligibleHours));
             if (_history.Count >= SoakBands.SalesWindowDays)
                 ReportViolations(SoakBands.CheckWindow(
                     _history.GetRange(_history.Count - SoakBands.SalesWindowDays, SoakBands.SalesWindowDays)));

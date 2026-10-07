@@ -39,6 +39,14 @@ namespace PetShop.Customer
         [Header("Archetype")]
         public CustomerArchetype Archetype = CustomerArchetype.Regular;
 
+        /// <summary>
+        /// One of the hour's guaranteed buyers (set by the spawner before Start runs). If browsing
+        /// leaves the basket empty they take one item off a stocked shelf, or failing that an adult
+        /// from a pen, whatever the purchase rolls and their budget said, so they always reach the
+        /// queue. With nothing in stock anywhere they behave like any other shopper.
+        /// </summary>
+        [HideInInspector] public bool MustBuy;
+
         /// <summary>The resolved tuning for <see cref="Archetype"/>; valid from Start onwards.</summary>
         public CustomerProfile Profile { get; private set; } = CustomerProfile.For(CustomerArchetype.Regular);
 
@@ -212,6 +220,7 @@ namespace PetShop.Customer
                 TryPickUp();
                 if (_basket.Count >= MaxPurchases) break;
             }
+            if (MustBuy && _basket.Count == 0) ForcePickUp();
 
             // Rep hit for an empty basket is scaled by the customer's profile.
             ApplyBrowsePenalties();
@@ -435,6 +444,41 @@ namespace PetShop.Customer
             _missedTooExpensive = true;
             shelf.AddStock(product, 1);
             SetBubble("too expensive", UIFactory.Bad);
+        }
+
+        /// <summary>
+        /// A guaranteed buyer's fallback (see <see cref="MustBuy"/>): one unit from a stocked shelf,
+        /// preferring their aisle, else an adult pet (one they would want first). No purchase roll
+        /// and no budget check; leaves the basket empty only when nothing at all is in stock.
+        /// </summary>
+        private void ForcePickUp()
+        {
+            var stocked   = Shelves.FindAll(s => s != null && !s.IsEmpty);
+            var preferred = stocked.FindAll(s => s.Category == PreferredCategory);
+            if (preferred.Count > 0) stocked = preferred;
+            if (stocked.Count > 0)
+            {
+                var product = stocked[Random.Range(0, stocked.Count)].TakeOne();
+                if (product != null)
+                {
+                    float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice) : product.basePrice;
+                    _basket.Add((product.id, product.displayName, price));
+                    SetBubble($"got {product.displayName}", UIFactory.Good);
+                    return;
+                }
+            }
+
+            var pens = PetPens.FindAll(p => p != null && p.HasAdults);
+            if (pens.Count == 0) return;
+            var pen = pens[Random.Range(0, pens.Count)];
+            Pet pet = Profile.FirstWantedPet(pen);
+            if (pet == null || !pen.RemovePet(pet)) pet = pen.TakeAdult();
+            if (pet == null) return;
+
+            float petPrice = ShopManager != null ? ShopManager.PriceOf(pet.SellPrice()) : pet.SellPrice();
+            _basket.Add(($"pet_{pet.species}", pet.DisplayName(), petPrice));
+            _boughtPet = true;
+            SetBubble($"buying a {pet.species}", UIFactory.Good);
         }
 
         /// <summary>Adults only, filtered by the profile's rarity; price checked against PetBudget first.</summary>

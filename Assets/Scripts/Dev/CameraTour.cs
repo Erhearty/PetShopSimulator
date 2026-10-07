@@ -270,7 +270,7 @@ namespace PetShop.Dev
             if (ui != null && ui.Pause != null)
                 shots.Add(Ui("pause_menu", uiFrom, uiTo,
                              () => ui.Pause.Open(),
-                             () => { ui.Pause.Close(); Time.timeScale = 1f; }));
+                             () => ui.Pause.Close()));   // Close restores the time scale Open saved
 
             // The real flow: a pen from the furniture inventory in hand, its ghost where the player aims.
             if (game != null && game.Build != null)

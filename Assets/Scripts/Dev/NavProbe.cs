@@ -27,10 +27,10 @@ namespace PetShop.Dev
             var report = new StringBuilder("[Nav] connectivity\n");
             bool allGood = true;
 
-            allGood &= Check(report, "pavement → forecourt", pavement,  forecourt);
-            allGood &= Check(report, "forecourt → doorway",  forecourt, inside);
-            allGood &= Check(report, "doorway → till",       inside,    till);
-            allGood &= Check(report, "pavement → till",      pavement,  till);
+            allGood &= Check(report, "pavement › forecourt", pavement,  forecourt);
+            allGood &= Check(report, "forecourt › doorway",  forecourt, inside);
+            allGood &= Check(report, "doorway › till",       inside,    till);
+            allGood &= Check(report, "pavement › till",      pavement,  till);
 
             report.Append(allGood ? "[Nav] OK — the shop is reachable from the street."
                                   : "[Nav] BROKEN — customers cannot reach the till on foot.");

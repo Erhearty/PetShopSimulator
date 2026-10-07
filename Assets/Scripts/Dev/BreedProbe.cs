@@ -52,7 +52,7 @@ namespace PetShop.Dev
             pen.ClearPlan();
 
             return $"[BreedProbe] plan valid: {planValid}, bred on the night: {bred} " +
-                   $"({before} → {after}), plan cleared after use: {cleared}, " +
+                   $"({before} to {after}), plan cleared after use: {cleared}, " +
                    $"stale plan rejected: {staleRejected}";
         }
     }

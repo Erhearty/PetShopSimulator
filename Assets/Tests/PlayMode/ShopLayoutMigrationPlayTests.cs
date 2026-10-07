@@ -35,6 +35,15 @@ namespace PetShop.Tests
         private const int FixtureShelfUnits = 3;
         /// <summary>Opening words of the one notice a load that moved or packed pieces shows.</summary>
         private const string RebuiltNotice = "Your shop was rebuilt at the front of the yard";
+        /// <summary>Opening words of the notice naming pets sold back because no pen could hold them.</summary>
+        private const string RefundNotice = "No room was left for a pen pushed off the yard, so its pets were sold back";
+        /// <summary>
+        /// A layout-0 cell in the open front yard, well clear of the room, whose 2x2 pen the shift pushes off the
+        /// yard's street edge; its unshifted cells are ordinary yard the fixture can block.
+        /// </summary>
+        private static readonly Vector2Int ExposedPenOldCell = new(6, 6);
+        /// <summary>Current-layout cell of the full pen of the fixture species in the back corner of the yard.</summary>
+        private static readonly Vector2Int FullPenCell = new(12, -8);
 
         [TearDown]
         public void TearDown() => PlaytestHarness.Teardown();
@@ -168,6 +177,114 @@ namespace PetShop.Tests
                             "The empty pen should be back in the furniture inventory.");
             Assert.AreEqual(packedBefore + 1, game.Furniture.PackedCount(BuildCatalog.PetPen),
                             "The empty pen should count as packed away.");
+        }
+
+        /// <summary>
+        /// A layout-0 pen with pets that the shift pushes off the yard, when the yard has no free pen spot left, the
+        /// only other pen of its species is full, and its old unshifted cells are taken by another saved piece:
+        /// no pet vanishes. Each is either kept in a pen or sold back, the balance rises by the sold pets' value,
+        /// and a notice names them and the refund.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator LoadingOldLayoutSave_SellsBackPetsOfAPenWithNowhereToGo()
+        {
+            yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
+            var game = PlaytestHarness.Game;
+            var data = SaveAndRead(game);
+            var layout = game.Layout;
+
+            // Current-layout cells: a full pen of the species, then a fence on one cell of every 2x2 square of the
+            // yard that is still a pen spot, so no pen fits anywhere. MakeOldLayoutFixture shifts them all back.
+            var fullPen = new SaveData.PlacedItem
+            {
+                catalogId = BuildCatalog.PetPen, variant = FixturePenSpecies.ToString(),
+                cellX = FullPenCell.x, cellY = FullPenCell.y,
+            };
+            for (int i = 0; i < BuildCatalog.PenCapacity; i++)
+                fullPen.pets.Add(NamedPet($"Full{i}"));
+            data.PlacedObjects.Add(fullPen);
+            BlockEveryPenSpot(data, layout);
+            MakeOldLayoutFixture(data);
+
+            var pen = new SaveData.PlacedItem
+            {
+                catalogId = BuildCatalog.PetPen, variant = FixturePenSpecies.ToString(),
+                cellX = ExposedPenOldCell.x, cellY = ExposedPenOldCell.y,
+            };
+            for (int i = 0; i < FixturePenPets; i++)
+                pen.pets.Add(NamedPet($"Stray{i}"));
+            data.PlacedObjects.Add(pen);
+
+            var oldCells = new RectInt(ExposedPenOldCell, BuildCatalog.Get(BuildCatalog.PetPen).Size);
+            Assert.IsTrue(data.PlacedObjects.Any(i => i != pen && ShiftedFootprint(i).Overlaps(oldCells)),
+                          "Fixture: another saved piece should stand on the pen's old unshifted cells.");
+
+            var allPets = fullPen.pets.Concat(pen.pets).ToList();
+            float balanceBefore = data.Balance;
+            ClearGrid(game);
+
+            var notices = new List<string>();
+            UnityAction<string> listen = notices.Add;
+            game.OnNotification.AddListener(listen);
+            try { LoadSave(game, data); }
+            finally { game.OnNotification.RemoveListener(listen); }
+
+            var keptIds = game.Grid.GetAllPlaced()
+                              .Where(e => e.Instance != null && e.Instance.GetComponent<PetPen>() != null)
+                              .SelectMany(e => e.Instance.GetComponent<PetPen>().Residents.Select(p => p.id))
+                              .ToList();
+            var soldBack = allPets.Where(p => !keptIds.Contains(p.id)).ToList();
+            Assert.IsNotEmpty(soldBack, "Fixture: the pen should have found no spot and no room for its pets.");
+
+            string refund = notices.FirstOrDefault(n => n.StartsWith(RefundNotice));
+            foreach (var pet in soldBack)
+                Assert.IsTrue(refund != null && refund.Contains(pet.petName),
+                              $"Pet '{pet.petName}' vanished: it is in no pen and no notice says it was sold back.");
+
+            float value = soldBack.Sum(p => SaveSystem.SaveDataToPet(p).SellPrice());
+            Assert.AreEqual(balanceBefore + value, game.Shop.Balance, 0.01f,
+                            "The balance should rise by the value of every pet sold back.");
+            StringAssert.Contains($"€{value:N2}", refund, "The notice should name the refund.");
+        }
+
+        /// <summary>A pet of the fixture species named <paramref name="name"/>, as saved.</summary>
+        private static SaveData.PetSaveData NamedPet(string name)
+        {
+            var saved = SaveSystem.PetToSaveData(BreedingSystem.GenerateRandom(FixturePenSpecies));
+            saved.petName = name;
+            return saved;
+        }
+
+        /// <summary>
+        /// Adds a fence on every yard cell whose x and y share the yard corner's parity (one cell of every 2x2
+        /// square), skipping cells that are already no pen spot: the room, its wall ring, the doorways and saved
+        /// pieces. Cells are in <paramref name="data"/>'s current layout.
+        /// </summary>
+        private static void BlockEveryPenSpot(SaveData data, ShopLayout layout)
+        {
+            RectInt yard = layout.LotStageCells(ShopLayout.FullYardLotStage);
+            RectInt ring = layout.RoomWallCells();
+            var taken = data.PlacedObjects.Where(i => BuildCatalog.Get(i.catalogId) != null)
+                            .Select(i => new RectInt(new Vector2Int(i.cellX, i.cellY),
+                                                     BuildMode.FootprintSize(BuildCatalog.Get(i.catalogId), i.footprintRotated)))
+                            .ToList();
+            for (int x = yard.xMin; x < yard.xMax; x += 2)
+            for (int y = yard.yMin; y < yard.yMax; y += 2)
+            {
+                var cell = new RectInt(x, y, 1, 1);
+                if (ring.Overlaps(cell) || layout.IsInsideShop(cell.position, cell.size) ||
+                    layout.OverlapsDoorway(cell) || taken.Any(t => t.Overlaps(cell))) continue;
+                data.PlacedObjects.Add(new SaveData.PlacedItem { catalogId = BuildCatalog.Fence, cellX = x, cellY = y });
+            }
+        }
+
+        /// <summary>The cells a layout-0 <paramref name="item"/> covers once shifted onto the current layout.</summary>
+        private static RectInt ShiftedFootprint(SaveData.PlacedItem item)
+        {
+            var def = BuildCatalog.Get(item.catalogId);
+            if (def == null) return new RectInt(0, 0, 0, 0);
+            return new RectInt(new Vector2Int(item.cellX, item.cellY) + ShopLayout.LegacyLayoutCellShift,
+                               BuildMode.FootprintSize(def, item.footprintRotated));
         }
 
         /// <summary>An empty legacy pen saved at <see cref="OffYardPenCell"/>.</summary>

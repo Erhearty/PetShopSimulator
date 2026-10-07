@@ -38,6 +38,9 @@ namespace PetShop.Commerce
 
         public UnityEvent<int> OnQueueChanged = new();
 
+        /// <summary>Fired when a shopper joins the back of the line (read by telemetry and tests).</summary>
+        public UnityEvent<IShopper> OnShopperJoined = new();
+
         /// <summary>
         /// Fired when a shopper is rung up, by the player or an assistant, with the basket value
         /// captured before the shopper paid. Feedback (coins, floating text) hangs off this.
@@ -80,6 +83,7 @@ namespace PetShop.Commerce
             _joinedAt[shopper] = Time.time;
             _patience[shopper] = Mathf.Max(MinPatienceMultiplier, patienceMultiplier);
             OnQueueChanged.Invoke(_queue.Count);
+            OnShopperJoined.Invoke(shopper);
         }
 
         public void Leave(IShopper shopper)

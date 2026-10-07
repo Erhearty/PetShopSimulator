@@ -25,6 +25,9 @@ namespace PetShop.UI
         private TMP_Text    _abandonLabel;
         private Button      _resume;
 
+        /// <summary>Time.timeScale when the menu opened, put back on close (1 unless -timescale was given).</summary>
+        private float       _resumeTimeScale = 1f;
+
         // Button column: row i spans [RowTop - i*RowStep - RowHeight, RowTop - i*RowStep].
         private const float RowTop    = 0.74f;
         private const float RowStep   = 0.09f;
@@ -140,6 +143,8 @@ namespace PetShop.UI
             CancelAbandon();
             _root.SetActive(true);
             _game?.SetModalOpen(true);
+            // Remember the running speed (a -timescale soak run is not 1x) to put back on resume.
+            if (Time.timeScale > 0f) _resumeTimeScale = Time.timeScale;
             Time.timeScale = 0f;
             if (_status != null) _status.text = StatusLine();
             RefreshMusicLabel();
@@ -153,7 +158,7 @@ namespace PetShop.UI
             CancelAbandon();
             _root.SetActive(false);
             _game?.SetModalOpen(false);
-            Time.timeScale = 1f;
+            Time.timeScale = _resumeTimeScale;
         }
 
         /// <summary>Esc: cancels an armed abandon first, otherwise opens or closes the menu.</summary>
