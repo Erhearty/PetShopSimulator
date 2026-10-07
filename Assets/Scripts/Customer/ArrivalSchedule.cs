@@ -31,18 +31,19 @@ namespace PetShop.Customer
 
         /// <summary>
         /// Fraction of an hour, centred on its middle, the guaranteed buyers are spaced across
-        /// (0.5 puts two of them at :22 and :37). Keeping them off the hour's edges means a
-        /// customer who reaches the till a little sooner or later than estimated still joins the
-        /// queue inside the hour they were meant for. Everyone else is spread over the whole hour.
+        /// (0.1 puts two of them at :28 and :31). Keeping them at the hour's middle means a
+        /// customer who reaches the till up to ±20 min (game time) sooner or later than estimated
+        /// still joins the queue inside the hour they were meant for; the measured spawn-to-queue
+        /// spread is ±0.33 h on a 540 s day. Everyone else is spread over the whole hour.
         /// </summary>
-        public const float GuaranteedSpread = 0.5f;
+        public const float GuaranteedSpread = 0.1f;
 
         /// <summary>
         /// Longest arrival lead, in game hours, at which the hourly guarantee is promised. Beyond it
         /// the walk in from the pavement is too long a share of an hour for the spread in walk times
         /// to keep guaranteed buyers inside their hour (and opening-hour buyers pile up at 09:00).
         /// </summary>
-        public const float MaxGuaranteedLeadHours = 0.5f;
+        public const float MaxGuaranteedLeadHours = 0.6f;
 
         /// <summary>The fewest customers a day can have: the floor in every hour.</summary>
         public const int MinTotal = MinQueueJoinsPerHour * HourCount;

@@ -93,11 +93,11 @@ namespace PetShop.Tests
         /// <summary>
         /// With the lead from <see cref="CustomerSpawner.SpawnToQueueSeconds"/> on a 540 s day, every
         /// hour still gets its guaranteed joins when the real spawn-to-queue time is anywhere in the
-        /// measured 14-43 s spread (spawns clamped to 09:00 included).
+        /// measured 14-54 s spread (spawns clamped to 09:00 included).
         /// </summary>
         [TestCase(14f)]
-        [TestCase(29f)]
-        [TestCase(43f)]
+        [TestCase(34f)]
+        [TestCase(54f)]
         public void Slots_GuaranteedJoinsLandInTheirHour_AcrossTheMeasuredSpread(float actualSeconds)
         {
             const float dayLength = 540f;
@@ -117,10 +117,10 @@ namespace PetShop.Tests
         }
 
         [TestCase(0f, true)]
-        [TestCase(0.5f, true)]
-        [TestCase(0.51f, false)]
+        [TestCase(0.6f, true)]
+        [TestCase(0.61f, false)]
         [TestCase(2f, false)]
-        public void GuaranteeHolds_UpToHalfAnHourOfLead(float leadHours, bool expected) =>
+        public void GuaranteeHolds_UpToAMaximumLead(float leadHours, bool expected) =>
             Assert.AreEqual(expected, ArrivalSchedule.GuaranteeHolds(leadHours));
 
         [Test]

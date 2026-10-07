@@ -50,11 +50,12 @@ namespace PetShop.Customer
         /// a 540 s day: 28.8 s mean, 14.3-42.5 s over 16 joins (the walk in, two to four browsing
         /// stops of 1.2-3 s each, then the walk to the line). Customers are let in this much ahead
         /// of their planned queue join (converted to game hours with the day length). On a 540 s
-        /// day the ±15 s spread is ±0.25 game hours, inside the quarter hour the guaranteed joins
-        /// (:22 and :37, <see cref="ArrivalSchedule.GuaranteedSpread"/>) keep clear of their hour's
-        /// edges. Walks and browsing run on scaled time, so this holds at any Time.timeScale.
+        /// day. A later run measured 32.2 s mean, 14.1-53.7 s, so the estimate is the centre of the
+        /// 14-54 s spread: ±20 s, i.e. ±0.33 game hours on a 540 s day, inside the margin the
+        /// guaranteed joins (:28 and :31, <see cref="ArrivalSchedule.GuaranteedSpread"/>) keep from
+        /// their hour's edges. Walks and browsing run on scaled time, so this holds at any Time.timeScale.
         /// </summary>
-        public const float SpawnToQueueSeconds = 29f;
+        public const float SpawnToQueueSeconds = 34f;
 
         /// <summary>
         /// Guaranteed buyers may go over <see cref="MaxConcurrent"/> by at most this many: one
