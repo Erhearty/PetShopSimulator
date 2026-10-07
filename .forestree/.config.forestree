@@ -25,7 +25,8 @@
                 "AI Navigation / NavMesh (com.unity.ai.navigation)",
                 "Unity Timeline",
                 "Unity Purchasing",
-                "Unity Test Framework"
+                "Unity Test Framework",
+                "Localization (en, uk)"
               ]
             },
             "h": 200,
@@ -234,6 +235,11 @@
                   "desc": "Soak-run mode: also attaches DayTelemetry, and quits the game after n in-game days.",
                   "example": "-quitafterdays 30",
                   "key": "-quitafterdays <n>"
+                },
+                {
+                  "desc": "UI language chosen in Settings: en (default) or uk. Saved in PlayerPrefs and applied at startup and when changed.",
+                  "example": "uk",
+                  "key": "PlayerPrefs: language"
                 }
               ]
             },
@@ -513,7 +519,7 @@
         "widgets": [
           {
             "data": {
-              "text": "Unity PlayerPrefs store for per-machine player preferences: key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs). Separate from the Local Save File, which holds game-progress state."
+              "text": "Unity PlayerPrefs store for player preferences that belong to one machine. It holds key bindings (InputBindings.cs, PlayerPrefsBindingStore) and settings such as the autosave preference (GameSettings.cs) and the UI language (`language`: en or uk). It is separate from the Local Save File, which holds game progress."
             },
             "h": 180,
             "id": "widget-1790782660813-0",
@@ -578,13 +584,13 @@
     },
     {
       "from": "pet-shop-simulator-game-client",
-      "protocol": "Unity PlayerPrefs API (key bindings, autosave setting)",
-      "to": "player-prefs-store"
+      "protocol": "Local filesystem append (File.AppendAllText, JSON lines)",
+      "to": "soak-telemetry-log"
     },
     {
       "from": "pet-shop-simulator-game-client",
-      "protocol": "Local filesystem append (File.AppendAllText, JSON lines)",
-      "to": "soak-telemetry-log"
+      "protocol": "Unity PlayerPrefs API (key bindings, autosave setting, language)",
+      "to": "player-prefs-store"
     }
   ],
   "forestreeFormatVersion": true,
@@ -606,7 +612,7 @@
         "value": ""
       },
       "alt_text": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "api_examples": {
@@ -614,15 +620,15 @@
         "value": ""
       },
       "ask_when_ambiguous": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "avoid_n_plus_one": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "bundle_budget": {
-        "checked": true,
+        "checked": false,
         "value": 250
       },
       "cache_expensive": {
@@ -634,19 +640,19 @@
         "value": ""
       },
       "cite_paths": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "commit_convention": {
-        "checked": true,
+        "checked": false,
         "value": "Conventional Commits (feat:, fix:, chore:)"
       },
       "commit_subject_len": {
-        "checked": true,
+        "checked": false,
         "value": 72
       },
       "contrast_target": {
-        "checked": true,
+        "checked": false,
         "value": "4.5:1 (WCAG AA)"
       },
       "dependency_audit": {
@@ -654,11 +660,11 @@
         "value": ""
       },
       "deterministic_tests": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "dry_principle": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "e2e_critical": {
@@ -670,27 +676,27 @@
         "value": ""
       },
       "fast_tests": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "focused_prs": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "formatter": {
-        "checked": true,
+        "checked": false,
         "value": "Prettier + ESLint (fix on save)"
       },
       "handle_errors": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "integration_tests": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "keyboard_nav": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "least_privilege": {
@@ -698,43 +704,43 @@
         "value": ""
       },
       "limit_function": {
-        "checked": true,
+        "checked": false,
         "value": 25
       },
       "max_file_length": {
-        "checked": true,
+        "checked": false,
         "value": 400
       },
       "max_nesting": {
-        "checked": true,
+        "checked": false,
         "value": 3
       },
       "min_coverage": {
-        "checked": true,
+        "checked": false,
         "value": 80
       },
       "mock_external": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "naming_conv": {
-        "checked": true,
+        "checked": false,
         "value": "camelCase for JS, PascalCase for classes"
       },
       "no_force_push": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "no_hardcoded_secrets": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "no_magic_numbers": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "no_secrets_in_logs": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "no_unrequested_commits": {
@@ -742,19 +748,19 @@
         "value": ""
       },
       "paginate_lists": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "parameterized_queries": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "plan_first": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "preserve_comments": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "profile_first": {
@@ -762,11 +768,11 @@
         "value": ""
       },
       "readme_current": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "rebase_policy": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "reduced_motion": {
@@ -774,15 +780,15 @@
         "value": ""
       },
       "regression_tests": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "require_docstrings": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "semantic_html": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "signed_commits": {
@@ -790,15 +796,15 @@
         "value": ""
       },
       "small_diffs": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "structured_logging": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "test_framework": {
-        "checked": true,
+        "checked": false,
         "value": "Jest for Frontend, Vitest for Backend Node"
       },
       "test_naming": {
@@ -806,7 +812,7 @@
         "value": ""
       },
       "update_docs": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "user_facing_messages": {
@@ -814,7 +820,7 @@
         "value": ""
       },
       "validate_input": {
-        "checked": true,
+        "checked": false,
         "value": ""
       },
       "verify_compilation": {
@@ -828,11 +834,11 @@
   "repoId": "cca103e0-e40e-475f-8726-8a6fee94529d",
   "topologyLayout": {
     "build-editor-tooling": {
-      "x": 56,
-      "y": 442
+      "x": 127,
+      "y": 561
     },
     "local-save-file": {
-      "x": 216,
+      "x": 271,
       "y": 112
     },
     "node-d5d6a598-2ec1-4004-9960-07142f8d4f63-calibration-tool": {
@@ -868,8 +874,16 @@
       "y": 405
     },
     "pet-shop-simulator-game-client": {
-      "x": 288,
-      "y": 341
+      "x": 322,
+      "y": 376
+    },
+    "player-prefs-store": {
+      "x": 431,
+      "y": 622
+    },
+    "soak-telemetry-log": {
+      "x": 56,
+      "y": 338
     }
   },
   "version": "1.0.0"

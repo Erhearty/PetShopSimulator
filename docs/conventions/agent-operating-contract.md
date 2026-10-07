@@ -14,62 +14,31 @@ These docs describe the intended architecture and are authoritative; read source
 Define general standards, style guides, and testing rules for your AI agents to follow across the entire project codebase.
 
 ## Coding Standards
-- **Functions should aim to be less than** `25` lines
-- **Enforce code naming conventions:** `camelCase for JS, PascalCase for classes`
-- **Require clear docstrings explaining the 'why' rather than 'what' for all public APIs**
-- **Avoid deep nesting of code; limit to maximum** `3` levels
-- **Keep individual source files under** `400` lines
-- **Avoid magic numbers; extract them into named constants**
-- **Refactor duplicated logic into shared functions (DRY)**
-- **Auto-format code with:** `Prettier + ESLint (fix on save)`
+*No specific guidelines active for this category.*
 
 ## Testing & Validation
-- **Target a minimum unit test coverage of** `80` %
-- **Primary testing framework to use:** `Jest for Frontend, Vitest for Backend Node`
-- **Require integration tests for primary API routing contracts, run in-process with external dependencies mocked**
-- **Mock all outbound network requests and external API endpoints**
-- **Add a regression test for every bug fix before it is merged**
-- **Keep tests deterministic - no reliance on real time, randomness, or live network**
-- **Keep tests fast and isolated - mock external boundaries, use fake timers, no real sleeps, subprocesses, or disk/git I/O in unit tests**
+*No specific guidelines active for this category.*
 
 ## AI Agent Rules
-- **Before writing code, explain your implementation plan first**
-- **Preserve all existing comment blocks and license headers**
-- **Reference exact file paths and line numbers when discussing code**
-- **Ask for clarification when requirements are ambiguous instead of guessing**
-- **Keep changes minimal and scoped to the request**
+*No specific guidelines active for this category.*
 
 ## Security & Secrets
-- **Never hardcode secrets, API keys, tokens, or credentials in source**
-- **Validate and sanitize all external and user-supplied input**
-- **Use parameterized queries; never build SQL by string concatenation**
-- **Never log secrets, tokens, or personally identifiable information**
+*No specific guidelines active for this category.*
 
 ## Version Control & Git
-- **Keep the commit subject line under** `72` characters
-- **Commit message convention:** `Conventional Commits (feat:, fix:, chore:)`
-- **Keep pull requests focused on a single logical change**
-- **Never force-push to shared or protected branches**
-- **Rebase feature branches onto the main branch before merging**
+*No specific guidelines active for this category.*
 
 ## Documentation
-- **Update relevant documentation whenever behavior changes**
-- **Keep the README's setup and run steps accurate and runnable**
+*No specific guidelines active for this category.*
 
 ## Performance & Efficiency
-- **Avoid N+1 queries; batch or eager-load data access**
-- **Keep the initial JavaScript bundle under** `250` KB
-- **Paginate or virtualize large lists and result sets**
+*No specific guidelines active for this category.*
 
 ## Error Handling & Logging
-- **Handle errors explicitly; never silently swallow exceptions**
-- **Emit structured, level-appropriate logs (no stray console output)**
+*No specific guidelines active for this category.*
 
 ## Accessibility & UX
-- **Use semantic HTML elements and add ARIA only where needed**
-- **All interactive elements must be fully keyboard-operable**
-- **Provide descriptive alt text for all meaningful images**
-- **Minimum text contrast ratio:** `4.5:1 (WCAG AA)`
+*No specific guidelines active for this category.*
 <!-- generated:end cap:global-rules -->
 
 <!-- generated:start cap:canonical-names -->

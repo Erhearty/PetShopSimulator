@@ -2,7 +2,7 @@
 # Interaction: Pet Shop Simulator (Game Client) → PlayerPrefs Settings Store
 
 - **Participants:** `pet-shop-simulator-game-client` → `player-prefs-store`
-- **Transport:** `Unity PlayerPrefs API (key bindings, autosave setting)`
+- **Transport:** `Unity PlayerPrefs API (key bindings, autosave setting, language)`
 <!-- generated:end edge:pet-shop-simulator-game-client→player-prefs-store -->
 
 ## Contract
