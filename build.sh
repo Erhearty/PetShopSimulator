@@ -11,7 +11,7 @@
 #    ./build.sh smoke      headless multi-day run, fails on any exception (rebuilds if stale)
 #    ./build.sh test       run EditMode unit tests headless (results in Logs/build/)
 #    ./build.sh playmode   run PlayMode tests headless; KnownIssue tests run too, non-gating
-#    ./build.sh soak       seeded 15-day headless economy run, checked against SoakBands (rebuilds if stale)
+#    ./build.sh soak       seeded 6-day headless economy run at real day length, checked against SoakBands (rebuilds if stale)
 #    ./build.sh spawnverify  check spawned pack models' size and grounding (SKIP without packs)
 #    ./build.sh playtest   spawnverify + playmode + smoke + soak, with a PASS/FAIL/SKIP summary
 #    ./build.sh look       render screenshots of the running game into Screenshots/
@@ -26,7 +26,9 @@
 #  setup and linux generate the Nunito font asset first when it is missing (it is checked in; regenerate with ./build.sh font).
 #
 #  Override the editor with:  UNITY=/path/to/Unity ./build.sh
-#  soak takes SEED (default 1) and SOAK_DAYS (default 15) from the environment.
+#  soak takes SEED (default 1), SOAK_DAYS (default 6) and SOAK_TIMESCALE (default 8, 1-20) from the
+#  environment. Days are the real 540 s, fast-forwarded by SOAK_TIMESCALE, so a run takes about
+#  SOAK_DAYS x 540 / SOAK_TIMESCALE seconds (6 days at 8x: ~7 min; 15 days would be ~17 min).
 #  run/smoke/soak rebuild the player when anything under Assets/, ProjectSettings/ or Packages/
 #  is newer than it; FORCE_BUILD=1 always rebuilds. A failed build never runs the old player.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +134,7 @@ ensure_font() {
         echo "· Nunito font sources changed since the asset was generated — regenerating it"
         build_font
     else
-        return
+        return 0   # a bare return would pass on the failed [[ ]] status and trip set -e
     fi
     echo "$hash" > "$FONT_STAMP"
 }
@@ -314,38 +316,72 @@ do_playmode() {
     [[ $rc -eq 0 ]] || exit 1
 }
 
-# Economy soak: a seeded multi-day headless run. DayTelemetry appends one JSON line per day
-# to soak.jsonl, logs each SoakBands violation as "[Soak] VIOLATION ...", and quits the player
-# with exit code 3 when any band was violated (0 when all held).
+# Economy soak: a seeded multi-day headless run at the real day length, fast-forwarded with
+# -timescale. DayTelemetry appends one JSON line per day to soak.jsonl, logs each SoakBands and
+# hourly queue-join violation as "[Soak] VIOLATION ...", and quits the player with exit code 3
+# when any band was violated (0 when all held). A bankrupt shop ("[Game] GAME OVER") also ends
+# the run early, with exit code 0 when no band broke, so that is checked separately.
+SOAK_DAY_LENGTH=540
 do_soak() {
+    local days="${SOAK_DAYS:-6}" scale="${SOAK_TIMESCALE:-8}" seed="${SEED:-1}"
+    if ! [[ "$days" =~ ^[1-9][0-9]*$ ]]; then
+        echo "✘ SOAK_DAYS must be a positive integer, got '$days'" >&2
+        exit 1
+    fi
+    if ! [[ "$scale" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+        echo "✘ SOAK_TIMESCALE must be a number (1-20), got '$scale'" >&2
+        exit 1
+    fi
+    # The game clamps -timescale to 1-20; budget for the speed it will actually run at, plus a
+    # quarter for slow frames and two minutes for boot, NavMesh bake and day transitions.
+    local limit
+    limit=$(awk -v d="$days" -v l="$SOAK_DAY_LENGTH" -v s="$scale" \
+        'BEGIN { if (s < 1) s = 1; if (s > 20) s = 20; printf "%d", d * l / s * 1.25 + 120 }')
+
     ensure_fresh_player
     local log="$LOG_DIR/soak.log" jsonl="$LOG_DIR/soak.jsonl" save="$LOG_DIR/soak-save.json"
     # Telemetry appends, and a leftover save changes the run — always start from nothing.
     rm -f "$log" "$jsonl" "$save" "$save".*
 
-    echo "▶ headless economy soak (${SOAK_DAYS:-15} days, seed ${SEED:-1})"
+    echo "▶ headless economy soak ($days days of ${SOAK_DAY_LENGTH}s at ${scale}x, seed $seed, timeout ${limit}s)"
     local rc=0
-    timeout 400 "$PLAYER" -batchmode -nographics -seed "${SEED:-1}" -daylength 12 -furnish \
-        -quitafterdays "${SOAK_DAYS:-15}" -savepath "$save" -telemetry "$jsonl" \
+    timeout "$limit" "$PLAYER" -batchmode -nographics -seed "$seed" \
+        -daylength "$SOAK_DAY_LENGTH" -timescale "$scale" -furnish \
+        -quitafterdays "$days" -savepath "$save" -telemetry "$jsonl" \
         -logFile "$log" >/dev/null 2>&1 || rc=$?
 
-    case "$rc" in
-        3)
-            echo "✘ soak run out of band:" >&2
-            grep -E "\[Soak\] VIOLATION" "$log" | sed "s|^|  |" >&2 || true
-            echo "  telemetry: $jsonl" >&2
-            exit 1
-            ;;
-        124)
-            echo "✘ soak run timed out after 400 s — see $log" >&2
-            exit 1
-            ;;
-        0) ;;
-        *)
-            echo "✘ soak player exited with code $rc — see $log" >&2
-            exit 1
-            ;;
-    esac
+    grep -E "^\[Soak\] Finished" "$log" 2>/dev/null | tail -1 || true
+
+    # Any violation fails the run, whatever the exit code; hourly queue-join violations
+    # ("hour=H queueJoins=N") are among them.
+    local violations
+    violations=$(grep -E "\[Soak\] VIOLATION" "$log" 2>/dev/null || true)
+    local failed=0
+    if [[ $rc -eq 124 ]]; then
+        echo "✘ soak run timed out after ${limit}s ($days days at ${scale}x) — see $log" >&2
+        failed=1
+    fi
+    if grep -qE "^\[Game\] GAME OVER" "$log" 2>/dev/null; then
+        echo "✘ soak shop went bankrupt before $days days: $(grep -E "^\[Game\] GAME OVER" "$log" | head -1)" >&2
+        failed=1
+    fi
+    if [[ -n "$violations" ]]; then
+        echo "✘ soak run out of band ($(echo "$violations" | wc -l) violation(s)):" >&2
+        echo "$violations" | sed "s|^|  |" >&2
+        failed=1
+    fi
+    if [[ $rc -ne 0 && $rc -ne 3 && $rc -ne 124 ]]; then
+        echo "✘ soak player exited with code $rc — see $log" >&2
+        failed=1
+    elif [[ $rc -eq 3 && -z "$violations" ]]; then
+        echo "✘ soak player reported violations (exit 3) but none were logged — see $log" >&2
+        failed=1
+    fi
+    if [[ $failed -ne 0 ]]; then
+        echo "  telemetry: $jsonl" >&2
+        print_soak_table "$jsonl" >&2
+        exit 1
+    fi
     if ! grep -q '"summary":true' "$jsonl" 2>/dev/null; then
         echo "✘ soak run wrote no summary line to $jsonl — see $log" >&2
         exit 1
@@ -353,6 +389,12 @@ do_soak() {
     if grep -qiE "Exception|NullReferenceException" "$log"; then
         echo "✘ exceptions during the soak run:" >&2
         grep -iE -A5 "Exception" "$log" | head -30 >&2
+        exit 1
+    fi
+    local done_days
+    done_days=$(grep '"summary":true' "$jsonl" | tail -1 | sed -nE 's/.*"days":([0-9]+).*/\1/p')
+    if [[ "${done_days:-0}" -lt "$days" ]]; then
+        echo "✘ soak run ended after ${done_days:-0} of $days days — see $log" >&2
         exit 1
     fi
     print_soak_table "$jsonl"

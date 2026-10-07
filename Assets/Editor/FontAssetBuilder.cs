@@ -40,20 +40,26 @@ public static class FontAssetBuilder
     /// <summary>Full project path of the generated font asset.</summary>
     private const string OutputPath = OutputFolder + "/" + AssetName + ".asset";
 
-    /// <summary>Point size glyphs are rasterised at.</summary>
-    private const int SamplingPointSize = 90;
+    /// <summary>
+    /// Point size glyphs are rasterised at. Sized so the ~200 prepopulated characters fit one
+    /// 512x512 atlas; SDF scales up cleanly, so larger UI text does not need a larger sample.
+    /// </summary>
+    private const int SamplingPointSize = 32;
 
-    /// <summary>Padding in pixels around each glyph in the atlas (SDF spread).</summary>
-    private const int AtlasPadding = 9;
+    /// <summary>Padding in pixels around each glyph in the atlas (SDF spread), 1/8 of the sample size.</summary>
+    private const int AtlasPadding = 4;
 
-    /// <summary>Width of each atlas texture in pixels.</summary>
-    private const int AtlasWidth = 1024;
+    /// <summary>Width of the atlas texture in pixels.</summary>
+    private const int AtlasWidth = 512;
 
-    /// <summary>Height of each atlas texture in pixels.</summary>
-    private const int AtlasHeight = 1024;
+    /// <summary>Height of the atlas texture in pixels.</summary>
+    private const int AtlasHeight = 512;
 
-    /// <summary>Allow extra atlas textures once the first fills up.</summary>
-    private const bool EnableMultiAtlas = true;
+    /// <summary>
+    /// One atlas only: the prepopulated set fits, and every extra atlas is serialised into the
+    /// asset. <see cref="Verify"/> fails the build if a required character did not fit.
+    /// </summary>
+    private const bool EnableMultiAtlas = false;
 
     /// <summary>First printable ASCII code point (space).</summary>
     private const int AsciiFirst = 32;

@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -49,6 +51,11 @@ public static class MaterialRepair
             return;
         }
 
+        // Before any material is loaded: loading one whose _MainTex is a cubemap logs
+        // "Error assigning CUBE texture to 2D texture property _MainTex".
+        _cubeCleaned.Clear();
+        ClearCubemapMainTextures();
+
         var guids = AssetDatabase.FindAssets("t:Material", new[] { "Assets" });
         int repaired = 0, checkedCount = 0;
         var byPack = new Dictionary<string, int>();
@@ -61,6 +68,9 @@ public static class MaterialRepair
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (mat == null) continue;
             checkedCount++;
+            // Tracked materials outside the re-extracted packs must never be dirtied and saved.
+            if (PackFolders.Any(dir => path.StartsWith(dir + "/")))
+                ClearCubemapMainTexture(mat, path);
 
             if (!NeedsRepair(mat)) continue;
 
@@ -73,7 +83,8 @@ public static class MaterialRepair
             mat.shader = standard;
 
             foreach (var (from, to) in TextureMap)
-                if (textures.TryGetValue(from, out var tex) && tex != null && mat.HasProperty(to))
+                if (textures.TryGetValue(from, out var tex) && tex != null
+                    && tex.dimension == UnityEngine.Rendering.TextureDimension.Tex2D && mat.HasProperty(to))
                     mat.SetTexture(to, tex);
 
             foreach (var (from, to) in ColorMap)
@@ -115,6 +126,8 @@ public static class MaterialRepair
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
+        Debug.Log($"[Materials] cleared a cubemap _MainTex from {_cubeCleaned.Count} material(s)" +
+                  (_cubeCleaned.Count > 0 ? ": " + string.Join(", ", _cubeCleaned.Select(Path.GetFileName)) : "."));
         if (tuned > 0) Debug.Log($"[Materials] toned down {tuned} over-shiny pack material(s).");
         foreach (var kv in byPack.OrderByDescending(k => k.Value))
             Debug.Log($"[Materials] repaired {kv.Value,3} in {kv.Key}");
@@ -184,29 +197,135 @@ public static class MaterialRepair
 
     private static readonly Dictionary<string, bool> _pipelineCache = new();
 
+    /// <summary>Paths of the materials whose cubemap _MainTex was cleared this run.</summary>
+    private static readonly HashSet<string> _cubeCleaned = new();
+
+    /// <summary>
+    /// Safety net for a material already in memory with a cubemap _MainTex (the on-disk pass in
+    /// <see cref="ClearCubemapMainTextures"/> cannot reach an instance loaded before it ran):
+    /// clears it through the serialised properties, which - unlike Material.HasProperty and
+    /// friends - do not apply the textures to the shader and so log no error.
+    /// </summary>
+    private static void ClearCubemapMainTexture(Material mat, string path)
+    {
+        var so = new SerializedObject(mat);
+        var array = so.FindProperty("m_SavedProperties.m_TexEnvs");
+        if (array == null) return;
+
+        bool changed = false;
+        for (int i = 0; i < array.arraySize; i++)
+        {
+            var entry = array.GetArrayElementAtIndex(i);
+            if (entry.FindPropertyRelative("first").stringValue != "_MainTex") continue;
+            var texProp = entry.FindPropertyRelative("second.m_Texture");
+            if (texProp.objectReferenceValue is Texture tex
+                && tex.dimension != UnityEngine.Rendering.TextureDimension.Tex2D)
+            {
+                texProp.objectReferenceValue = null;
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(mat);
+        _cubeCleaned.Add(path);
+    }
+
+    /// <summary>
+    /// The texture reference under a material's _MainTex entry in m_TexEnvs, in the current
+    /// ("- _MainTex:") and the legacy ("- first: name: _MainTex / second:") serialisation.
+    /// Group "ref" is the {fileID, guid, type} reference, group "guid" its GUID.
+    /// </summary>
+    private static readonly Regex MainTexReference = new(
+        @"(?<head>(?:-[ \t]+_MainTex:|name:[ \t]+_MainTex[ \t]*\r?\n[ \t]*second:)[ \t]*\r?\n[ \t]*m_Texture:[ \t]*)" +
+        @"(?<ref>\{fileID:[ \t]*-?\d+,[ \t]*guid:[ \t]*(?<guid>[0-9a-fA-F]{32}),[ \t]*type:[ \t]*\d+\})");
+
+    /// <summary>
+    /// Clears the _MainTex entry of every text-serialised .mat under Assets that points at a
+    /// cubemap (a texture imported with the Cube shape, or a .cubemap asset), by editing the YAML
+    /// on disk so the material is never loaded with it. Pack folders are re-extracted by
+    /// ./build.sh assets, so this has to happen here rather than in the assets themselves.
+    /// Returns the number of materials changed.
+    /// </summary>
+    private static int ClearCubemapMainTextures()
+    {
+        var cubeByGuid = new Dictionary<string, bool>();
+        bool IsCubemap(string guid)
+        {
+            if (cubeByGuid.TryGetValue(guid, out bool known)) return known;
+            string texPath = AssetDatabase.GUIDToAssetPath(guid);
+            bool cube = !string.IsNullOrEmpty(texPath)
+                     && typeof(Cubemap).IsAssignableFrom(AssetDatabase.GetMainAssetTypeAtPath(texPath));
+            cubeByGuid[guid] = cube;
+            return cube;
+        }
+
+        // Only the re-extracted pack folders: tracked materials elsewhere (e.g. the baked scene's)
+        // must never be rewritten, or they lose textures that are 2D in a fresh checkout.
+        var changed = new List<string>();
+        var packFiles = PackFolders.Where(Directory.Exists)
+            .SelectMany(dir => Directory.EnumerateFiles(dir, "*.mat", SearchOption.AllDirectories));
+        foreach (string file in packFiles)
+        {
+            string path = file.Replace('\\', '/');
+
+            string yaml;
+            try { yaml = File.ReadAllText(path); }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[Materials] could not read {path}: {e.Message}");
+                continue;
+            }
+            if (!yaml.StartsWith("%YAML")) continue; // binary-serialised; nothing to edit
+
+            string fixedYaml = MainTexReference.Replace(yaml, m =>
+                IsCubemap(m.Groups["guid"].Value.ToLowerInvariant())
+                    ? m.Groups["head"].Value + "{fileID: 0}"
+                    : m.Value);
+            if (fixedYaml == yaml) continue;
+
+            try { File.WriteAllText(path, fixedYaml); }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[Materials] could not write {path}: {e.Message}");
+                continue;
+            }
+            changed.Add(path);
+            _cubeCleaned.Add(path);
+        }
+
+        foreach (string path in changed)
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        return changed.Count;
+    }
+
     /// <summary>
     /// Imported packs are authored for physically-based pipelines and often arrive metallic
     /// and glossy. Under Built-in with a sky ambient that makes models mirror the sky and
     /// come out uniformly blue, which reads as a texture fault rather than a material one.
     /// Flatten anything that is not deliberately metallic.
     /// </summary>
+    private static readonly string[] PackFolders =
+    {
+        "Assets/CuteMagic_CubeAnimals_Free", "Assets/DenysAlmaral",
+        "Assets/SimplePoly City - Low Poly Assets", "Assets/LowpolyStreetPack",
+        "Assets/Low-Poly Furniture Kit - Stylized Wooden Set", "Assets/SimpleNaturePack",
+        "Assets/100 People - Animated Characters Pack", "Assets/Resources/Packs",
+    };
+
     private static int TuneImportedMaterials()
     {
-        string[] packFolders =
-        {
-            "Assets/CuteMagic_CubeAnimals_Free", "Assets/DenysAlmaral",
-            "Assets/SimplePoly City - Low Poly Assets", "Assets/LowpolyStreetPack",
-            "Assets/Low-Poly Furniture Kit - Stylized Wooden Set", "Assets/SimpleNaturePack",
-            "Assets/100 People - Animated Characters Pack", "Assets/Resources/Packs",
-        };
-        var existing = packFolders.Where(AssetDatabase.IsValidFolder).ToArray();
+        var existing = PackFolders.Where(AssetDatabase.IsValidFolder).ToArray();
         if (existing.Length == 0) return 0;
 
         int tuned = 0;
         foreach (string guid in AssetDatabase.FindAssets("t:Material", existing))
         {
-            var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
-            if (mat == null || mat.shader == null || mat.shader.name != "Standard") continue;
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null) continue;
+            ClearCubemapMainTexture(mat, path);
+            if (mat.shader == null || mat.shader.name != "Standard") continue;
 
             bool changed = false;
             if (mat.HasProperty("_Metallic") && mat.GetFloat("_Metallic") > 0.05f)

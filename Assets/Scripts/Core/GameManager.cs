@@ -155,6 +155,7 @@ namespace PetShop.Core
         {
             _saveLoad.NewGame(skipTutorial);
             if (PlaytestOptions.Furnish) Dev.DevFurnisher.Furnish(this, PlaytestOptions.Seed ?? Dev.DevFurnisher.DefaultSeed);
+            if (PlaytestOptions.Furnish && (Application.isBatchMode || Debug.isDebugBuild)) Dev.SoakSteward.Begin(this); // unattended stock chores
         }
 
         private void Update()
