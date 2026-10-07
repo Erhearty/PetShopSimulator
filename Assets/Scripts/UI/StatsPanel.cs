@@ -135,25 +135,15 @@ namespace PetShop.UI
         /// Adds page <paramref name="id"/> (English, used for object names and the <c>tabs.&lt;id&gt;</c>
         /// keys) with its heading, purpose line (<c>tabs.&lt;id&gt;.purpose</c>), body text and nav button.
         /// </summary>
-        private BookPage AddPage(string id, float bodySize) => AddPage(id, null, bodySize);
-
-        /// <summary>
-        /// Adds page <paramref name="id"/>; its heading and nav button show <c>tabs.&lt;id&gt;</c>. The purpose
-        /// line shows <paramref name="purpose"/> as given, or <c>tabs.&lt;id&gt;.purpose</c> when it is null.
-        /// </summary>
-        private BookPage AddPage(string id, string purpose, float bodySize)
+        private BookPage AddPage(string id, float bodySize)
         {
             int index = _pages.Count;
             string key = "tabs." + id.ToLowerInvariant();
             var root = UIFactory.Node($"Page_{id}", _panel, ContentMin, ContentMax);
             UIFactory.LabelKey("Heading", root.transform, key, new Vector2(0f, HeadingBottom),
                 new Vector2(CloseLeft, 1f), UIFactory.TextHeading, UIFactory.Ink);
-            if (purpose == null)
-                UIFactory.LabelKey("Purpose", root.transform, key + ".purpose", new Vector2(0f, PurposeBottom),
-                    new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
-            else
-                UIFactory.Label("Purpose", root.transform, purpose, new Vector2(0f, PurposeBottom),
-                    new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
+            UIFactory.LabelKey("Purpose", root.transform, key + ".purpose", new Vector2(0f, PurposeBottom),
+                new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
             var body = UIFactory.Label("Body", root.transform, "", new Vector2(0f, BodyBottom),
                 new Vector2(1f, BodyTop), bodySize, UIFactory.Ink, TextAlignmentOptions.TopLeft);
             body.richText = true;

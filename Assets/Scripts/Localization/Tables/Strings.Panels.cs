@@ -40,6 +40,8 @@ namespace PetShop.Localization.Strings
             Add("tabs.build.purpose", "Order furniture, place what you own, and change the walls.",
                                       "Замовляйте меблі, розставляйте придбане та змінюйте стіни.");
             Add("tabs.guide", "Guide", "Довідник");
+            Add("tabs.guide.purpose", "How every part of running the shop works.",
+                                      "Як влаштована кожна частина роботи крамниці.");
 
             // Build page tools
             Add("tabs.build.open_view", "Open build view", "Режим будівництва");
