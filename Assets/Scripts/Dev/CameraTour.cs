@@ -29,6 +29,13 @@ namespace PetShop.Dev
         public int    Height    = 900;
         public float  WarmupSeconds = 3.5f;
 
+        /// <summary>
+        /// Extra resolutions every UI screen is captured at, on top of <see cref="Width"/> x
+        /// <see cref="Height"/>: the reference resolution and a small laptop screen, so clipped
+        /// or overflowing text shows up where it would actually happen.
+        /// </summary>
+        private static readonly Vector2Int[] UiSizes = { new(1920, 1080), new(1280, 720) };
+
         private enum Kind { World, Plan, Ui }
 
         private struct Shot
@@ -89,8 +96,11 @@ namespace PetShop.Dev
             cam.nearClipPlane   = 0.05f;
             cam.farClipPlane    = 900f;
 
-            var rt  = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
-            var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
+            // Same post FX as the player's camera, rendered HDR; plain LDR on a null device.
+            var capture = new TourCapture(cam, Width, Height);
+            var uiCaptures = new TourCapture[UiSizes.Length];
+            for (int s = 0; s < UiSizes.Length; s++)
+                uiCaptures[s] = new TourCapture(cam, UiSizes[s].x, UiSizes[s].y);
 
             for (int index = 0; index < shots.Count; index++)
             {
@@ -113,19 +123,24 @@ namespace PetShop.Dev
 
                 if (shot.FromMainCamera) MatchMainCamera(cam);
 
-                cam.targetTexture = rt;
-                cam.Render();
-                cam.targetTexture = null;
-
-                var previous = RenderTexture.active;
-                RenderTexture.active = rt;
-                tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
-                tex.Apply();
-                RenderTexture.active = previous;
-
                 string file = Path.Combine(OutputDir, $"{index:00}_{shot.Name}.png");
-                File.WriteAllBytes(file, tex.EncodeToPNG());
+                File.WriteAllBytes(file, capture.RenderPng(cam));
                 Debug.Log($"[Tour] {file}");
+
+                // UI screens again at each UiSizes resolution; the canvas needs the frames in
+                // between to lay out at the new size.
+                for (int s = 0; uiShot && s < uiCaptures.Length; s++)
+                {
+                    uiCaptures[s].Bind(cam);
+                    yield return null;
+                    yield return null;
+                    if (shot.FromMainCamera) MatchMainCamera(cam);
+
+                    string sized = Path.Combine(OutputDir,
+                        $"{index:00}_{shot.Name}_{UiSizes[s].x}x{UiSizes[s].y}.png");
+                    File.WriteAllBytes(sized, uiCaptures[s].RenderPng(cam));
+                    Debug.Log($"[Tour] {sized}");
+                }
 
                 try { shot.Teardown?.Invoke(); }
                 catch (Exception e) { Debug.LogWarning($"[Tour] teardown for {shot.Name} failed: {e.Message}"); }
@@ -133,8 +148,9 @@ namespace PetShop.Dev
                 if (canvas != null) RestoreCanvas(canvas);
             }
 
-            Destroy(cam.gameObject);
-            rt.Release();
+            Destroy(cam.gameObject);   // takes the PostProcessLayer with it
+            capture.Dispose();
+            foreach (var sized in uiCaptures) sized.Dispose();
             if (traffic != null) traffic.Unfreeze();
 
             // After the camera work: paths that cannot be photographed get checked instead.
@@ -186,7 +202,7 @@ namespace PetShop.Dev
 
             float w = gen != null ? gen.RoomWidth  : 16f;
             float d = gen != null ? gen.RoomDepth  : 12f;
-            float h = gen != null ? gen.WallHeight : 4f;
+            float h = gen != null ? gen.WallHeight : ShopLayout.WallPieceHeight;
             Vector3 shop  = gen != null ? gen.ShopCentre : Vector3.zero;
             float front   = shop.z + d * 0.5f;
             float yardEnd = gen != null ? gen.YardFrontZ : 17f;
@@ -237,10 +253,10 @@ namespace PetShop.Dev
 
             if (ui != null && ui.Stats != null)
             {
-                shots.Add(Ui("ledger_shelves",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(0); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_animals",   uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(1); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_catalogue", uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(2); }, ui.Stats.Hide));
-                shots.Add(Ui("ledger_manage",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(3); }, ui.Stats.Hide));
+                shots.Add(Ui("book_overview", uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.OverviewTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_stock",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.StockTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_animals",  uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.AnimalsTab); }, ui.Stats.Hide));
+                shots.Add(Ui("book_staff",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.StaffTab); }, ui.Stats.Hide));
             }
 
             if (ui != null && ui.Info != null)
@@ -254,7 +270,7 @@ namespace PetShop.Dev
             if (ui != null && ui.Pause != null)
                 shots.Add(Ui("pause_menu", uiFrom, uiTo,
                              () => ui.Pause.Open(),
-                             () => { ui.Pause.Close(); Time.timeScale = 1f; }));
+                             () => ui.Pause.Close()));   // Close restores the time scale Open saved
 
             // The real flow: a pen from the furniture inventory in hand, its ghost where the player aims.
             if (game != null && game.Build != null)
@@ -315,10 +331,67 @@ namespace PetShop.Dev
                 });
             }
 
+            // Every remaining UI screen, appended so the earlier indices (and baselines) stay put.
+            if (ui != null) AddRemainingUiShots(shots, ui, uiFrom, uiTo);
+
             return shots;
         }
 
         // ── Shot helpers ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The UI screens the original shot list does not reach: the book's Build and Guide pages,
+        /// the guide, settings, family tree, showcase, reorder, catalogue, build toolbar, title
+        /// screen and a notification toast.
+        /// </summary>
+        private static void AddRemainingUiShots(List<Shot> shots, GameUI ui, Vector3 uiFrom, Vector3 uiTo)
+        {
+            if (ui.Stats != null)
+            {
+                shots.Add(Ui("book_build", uiFrom, uiTo,
+                             () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.BuildTab); },
+                             () => { CloseCatalogueAndView(ui); ui.Stats.Hide(); }));
+                shots.Add(Ui("book_guide", uiFrom, uiTo,
+                             () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.GuideTab); },
+                             () => { if (ui.Guide != null) ui.Guide.Hide(); ui.Stats.Hide(); }));
+            }
+            if (ui.Guide != null)
+                shots.Add(Ui("guide", uiFrom, uiTo, ui.Guide.Show, ui.Guide.Hide));
+            if (ui.Settings != null)
+                shots.Add(Ui("settings", uiFrom, uiTo, ui.Settings.Show, ui.Settings.Hide));
+            if (ui.FamilyTree != null)
+                shots.Add(Ui("family_tree", uiFrom, uiTo, () => ui.FamilyTree.Show(TourPet()), ui.FamilyTree.Hide));
+            if (ui.Showcase != null)
+                shots.Add(Ui("showcase", uiFrom, uiTo, ui.Showcase.Show, ui.Showcase.Hide));
+            if (ui.Reorder != null)
+                shots.Add(Ui("reorder", uiFrom, uiTo, ui.Reorder.Show, ui.Reorder.Hide));
+            if (ui.Catalogue != null)
+                shots.Add(Ui("furniture_catalog", uiFrom, uiTo, ui.Catalogue.Show, ui.Catalogue.Hide));
+            if (ui.BuildView != null)
+                shots.Add(Ui("build_toolbar", uiFrom, uiTo, ui.BuildView.Enter, () => CloseCatalogueAndView(ui)));
+            if (ui.Title != null)
+                shots.Add(Ui("title_screen", uiFrom, uiTo,
+                             () => ui.Title.Build(ui.CanvasRoot, (_, _) => { }), ui.Title.Hide));
+            if (ui.HUD != null)
+                shots.Add(Ui("notification", uiFrom, uiTo,
+                             () => ui.HUD.ShowNotification("Delivery arrived — 18 × food on the forecourt"), null));
+        }
+
+        /// <summary>Closes the catalogue and leaves the build view, whichever of them is open.</summary>
+        private static void CloseCatalogueAndView(GameUI ui)
+        {
+            if (ui.Catalogue != null) ui.Catalogue.Hide();
+            if (ui.BuildView != null && ui.BuildView.IsActive) ui.BuildView.Exit();
+        }
+
+        /// <summary>An unregistered pet for the family tree shot; the panel draws it as a lone root.</summary>
+        private static PetShop.Pets.Pet TourPet()
+        {
+            var pet = ScriptableObject.CreateInstance<PetShop.Pets.Pet>();
+            pet.id      = "tour-pet";
+            pet.petName = "Biscuit";
+            return pet;
+        }
 
         private static Shot World(string name, Vector3 from, Vector3 to, float fov) =>
             new() { Name = name, Kind = Kind.World, Position = from, LookAt = to, Fov = fov };

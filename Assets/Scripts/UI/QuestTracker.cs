@@ -34,7 +34,7 @@ namespace PetShop.UI
         private static readonly Vector2 PanelMax    = new(340f, PanelTop);
         private static readonly Vector2 TextMin     = new(0.03f, 0.04f);
         private static readonly Vector2 TextMax     = new(0.97f, 0.96f);
-        private static readonly Color   HighlightBg = new(0.10f, 0.30f, 0.17f, 0.94f);
+        private static readonly Color   HighlightBg = UIFactory.PositiveFill;
 
         private GameManager   _game;
         private GameObject    _root;

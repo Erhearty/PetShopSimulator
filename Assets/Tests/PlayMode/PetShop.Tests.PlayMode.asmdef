@@ -3,6 +3,9 @@
     "rootNamespace": "PetShop.Tests",
     "references": [
         "PetShop",
+        "Unity.Postprocessing.Runtime",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -26,6 +26,7 @@ namespace PetShop.UI
         private BuildMode   _build;
 
         private TMP_Text _balanceLabel;
+        private BalanceTicker _balanceTicker;
         private TMP_Text _tickerLabel;
         private TMP_Text _dayLabel;
         private TMP_Text _repLabel;
@@ -96,6 +97,7 @@ namespace PetShop.UI
             _balanceLabel = UIFactory.Label("Balance", money.transform, "€ 0",
                 new Vector2(0.06f, 0.40f), new Vector2(0.96f, 0.97f), 30f, UIFactory.Good);
             _balanceLabel.fontStyle = FontStyles.Bold;
+            _balanceTicker = _balanceLabel.gameObject.AddComponent<BalanceTicker>();
             // Live running total for the day — the thing players check most often.
             _tickerLabel = UIFactory.Label("Ticker", money.transform, "today  +€ 0  /  −€ 0",
                 new Vector2(0.06f, 0.05f), new Vector2(0.96f, 0.42f), 13f, UIFactory.InkMuted);
@@ -152,10 +154,10 @@ namespace PetShop.UI
         {
             float top = CardBottom - ChipHeight - 6f - 38f;   // below chips and the alert strip
             var toast = UIFactory.Card("Toast", canvas, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                                       new Color(0.10f, 0.14f, 0.21f, 0.94f),
+                                       UIFactory.CardBg,
                                        new Vector2(-400f, top - 40f), new Vector2(400f, top));
             _notification = UIFactory.Label("ToastText", toast.transform, "",
-                new Vector2(0.03f, 0f), new Vector2(0.97f, 1f), 17f, new Color(1f, 0.94f, 0.72f),
+                new Vector2(0.03f, 0f), new Vector2(0.97f, 1f), UIFactory.TextBody, UIFactory.Ink,
                 TextAlignmentOptions.Center);
             toast.SetActive(false);
         }
@@ -164,7 +166,7 @@ namespace PetShop.UI
         private void BuildCrosshair(Transform canvas)
         {
             var dot = UIFactory.Panel("Crosshair", canvas, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                                      new Color(1f, 1f, 1f, 0.55f),
+                                      UIFactory.Crosshair,
                                       new Vector2(-2.5f, -2.5f), new Vector2(2.5f, 2.5f));
             dot.GetComponent<Image>().raycastTarget = false;
             _crosshair = dot;
@@ -175,9 +177,11 @@ namespace PetShop.UI
             var holder = UIFactory.Node("InteractPrompt", canvas,
                                         new Vector2(0.25f, 0.20f), new Vector2(0.75f, 0.26f));
             _prompt = holder.AddComponent<TextMeshProUGUI>();
+            var font = UIFactory.Font();
+            if (font != null) _prompt.font = font;
             _prompt.fontSize  = 21f;
             _prompt.alignment = TextAlignmentOptions.Center;
-            _prompt.color     = new Color(1f, 0.95f, 0.65f);
+            _prompt.color     = UIFactory.Accent;
             _prompt.raycastTarget = false;
             _prompt.enabled   = false;
         }
@@ -266,7 +270,14 @@ namespace PetShop.UI
 
         private void OnBuildEntered(PlacedObjectData item)
         {
-            if (_buildHint != null)
+            if (_buildHint != null && item == null)
+            {
+                // The Remove tool carries no item.
+                _buildHintBase     = $"Remove tool — LMB / middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
+                _buildHint.text    = _buildHintBase;
+                _buildHint.enabled = true;
+            }
+            else if (_buildHint != null)
             {
                 _buildHintBase     = $"Placing {item.DisplayName} — LMB place · " +
                                      $"middle-click / {InputBindings.Label(GameAction.BuildRemove)} remove · Esc cancel";
@@ -338,8 +349,7 @@ namespace PetShop.UI
 
             if (_balanceLabel != null)
             {
-                _balanceLabel.text  = $"€ {_shop.Balance:N0}";
-                _balanceLabel.color = _shop.Balance >= _shop.DailyRent ? UIFactory.Good : UIFactory.Bad;
+                _balanceTicker.SetTarget(_shop.Balance, _shop.Balance >= _shop.DailyRent ? UIFactory.Good : UIFactory.Bad);
             }
             if (_tickerLabel != null)
             {

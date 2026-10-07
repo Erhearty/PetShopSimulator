@@ -111,10 +111,10 @@ namespace PetShop.UI
             btn.onClick.AddListener(() => Activate(captured));
 
             var swatchGo = UIFactory.Card("Icon", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                          Color.white, new Vector2(8f, -38f), new Vector2(38f, -8f));
+                                          UIFactory.NoTint, new Vector2(8f, -38f), new Vector2(38f, -8f));
             slot.Swatch = swatchGo.GetComponent<Image>();
             slot.Letter = UIFactory.Label("Letter", swatchGo.transform, "", Vector2.zero, Vector2.one, 16f,
-                                          Color.white, TextAlignmentOptions.Center);
+                                          UIFactory.NoTint, TextAlignmentOptions.Center);
 
             slot.Key = UIFactory.Label("Key", card.transform, $"{index + 1}", new Vector2(0.55f, 0.55f), new Vector2(0.96f, 0.96f),
                                        13f, UIFactory.InkMuted, TextAlignmentOptions.TopRight);

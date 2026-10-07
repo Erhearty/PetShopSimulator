@@ -13,7 +13,8 @@ namespace PetShop.Shop
     /// 3D build mode — projects the mouse onto the floor plane, shows a translucent
     /// ghost of the item, and places real furniture on LMB.
     /// LMB place | R / Shift+R rotate (wheel too while holding an item) | Q cycle pen species |
-    /// RMB/Esc/B cancel | Delete-key or middle-click removes.
+    /// RMB (first person only) / Esc / B cancel | Delete-key or middle-click removes.
+    /// The Remove tool lives in BuildMode.Remove.cs.
     /// Held-item placement (from the furniture inventory) lives in BuildMode.Held.cs, the ghost
     /// in BuildMode.Ghost.cs.
     /// </summary>
@@ -41,6 +42,13 @@ namespace PetShop.Shop
         public UnityEvent<GameObject>                   OnFurnitureDespawning   = new();
 
         /// <summary>
+        /// Raised after the player places furniture interactively (paid or from the hand). Unlike
+        /// <see cref="OnFurnitureSpawned"/> it is not raised by save loading, room seeding or dev
+        /// furnishing, which call <see cref="Place"/> directly — game-feel effects listen here.
+        /// </summary>
+        public UnityEvent<GameObject>                   OnFurniturePlacedByPlayer = new();
+
+        /// <summary>
         /// Pen species the player may pick with Q for the legacy <c>pet_pen</c>, as pen variant
         /// strings. Per-species pens ignore it. Null or empty leaves the factory default (Rabbit).
         /// </summary>
@@ -48,6 +56,14 @@ namespace PetShop.Shop
 
         /// <summary>Catalog type of pens, the only item whose species can be picked.</summary>
         private const string PenType = "pen";
+        /// <summary>Shown when the Remove tool is used on a cell with nothing on it.</summary>
+        public const string NothingToRemoveNotice = "Nothing to remove there.";
+        /// <summary>Shown when an occupied pen refuses to be packed away.</summary>
+        public const string PenHasPetsNotice = "Move the pets out before packing this pen away.";
+        /// <summary>Shown when the Remove tool's aim meets neither a placed piece nor the floor (or there is no camera).</summary>
+        public const string AimToRemoveNotice = "Aim at a piece or the floor to remove it.";
+        /// <summary>Shown when the grid refuses to give up a piece it holds.</summary>
+        public const string CannotRemoveNotice = "That piece can't be removed right now.";
         /// <summary>Share of an item's cost refunded when removed without a furniture inventory.</summary>
         private const float SellBackShare = 0.5f;
         /// <summary>Index into the current pen variant options; wrapped on use.</summary>
@@ -89,6 +105,7 @@ namespace PetShop.Shop
         {
             CurrentItem = item;
             IsActive    = true;
+            IsRemoving  = false;
             _rotation   = 0f;
             CreateGhost();
             OnBuildModeEntered.Invoke(item);
@@ -99,7 +116,8 @@ namespace PetShop.Shop
         public void ExitBuildMode()
         {
             if (!IsActive) return;
-            IsActive = false;
+            IsActive   = false;
+            IsRemoving = false;
             ReturnHeld();
             DestroyGhost();
             OnBuildModeExited.Invoke();
@@ -113,8 +131,10 @@ namespace PetShop.Shop
             if (!IsActive) return;
 
             // Escape is routed by GameUI so a single press cannot also close a panel.
-            if (InputBindings.GetKeyDown(GameAction.BuildMode) || Input.GetMouseButtonDown(1))
+            // RMB cancels in first person; in the build view it is the camera's.
+            if (InputBindings.GetKeyDown(GameAction.BuildMode) || (Input.GetMouseButtonDown(1) && RightClickCancels))
             { ExitBuildMode(); return; }
+            if (IsRemoving) { UpdateRemoveTool(); return; }
 
             HandleRotationInput();
             if (Input.GetKeyDown(KeyCode.Q)) CyclePenVariant();
@@ -136,7 +156,7 @@ namespace PetShop.Shop
             var cell = GridManager.WorldToGrid(worldPos);
             if (IsHolding) { PlaceHeld(cell); return; }
 
-            if (RefusePlacement(CurrentItem, cell, CurrentItem.Size)) return;
+            if (RefusePlacement(CurrentItem, cell, CurrentItem.Size, _rotation)) return;
             if (Shop != null && Shop.Balance < CurrentItem.Cost)
             {
                 OnBuildMessage.Invoke($"Not enough money — {CurrentItem.DisplayName} costs €{CurrentItem.Cost:N0}.");
@@ -145,7 +165,9 @@ namespace PetShop.Shop
 
             PrepareFloor(CurrentItem, cell, CurrentItem.Size);
             string variant = IsLegacyPen(CurrentItem) ? CurrentPenVariant() : null;
-            AddStarterPair(Place(cell, CurrentItem, variant, _rotation, charge: true), CurrentItem);
+            var go = Place(cell, CurrentItem, variant, _rotation, charge: true);
+            AddStarterPair(go, CurrentItem);
+            if (go != null) OnFurniturePlacedByPlayer.Invoke(go);
         }
 
         /// <summary>
@@ -194,6 +216,7 @@ namespace PetShop.Shop
                 Shop.ChangeBalance(-def.Cost, $"Build {def.DisplayName}");
 
             var go = FurnitureFactory.Spawn(def, cell, variant, GridManager, ObjectRoot, rotation, size);
+            if (Layout != null) Layout.ShapeRoomWallPiece(go, cell, def);   // a ring corner closes itself
             _placedNodes[cell] = go;
 
             if (GridManager.TryGetObject(cell, out var entry))
@@ -207,11 +230,45 @@ namespace PetShop.Shop
             return go;
         }
 
-        /// <summary>Removes whatever stands on the floor cell under the aim point.</summary>
+        /// <summary>Removes the piece under the aim point, or whatever stands on the floor cell there.</summary>
         public void TryRemoveUnderCursor()
         {
-            if (!RaycastFloor(out var worldPos)) return;
-            RemoveAtWorldPos(worldPos);
+            if (!TryAimRay(out var ray)) { OnBuildMessage.Invoke(AimToRemoveNotice); return; }
+            RemoveAlongRay(ray);
+        }
+
+        /// <summary>
+        /// Removes the placed piece <paramref name="ray"/> hits (any collider of it, children included, on the
+        /// furniture layer); when it hits none, whatever stands on the floor cell where the ray meets the floor.
+        /// Aiming at a tall piece such as a wall therefore removes that wall, not the cell behind it.
+        /// </summary>
+        public void RemoveAlongRay(Ray ray)
+        {
+            if (!TryAimCell(ray, out var cell)) { OnBuildMessage.Invoke(AimToRemoveNotice); return; }
+            RemoveAtWorldPos(GridManager.GridToWorld(cell));
+        }
+
+        /// <summary>The root cell of the piece <paramref name="ray"/> hits, else the floor cell it reaches.</summary>
+        private bool TryAimCell(Ray ray, out Vector2Int cell)
+        {
+            if (TryPieceAlongRay(ray, out cell)) return true;
+            if (!FloorPoint(ray, out var worldPos)) return false;
+            cell = GridManager.WorldToGrid(worldPos);
+            return true;
+        }
+
+        /// <summary>True when <paramref name="ray"/> hits a collider belonging to a placed piece; gives its root cell.</summary>
+        private bool TryPieceAlongRay(Ray ray, out Vector2Int root)
+        {
+            root = default;
+            float reach = Cursor.lockState == CursorLockMode.Locked || _cam == null
+                ? MaxPlacementDistance : _cam.farClipPlane;
+            if (!Physics.Raycast(ray, out var hit, reach, GameLayers.InteractMask, QueryTriggerInteraction.Ignore))
+                return false;
+            for (var t = hit.collider.transform; t != null; t = t.parent)
+                foreach (var node in _placedNodes)
+                    if (node.Value == t.gameObject) { root = node.Key; return true; }
+            return false;
         }
 
         /// <summary>
@@ -222,18 +279,20 @@ namespace PetShop.Shop
         public void RemoveAtWorldPos(Vector3 worldPos)
         {
             var cell = GridManager.WorldToGrid(worldPos);
-            if (!GridManager.TryGetObject(cell, out var entry)) return;
+            if (!GridManager.TryGetObject(cell, out var entry)) { OnBuildMessage.Invoke(NothingToRemoveNotice); return; }
             if (Supply != null && PenHasPets(entry.Instance))
             {
-                OnBuildMessage.Invoke("Move the pets out before packing this pen away.");
+                OnBuildMessage.Invoke(PenHasPetsNotice);
                 return;
             }
 
-            var root = entry.Root;
-            var def  = entry.Data;
-            if (Supply != null) ReturnShelfStock(entry.Instance);
-            if (!GridManager.RemoveObject(cell)) return;
-            ReleaseFloor(def, root, entry.Size);
+            var root     = entry.Root;
+            var def      = entry.Data;
+            var instance = entry.Instance;
+            var size     = entry.Size;
+            if (!GridManager.RemoveObject(cell)) { OnBuildMessage.Invoke(CannotRemoveNotice); return; }
+            if (Supply != null) ReturnShelfStock(instance);
+            ReleaseFloor(def, root, size);
 
             DespawnNode(root);
             string message = SettleRemoval(def);
@@ -290,13 +349,27 @@ namespace PetShop.Shop
         private bool RaycastFloor(out Vector3 worldPos)
         {
             worldPos = Vector3.zero;
+            return TryAimRay(out var ray) && FloorPoint(ray, out worldPos);
+        }
+
+        /// <summary>The aim ray: through the screen centre in first person, through the free cursor otherwise.</summary>
+        private bool TryAimRay(out Ray ray)
+        {
+            ray = default;
             if (_cam == null) { _cam = Camera.main; if (_cam == null) return false; }
 
             Vector3 aim = Cursor.lockState == CursorLockMode.Locked
                 ? new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f)
                 : Input.mousePosition;
 
-            Ray ray = _cam.ScreenPointToRay(aim);
+            ray = _cam.ScreenPointToRay(aim);
+            return true;
+        }
+
+        /// <summary>Where <paramref name="ray"/> meets the y = 0 floor, clamped to reach in first person.</summary>
+        private bool FloorPoint(Ray ray, out Vector3 worldPos)
+        {
+            worldPos = Vector3.zero;
             if (Mathf.Abs(ray.direction.y) < 0.0001f) return false;
 
             float t = -ray.origin.y / ray.direction.y;
@@ -307,7 +380,7 @@ namespace PetShop.Shop
             // Keep placement within arm's reach-ish, so looking at the horizon does not put
             // furniture on the far side of the map. The overhead build view aims with a free
             // cursor at whatever is on screen, so it is not limited.
-            if (Cursor.lockState != CursorLockMode.Locked) return true;
+            if (Cursor.lockState != CursorLockMode.Locked || _cam == null) return true;
             Vector3 from = _cam.transform.position; from.y = 0f;
             Vector3 flat = worldPos;                flat.y = 0f;
             if (Vector3.Distance(from, flat) > MaxPlacementDistance)

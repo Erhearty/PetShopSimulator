@@ -117,6 +117,8 @@ namespace PetShop.Tests
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha1));
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha8));
             Assert.IsFalse(InputBindings.IsBindable(KeyCode.Alpha9));
+            foreach (var key in new[] { KeyCode.Z, KeyCode.X, KeyCode.C, KeyCode.V, KeyCode.G })
+                Assert.IsFalse(InputBindings.IsBindable(key), $"{key} is a build-toolbar key");
             Assert.IsTrue(InputBindings.IsBindable(KeyCode.Space));
             Assert.IsTrue(InputBindings.IsBindable(KeyCode.Return));
         }

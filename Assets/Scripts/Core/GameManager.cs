@@ -56,12 +56,20 @@ namespace PetShop.Core
         public float DayProgress => DayLengthSeconds <= 0f ? 0f
             : Mathf.Clamp01(_dayElapsed / DayLengthSeconds);
 
+        /// <summary>Opening time on the shop-floor clock, in hours.</summary>
+        public const float OpeningHour = 9f;
+        /// <summary>Closing time on the shop-floor clock, in hours.</summary>
+        public const float ClosingHour = 18f;
+
+        /// <summary>The shop-floor clock in game hours: 9 at opening, 18 at closing.</summary>
+        public float CurrentGameHour => Mathf.Lerp(OpeningHour, ClosingHour, DayProgress);
+
         /// <summary>Shop-floor clock, 09:00 to 18:00 across the trading day.</summary>
         public string ClockText
         {
             get
             {
-                float hours   = Mathf.Lerp(9f, 18f, DayProgress);
+                float hours   = CurrentGameHour;
                 int   hour    = Mathf.FloorToInt(hours);
                 int   minutes = Mathf.FloorToInt((hours - hour) * 60f);
                 return $"{hour:00}:{minutes:00}";
@@ -147,6 +155,7 @@ namespace PetShop.Core
         {
             _saveLoad.NewGame(skipTutorial);
             if (PlaytestOptions.Furnish) Dev.DevFurnisher.Furnish(this, PlaytestOptions.Seed ?? Dev.DevFurnisher.DefaultSeed);
+            if (PlaytestOptions.Furnish && (Application.isBatchMode || Debug.isDebugBuild)) Dev.SoakSteward.Begin(this); // unattended stock chores
         }
 
         private void Update()
@@ -176,9 +185,59 @@ namespace PetShop.Core
             if (_dayElapsed >= DayLengthSeconds) EndDay();
         }
 
+        /// <summary>Slowest -timescale honoured.</summary>
+        public const float MinTimeScale = 1f;
+        /// <summary>Fastest -timescale honoured.</summary>
+        public const float MaxTimeScale = 20f;
+
+        /// <summary>
+        /// Unity's own Time.maximumDeltaTime default (1/3 s): the cap at 1x, and the floor of
+        /// <see cref="MaxDeltaTimeFor"/>.
+        /// </summary>
+        public const float DefaultMaxDeltaTime = 1f / 3f;
+
+        /// <summary>
+        /// Slowest real frame, in real seconds, that still advances the full -timescale. Unity caps
+        /// the SCALED Time.deltaTime with Time.maximumDeltaTime, so a fixed cap would also cap the
+        /// speed-up (0.1 s held -timescale 20 to ~6x at 60 fps); the cap is this many real seconds
+        /// times the time scale instead.
+        /// </summary>
+        public const float MaxRealFrameSeconds = 1f / 30f;
+
+        /// <summary>
+        /// Time.maximumDeltaTime for <paramref name="timeScale"/>: one <see cref="MaxRealFrameSeconds"/>
+        /// frame of game time, never below <see cref="DefaultMaxDeltaTime"/>. Any frame at 30 fps or
+        /// better then advances the full timescale (so -timescale N really delivers N), while a
+        /// hitch slower than that is clipped rather than throwing NavMesh agents metres past their
+        /// stopping distance in one step. Time.fixedDeltaTime is left alone: physics keeps its normal
+        /// step (this cap also bounds how many fixed steps a frame may catch up), just run more
+        /// often per real second.
+        /// </summary>
+        public static float MaxDeltaTimeFor(float timeScale) =>
+            Mathf.Max(DefaultMaxDeltaTime, MaxRealFrameSeconds * timeScale);
+
+        /// <summary>
+        /// The value after -timescale in <paramref name="args"/>, clamped to
+        /// [<see cref="MinTimeScale"/>, <see cref="MaxTimeScale"/>]; null when absent or not a number.
+        /// </summary>
+        public static float? ParseTimeScale(string[] args)
+        {
+            if (args == null) return null;
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] != "-timescale") continue;
+                if (!float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out float scale)
+                    || float.IsNaN(scale)) return null;
+                return Mathf.Clamp(scale, MinTimeScale, MaxTimeScale);
+            }
+            return null;
+        }
+
         /// <summary>
         /// Honours -daylength &lt;seconds&gt; so the game can be driven headlessly, and
-        /// so players can pick a pace without rebuilding.
+        /// so players can pick a pace without rebuilding; and -timescale &lt;N&gt; (1-20) so a
+        /// soak run can fast-forward a real-length day.
         /// </summary>
         private void ApplyCommandLineOverrides()
         {
@@ -190,6 +249,14 @@ namespace PetShop.Core
                     DayLengthSeconds = seconds;
                     Debug.Log($"[Game] Day length set to {seconds}s from the command line.");
                 }
+            }
+
+            float? timeScale = ParseTimeScale(args);
+            if (timeScale.HasValue)
+            {
+                Time.timeScale        = timeScale.Value;
+                Time.maximumDeltaTime = MaxDeltaTimeFor(timeScale.Value);
+                Debug.Log($"[Game] Time scale set to {timeScale.Value}x from the command line.");
             }
             _autoContinue = Application.isBatchMode;
         }

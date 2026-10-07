@@ -38,6 +38,18 @@ namespace PetShop.Commerce
 
         public UnityEvent<int> OnQueueChanged = new();
 
+        /// <summary>Fired when a shopper joins the back of the line (read by telemetry and tests).</summary>
+        public UnityEvent<IShopper> OnShopperJoined = new();
+
+        /// <summary>
+        /// Fired when a shopper is rung up, by the player or an assistant, with the basket value
+        /// captured before the shopper paid. Feedback (coins, floating text) hangs off this.
+        /// </summary>
+        public UnityEvent<IShopper, float> OnShopperServed = new();
+
+        /// <summary>Fired when a shopper runs out of patience and walks out of the line.</summary>
+        public UnityEvent<IShopper> OnShopperGaveUp = new();
+
         private readonly List<IShopper>      _queue = new();
         private readonly Dictionary<IShopper, float> _joinedAt = new();
         private readonly Dictionary<IShopper, float> _patience = new();
@@ -71,6 +83,7 @@ namespace PetShop.Commerce
             _joinedAt[shopper] = Time.time;
             _patience[shopper] = Mathf.Max(MinPatienceMultiplier, patienceMultiplier);
             OnQueueChanged.Invoke(_queue.Count);
+            OnShopperJoined.Invoke(shopper);
         }
 
         public void Leave(IShopper shopper)
@@ -126,8 +139,10 @@ namespace PetShop.Commerce
             var shopper = NextReady;
             if (shopper == null) return null;
 
+            float value = shopper.BasketValue;
             Leave(shopper);
             shopper.OnServed();
+            OnShopperServed.Invoke(shopper, value);
             return shopper;
         }
 
@@ -142,6 +157,7 @@ namespace PetShop.Commerce
 
                 Leave(shopper);
                 shopper.OnGaveUp();
+                OnShopperGaveUp.Invoke(shopper);
             }
         }
     }

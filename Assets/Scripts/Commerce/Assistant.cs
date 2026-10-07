@@ -58,6 +58,10 @@ namespace PetShop.Commerce
         /// <summary>True while walking to or working at a shelf or pen, away from the till.</summary>
         private bool _away;
 
+        /// <summary>The notice shown, once for the whole shop, when the last counter goes and cashiers stop serving.</summary>
+        public const string NoCounterNotice =
+            "Your cashiers have no counter to serve from — place a counter to open the till again.";
+
         /// <summary>Builds an assistant standing at the till, facing the queue.</summary>
         public static Assistant Create(Transform parent, Vector3 position, Vector3 facing,
                                        CheckoutQueue queue, ShopManager shop, int index)
@@ -166,6 +170,7 @@ namespace PetShop.Commerce
         private void Update()
         {
             if (Role != StaffRole.Cashier || _away) { _timer = 0f; return; }
+            if (!HasCounterToServeFrom()) { _timer = 0f; return; }
             if (Queue == null || !Queue.FrontReady) { _timer = 0f; return; }
 
             _timer += Time.deltaTime;
@@ -179,6 +184,19 @@ namespace PetShop.Commerce
             Queue.ServeFront();
             AudioManager.Instance?.PlaySfx("sale", 0.6f);
             GameManager.Instance?.Notify($"{name.Replace('_', ' ')} served {shopper.ShopperName} — €{value:N2}");
+        }
+
+        /// <summary>
+        /// True when there is a counter to serve from. Without one (the last counter was packed away)
+        /// the cashier stays on the payroll but waits. The shop is told once per loss of the last counter, not
+        /// once per cashier (<see cref="GameManager.ClaimNoCounterNotice"/>).
+        /// </summary>
+        private bool HasCounterToServeFrom()
+        {
+            var game = GameManager.Instance;
+            if (game == null || game.StaffStationValid) return true;
+            if (game.ClaimNoCounterNotice()) Notify(NoCounterNotice);
+            return false;
         }
 
         /// <summary>Name for notifications: the staff name, or the object name as a fallback.</summary>

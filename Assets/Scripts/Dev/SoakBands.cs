@@ -29,6 +29,32 @@ namespace PetShop.Dev
         public float reputation;
         /// <summary>Shop balance at close.</summary>
         public float balance;
+
+        // Diagnostic breakdowns, appended after the band fields so existing readers are unaffected.
+        // Each walkout* sums to walkoutsEmpty; each navTimeout* sums to navTimeouts.
+
+        /// <summary>Empty walkouts: nothing they were after was in stock.</summary>
+        public int walkoutNoStockForWant;
+        /// <summary>Empty walkouts: what they wanted cost more than they would pay.</summary>
+        public int walkoutTooExpensive;
+        /// <summary>Empty walkouts: at least one walk to a shelf or pen failed.</summary>
+        public int walkoutCouldNotReachShelf;
+        /// <summary>Empty walkouts: stock was there, every purchase roll failed.</summary>
+        public int walkoutNotTempted;
+        /// <summary>Navigation timeouts walking in to the forecourt.</summary>
+        public int navTimeoutForecourtIn;
+        /// <summary>Navigation timeouts walking to a shelf or pen.</summary>
+        public int navTimeoutBrowse;
+        /// <summary>Navigation timeouts walking to the register (no queue).</summary>
+        public int navTimeoutRegister;
+        /// <summary>Navigation timeouts walking to a queue place.</summary>
+        public int navTimeoutQueue;
+        /// <summary>Navigation timeouts stepping aside off the queue line.</summary>
+        public int navTimeoutStepAside;
+        /// <summary>Navigation timeouts walking back out to the forecourt.</summary>
+        public int navTimeoutForecourtOut;
+        /// <summary>Navigation timeouts walking off along the pavement.</summary>
+        public int navTimeoutExit;
     }
 
     /// <summary>

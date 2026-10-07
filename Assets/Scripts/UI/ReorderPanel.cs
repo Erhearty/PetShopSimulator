@@ -29,7 +29,7 @@ namespace PetShop.UI
         private const float RowsBottom = 0.05f;
 
         /// <summary>Toggle-on fill: dark enough for white-ish text at ≥ 4.5:1.</summary>
-        private static readonly Color ToggleOn = new Color(0.10f, 0.38f, 0.22f, 0.98f);
+        private static readonly Color ToggleOn = UIFactory.PositiveFill;
 
         private class Row
         {
@@ -48,14 +48,11 @@ namespace PetShop.UI
         {
             _game = game;
             _root = UIFactory.Panel("ReorderDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
-            var panel = UIFactory.Panel("Reorder", _root.transform,
+                                    UIFactory.Dim);
+            var panel = UIFactory.ModalPanel("Reorder", _root.transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), UIFactory.PanelBg,
                 new Vector2(-420f, -260f), new Vector2(420f, 260f));
-            UIFactory.Panel("Accent", panel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                            UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
-            UIFactory.Label("Header", panel.transform, "Auto-reorder",
-                new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f), 24f, UIFactory.Ink);
+            UIFactory.Header(panel.transform, "Auto-reorder", new Vector2(0.03f, 0.89f), new Vector2(0.76f, 0.97f));
             UIFactory.Button("Close", panel.transform, "Close",
                 new Vector2(0.78f, 0.895f), new Vector2(0.97f, 0.965f), 15f).onClick.AddListener(Hide);
             BuildHeadings(panel.transform);

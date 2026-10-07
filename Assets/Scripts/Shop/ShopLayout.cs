@@ -12,7 +12,7 @@ namespace PetShop.Shop
     /// with an empty shop; the player orders and places every piece of furniture. Everything here is edited by hand in the scene; anchors left empty fall back to the
     /// positions derived from the dimensions, which reproduces the generated layout exactly.
     /// </summary>
-    public class ShopLayout : MonoBehaviour
+    public partial class ShopLayout : MonoBehaviour
     {
         [Header("Yard — the open lot the shop stands in (metres)")]
         public float YardWidth = 64f;
@@ -21,9 +21,29 @@ namespace PetShop.Shop
         [Header("Shop building (metres)")]
         public float RoomWidth  = 16f;
         public float RoomDepth  = 12f;
-        public float WallHeight = 4f;
+        /// <summary>Height of the room's walls: always the wall pieces' height, so the roof sits on their tops.</summary>
+        public float WallHeight => WallPieceHeight;
         public float ShopSideMargin  = 2f;
-        public float ShopFrontMargin = 7f;
+        /// <summary>
+        /// Room edge to street edge. 3 m puts the room's front wall-ring row on the yard's front row, so the
+        /// shopfront opens straight onto the street (layout version 1; version 0 stood 7 m back).
+        /// </summary>
+        public float ShopFrontMargin = 3f;
+
+        /// <summary>Save layout version written by this build; see <see cref="LegacyLayoutCellShift"/>.</summary>
+        public const int CurrentLayoutVersion = 1;
+        /// <summary>Grid cells the room moved towards the street between layout version 0 and 1.</summary>
+        public static readonly Vector2Int LegacyLayoutCellShift = new(0, 2);
+
+        /// <summary>Metres from the wall ring's street edge to the forecourt spot customers and deliveries use.</summary>
+        private const float ForecourtStandoff = 2.5f;
+        /// <summary>Metres from the forecourt spot to the derived pavement centre, along the street direction.</summary>
+        private const float PavementAhead = 2.5f;
+        /// <summary>
+        /// Metres of yard behind the room inside the starter lot: the strip the room vacated when it moved to the
+        /// street, so the starter lot keeps its old size.
+        /// </summary>
+        private const float StarterLotBackStrip = 4f;
 
         [Header("Anchors — optional, derived from the dimensions when empty")]
         public Transform ShopCentreAnchor;
@@ -67,9 +87,9 @@ namespace PetShop.Shop
         public Vector3 DoorPosition => DoorAnchor != null ? Flat(DoorAnchor.position)
             : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f - 1.6f);
 
-        /// <summary>On the forecourt, a couple of metres outside the shop door.</summary>
+        /// <summary>On the street side, a couple of metres outside the shopfront's wall ring.</summary>
         public Vector3 ForecourtPosition => ForecourtAnchor != null ? Flat(ForecourtAnchor.position)
-            : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f + 2.5f);
+            : ShopCentre + new Vector3(0f, 0f, RoomDepth * 0.5f + WallRingOffset * GridManager.CellSize + ForecourtStandoff);
 
         /// <summary>Where the player starts (full position, height included).</summary>
         public Vector3 PlayerStartPosition => PlayerStartAnchor != null ? PlayerStartAnchor.position
@@ -82,7 +102,7 @@ namespace PetShop.Shop
             {
                 if (PavementAnchor != null) return Flat(PavementAnchor.position);
                 if (_pavementOverride.HasValue) return _pavementOverride.Value;
-                return ForecourtPosition + Vector3.forward * 6f;
+                return ForecourtPosition + Vector3.forward * PavementAhead;
             }
         }
 
@@ -108,7 +128,9 @@ namespace PetShop.Shop
 
         /// <summary>
         /// Makes every cell of lot <paramref name="stage"/> buildable. Stages only grow, so
-        /// cells from an earlier stage stay buildable; the doorway never is. Does nothing
+        /// cells from an earlier stage stay buildable; the doorway never is, except where it crosses
+        /// the wall ring. The room's wall ring (<see cref="RoomWallCells"/>) always keeps its floor, so a
+        /// removed wall can be put back after a load or tier-up. Does nothing
         /// before <see cref="FillFloorGrid"/> has bound a grid.
         /// </summary>
         public void ApplyLotStage(int stage)
@@ -118,6 +140,8 @@ namespace PetShop.Shop
             RectInt area = LotStageCells(stage);
             _grid.FillFloorRect(area.position, area.size);
             ClearDoorway();
+            EnsureRoomWallFloor();
+            RemoveLegacyRoomWallCorners();
         }
 
         /// <summary>Grid cells covered by a lot stage, clamped to the yard.</summary>
@@ -132,7 +156,8 @@ namespace PetShop.Shop
             Vector3 shop = ShopCentre;
             float xMin = shop.x - RoomWidth * 0.5f;
             float xMax = shop.x + RoomWidth * 0.5f;
-            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f : shop.z - RoomDepth * 0.5f;
+            float zMin = stage >= BackStripLotStage ? -YardDepth * 0.5f
+                                                    : shop.z - RoomDepth * 0.5f - StarterLotBackStrip;
 
             int x0 = Mathf.Max(yard.xMin, Mathf.FloorToInt(xMin / cs));
             int x1 = Mathf.Min(yard.xMax, Mathf.CeilToInt(xMax / cs));
@@ -180,13 +205,34 @@ namespace PetShop.Shop
             if (grid == null) return false;
             var footprint = new RectInt(cell, size);
             RectInt yard  = LotStageCells(FullYardLotStage);
-            if (IsInsideShop(cell, size) || DoorwayCells(grid.WorldToGrid(DoorPosition)).Overlaps(footprint))
+            if (IsInsideShop(cell, size) || OverlapsDoorway(footprint))
                 return false;
             for (int x = 0; x < size.x; x++)
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
                 if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// True when a building piece (wall, window wall, doorway, fence) of <paramref name="size"/> rooted at
+        /// <paramref name="cell"/> may stand in the yard: every footprint cell lies inside the full yard (never the
+        /// street), is free on <paramref name="grid"/>, and is not a doorway clearance cell off the wall ring.
+        /// Ignores the unlocked lot stage and needs no floor — walls go anywhere in the yard. The wall ring's own
+        /// rule (<see cref="AllowsOnRoomWallRing"/>) is checked separately.
+        /// </summary>
+        public bool CanPlaceStructure(GridManager grid, Vector2Int cell, Vector2Int size)
+        {
+            if (grid == null) return false;
+            RectInt yard = LotStageCells(FullYardLotStage);
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            {
+                var check = cell + new Vector2Int(x, y);
+                if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+                if (IsDoorwayCell(check) && !IsRoomWallCell(check)) return false;
             }
             return true;
         }
@@ -206,19 +252,41 @@ namespace PetShop.Shop
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
-                if (!unlocked.Contains(check) && !grid.TryGetObject(check, out _)) grid.SetFloor(check, false);
+                if (unlocked.Contains(check) || IsRoomWallCell(check) || grid.TryGetObject(check, out _)) continue;
+                grid.SetFloor(check, false);
             }
         }
 
+        /// <summary>Takes the floor off the front and back doorways so no furniture blocks either way through.</summary>
         private void ClearDoorway()
         {
-            Vector2Int door = _grid.WorldToGrid(DoorPosition);
-            for (int dz = DoorwayBehind; dz <= DoorwayAhead; dz++)
-                for (int dx = DoorwayLeft; dx <= DoorwayRight; dx++)
-                    _grid.SetFloor(new Vector2Int(door.x + dx, door.y + dz), false);
+            foreach (var cell in DoorwayCells(_grid.WorldToGrid(DoorPosition)).allPositionsWithin)
+                _grid.SetFloor(cell, false);
+            foreach (var cell in BackDoorwayCells().allPositionsWithin)
+                _grid.SetFloor(cell, false);
         }
 
         // ── NavMesh ─────────────────────────────────────────────────────────────
+
+        /// <summary>Open <see cref="SuspendNavMeshBakes"/> calls; bakes are deferred while above zero.</summary>
+        private int  _bakeSuspensions;
+        /// <summary>True when a bake was asked for while suspended and is still owed.</summary>
+        private bool _bakePending;
+
+        /// <summary>
+        /// Defers <see cref="BakeNavMesh"/> until the matching <see cref="ResumeNavMeshBakes"/>, so laying
+        /// many pieces at once (seeding, loading) bakes once instead of once per piece. Nests.
+        /// </summary>
+        public void SuspendNavMeshBakes() => _bakeSuspensions++;
+
+        /// <summary>Ends one <see cref="SuspendNavMeshBakes"/>; the last one runs a single owed bake.</summary>
+        public void ResumeNavMeshBakes()
+        {
+            if (_bakeSuspensions > 0) _bakeSuspensions--;
+            if (_bakeSuspensions > 0 || !_bakePending) return;
+            _bakePending = false;
+            BakeNavMesh();
+        }
 
         /// <summary>
         /// (Re)bakes the walkable surface. Call after furniture changes so customers
@@ -226,6 +294,7 @@ namespace PetShop.Shop
         /// </summary>
         public void BakeNavMesh()
         {
+            if (_bakeSuspensions > 0) { _bakePending = true; return; }
             Transform root = ShopRoot != null ? ShopRoot : transform;
 
             if (_surface == null)

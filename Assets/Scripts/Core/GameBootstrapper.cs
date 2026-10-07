@@ -84,17 +84,18 @@ namespace PetShop.Core
                     if (!continueSave) SaveSystem.Delete();
                     _game.SetModalOpen(false);
                     _game.Begin(_ui.Title.SkipTutorial);
-                }, () => _ui.Settings.Show());
+                }, () => _ui.Settings.Show(), () => _ui.Guide.Show());
             }
 
-            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B build view, Tab ledger, Enter to close the day.");
+            Debug.Log("[Bootstrap] Pet shop ready — WASD move, RMB orbit, E interact, B build view, Tab Shop book, F1 guide, Enter to close the day.");
         }
 
         private void Update()
         {
             if (_game == null || _game.IsGameOver) return;
+            bool guideOpen = _ui != null && _ui.Guide != null && _ui.Guide.IsOpen;
             if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
-                                    InputBindings.GetKeyDown(GameAction.BuildMode))) return;
+                                    InputBindings.GetKeyDown(GameAction.BuildMode), guideOpen)) return;
             if (_ui != null && _ui.AnyModalOpen) return;
             // Number keys 1-9 belong to the inventory bar (place an owned piece); the build key
             // toggles the top-down build view.
@@ -117,12 +118,14 @@ namespace PetShop.Core
         /// <summary>
         /// While the catalogue is open it owns the keyboard: the build key toggles it shut. This is
         /// its only owner, so one press cannot close and reopen it in the same frame. True when the
-        /// catalogue was open and the frame's input is consumed.
+        /// catalogue was open and the frame's input is consumed. While the guide is open over it
+        /// (<paramref name="guideOpen"/>) the key is swallowed instead, so the guide closes back onto it.
         /// </summary>
-        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown)
+        internal static bool RouteCatalogueInput(FurnitureCatalogPanel catalogue, bool buildKeyDown,
+                                                 bool guideOpen = false)
         {
             if (catalogue == null || !catalogue.IsOpen) return false;
-            if (buildKeyDown) catalogue.Hide();
+            if (buildKeyDown && !guideOpen) catalogue.Hide();
             return true;
         }
 
@@ -182,6 +185,7 @@ namespace PetShop.Core
                 else Debug.LogWarning("[Bootstrap] No 'Player' object in the scene.");
             }
 
+            LightingSetup.Apply();
             if (RenderSettings.skybox != null) DynamicGI.UpdateEnvironment();
 
             if (_layout.Player != null)
@@ -297,6 +301,7 @@ namespace PetShop.Core
 
             _build.OnFurnitureSpawned.AddListener(_game.RegisterFurniture);
             _build.OnFurnitureDespawning.AddListener(_game.UnregisterFurniture);
+            new GameObject("FeedbackFX").AddComponent<FeedbackFX>().Attach(_queue, _build);
 
             // Walls block movement, so the NavMesh has to follow them immediately — waiting
             // until build mode exits lets customers walk through a wall you just built.

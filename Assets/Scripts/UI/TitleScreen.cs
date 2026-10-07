@@ -55,21 +55,22 @@ namespace PetShop.UI
 
         /// <summary>
         /// Builds and shows the title screen. <paramref name="onStart"/> receives the chosen slot and
-        /// whether to continue it (false = fresh shop); <paramref name="onSettings"/> runs when Settings is clicked.
+        /// whether to continue it (false = fresh shop); <paramref name="onSettings"/> runs when Settings is clicked
+        /// and <paramref name="onGuide"/> when Guide is clicked.
         /// </summary>
-        public void Build(Transform canvas, Action<int, bool> onStart, Action onSettings = null)
+        public void Build(Transform canvas, Action<int, bool> onStart, Action onSettings = null, Action onGuide = null)
         {
             _onStart = onStart;
             SkipTutorial = false;
             _navRows.Clear();
 
             _root = UIFactory.Panel("TitleScreen", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.04f, 0.06f, 0.09f, 0.78f));
+                                    UIFactory.Dim);
             var slab = BuildSlab();
 
             for (int slot = 1; slot <= SaveSystem.SlotCount; slot++)
                 BuildSlotRow(slab, slot, SlotTop - (slot - 1) * SlotStep);
-            BuildFooter(slab, onSettings);
+            BuildFooter(slab, onSettings, onGuide);
 
             _hint = UIFactory.Label("Hint", slab, "",
                 new Vector2(LeftX, 0.015f), new Vector2(TextRightX, 0.065f), HintFont, UIFactory.InkMuted);
@@ -84,7 +85,7 @@ namespace PetShop.UI
         {
             var slab = UIFactory.Panel("TitleSlab", _root.transform,
                                        new Vector2(0f, 0f), new Vector2(0.44f, 1f),
-                                       new Color(0.06f, 0.08f, 0.12f, 0.96f)).transform;
+                                       UIFactory.Surface).transform;
 
             UIFactory.Panel("Accent", slab, new Vector2(1f, 0f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(-4f, 0f), Vector2.zero);
@@ -147,18 +148,23 @@ namespace PetShop.UI
             return button;
         }
 
-        /// <summary>Quit and Settings, side by side under the slots.</summary>
-        private void BuildFooter(Transform slab, Action onSettings)
+        /// <summary>Quit, Settings and Guide, side by side under the slots.</summary>
+        private void BuildFooter(Transform slab, Action onSettings, Action onGuide)
         {
             var min = new Vector2(LeftX, FooterBottom);
             var quit = UIFactory.Button("Quit", slab, "Quit",
                 min, new Vector2(MidLeftX, FooterBottom + ButtonHeight), ButtonFont);
             quit.onClick.AddListener(Application.Quit);
 
+            float split = (MidRightX + ButtonRightX) * 0.5f;
             var settings = UIFactory.Button("Settings", slab, "Settings",
-                new Vector2(MidRightX, FooterBottom), new Vector2(ButtonRightX, FooterBottom + ButtonHeight), ButtonFont);
+                new Vector2(MidRightX, FooterBottom), new Vector2(split - ButtonGap, FooterBottom + ButtonHeight), ButtonFont);
             settings.onClick.AddListener(() => onSettings?.Invoke());
-            _navRows.Add(new Selectable[] { quit, settings, BuildSkipToggle(slab) });
+
+            var guide = UIFactory.Button("Guide", slab, "Guide",
+                new Vector2(split + ButtonGap, FooterBottom), new Vector2(ButtonRightX, FooterBottom + ButtonHeight), ButtonFont);
+            guide.onClick.AddListener(() => onGuide?.Invoke());
+            _navRows.Add(new Selectable[] { quit, settings, guide, BuildSkipToggle(slab) });
         }
 
         /// <summary>The "Skip tutorial" toggle: applies to the next New shop.</summary>
@@ -178,7 +184,7 @@ namespace PetShop.UI
         private void RefreshSkip(Button button, TMP_Text label)
         {
             label.text = SkipPrefix + (SkipTutorial ? "on" : "off");
-            button.targetGraphic.color = SkipTutorial ? UIFactory.ButtonOn : UIFactory.ButtonBg;
+            UIFactory.SetSelected(button, SkipTutorial);
         }
 
         /// <summary>"Slot i — Day N · €balance · saved date", or "Slot i — empty".</summary>

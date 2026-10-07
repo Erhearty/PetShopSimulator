@@ -9,7 +9,10 @@ namespace PetShop.Customer
 {
     /// <summary>
     /// Releases customers through the door across the day. Footfall scales with
-    /// reputation, so a well-run shop gets busier.
+    /// reputation, so a well-run shop gets busier. Arrivals follow the day's
+    /// <see cref="ArrivalSchedule"/>: a normal curve peaking at 14:00, with at least
+    /// <see cref="ArrivalSchedule.MinQueueJoinsPerHour"/> guaranteed buyers reaching the till
+    /// in every trading hour.
     /// </summary>
     public class CustomerSpawner : MonoBehaviour
     {
@@ -25,8 +28,6 @@ namespace PetShop.Customer
         public float SpawnSpreadX = 20f;
 
         [Header("Tuning")]
-        public float FirstCustomerDelay  = 2f;
-        public float BaseIntervalSeconds = 11f;
         public int   MaxCustomersPerDay  = 18;
         public int   MinCustomersPerDay  = 3;
         public int   MaxConcurrent       = 8;
@@ -43,10 +44,32 @@ namespace PetShop.Customer
         [Tooltip("Relative weight of parents bringing a child.")]
         [Min(0f)] public float ParentWithChildWeight = CustomerProfile.DefaultParentWithChildWeight;
 
-        /// <summary>Fewest in-game minutes between two customers arriving.</summary>
-        public const float GameMinutesBetweenCustomers = 30f;
-        /// <summary>In-game minutes in one trading day (09:00 to 18:00).</summary>
-        private const float GameMinutesPerDay = 540f;
+        /// <summary>
+        /// Game seconds (real seconds at time scale 1) from a customer appearing on the pavement to
+        /// joining the checkout queue, as measured by ArrivalCurvePlayTests in the furnished shop on
+        /// a 540 s day: 28.8 s mean, 14.3-42.5 s over 16 joins (the walk in, two to four browsing
+        /// stops of 1.2-3 s each, then the walk to the line). Customers are let in this much ahead
+        /// of their planned queue join (converted to game hours with the day length). On a 540 s
+        /// day. A later run measured 32.2 s mean, 14.1-53.7 s, so the estimate is the centre of the
+        /// 14-54 s spread: ±20 s, i.e. ±0.33 game hours on a 540 s day, inside the margin the
+        /// guaranteed joins (:28 and :31, <see cref="ArrivalSchedule.GuaranteedSpread"/>) keep from
+        /// their hour's edges. Walks and browsing run on scaled time, so this holds at any Time.timeScale.
+        /// </summary>
+        public const float SpawnToQueueSeconds = 34f;
+
+        /// <summary>
+        /// Guaranteed buyers may go over <see cref="MaxConcurrent"/> by at most this many: one
+        /// hour's floor, so a full shop never holds up the hour's guarantee, while a day whose
+        /// arrivals bunch up (a short day collapses the lead onto 09:00) cannot flood the floor.
+        /// </summary>
+        public const int GuaranteedOverflow = ArrivalSchedule.MinQueueJoinsPerHour;
+
+        /// <summary>
+        /// While the shop cannot trade, a planned arrival is kept this many game hours past its
+        /// time and then dropped, so furnishing the shop mid-day does not release a crowd at once.
+        /// </summary>
+        public const float MissedArrivalGraceHours = 0.25f;
+
         /// <summary>Day length used when there is no GameManager, in real seconds.</summary>
         private const float FallbackDayLengthSeconds = 540f;
 
@@ -71,16 +94,27 @@ namespace PetShop.Customer
         /// <summary>Customers currently in the world.</summary>
         public int LiveCustomers { get; private set; }
 
-        /// <summary>Event-driven multiplier on the spawn interval. Below 1 means busier; 1 = normal.</summary>
+        /// <summary>
+        /// Event-driven multiplier on the gap between customers. Below 1 means busier; 1 = normal.
+        /// Arrivals are scheduled rather than timed, so at StartDay it is inverted into a count
+        /// multiplier on the reputation target (0.6 => 1/0.6 as many). That only moves customers
+        /// above the per-hour floor: the floor of guaranteed buyers is never scaled.
+        /// </summary>
         public float IntervalMultiplier { get; set; } = 1f;
 
         /// <summary>Event-driven multiplier on today's customer target, applied at StartDay. 1 = normal.</summary>
         public float TargetMultiplier { get; set; } = 1f;
 
         private bool  _dayActive;
-        private float _timer;
+        private float _dayElapsed;
         private float _censusTimer;
         private bool  _warnedNotTrading;
+
+        /// <summary>Today's arrivals not yet let in, earliest first.</summary>
+        private readonly List<ArrivalSchedule.Slot> _pending = new();
+
+        /// <summary>Arrivals still to come today (scheduled but not yet let in or dropped).</summary>
+        public int PendingArrivals => _pending.Count;
 
         /// <summary>
         /// The shop can trade once it has somewhere to pay (a counter) and something to sell
@@ -90,12 +124,17 @@ namespace PetShop.Customer
             hasCounter && (shelfCount > 0 || penCount > 0);
 
         /// <summary>
-        /// Real seconds between customers at the minimum gap of
-        /// <see cref="GameMinutesBetweenCustomers"/> game minutes, for a day lasting
-        /// <paramref name="dayLengthSeconds"/> real seconds.
+        /// Today's customer target before the hourly floor: the reputation lerp between
+        /// <paramref name="min"/> and <paramref name="max"/>, times the event
+        /// <paramref name="targetMultiplier"/>, times the inverse of the event
+        /// <paramref name="intervalMultiplier"/> (a shorter gap means more customers).
         /// </summary>
-        public static float MinGapSeconds(float dayLengthSeconds) =>
-            dayLengthSeconds * GameMinutesBetweenCustomers / GameMinutesPerDay;
+        public static int TargetFor(float reputation, float targetMultiplier, float intervalMultiplier,
+                                    int min, int max)
+        {
+            float countMultiplier = intervalMultiplier > 0f ? 1f / intervalMultiplier : 1f;
+            return Mathf.RoundToInt(Mathf.Lerp(min, max, reputation / 100f) * targetMultiplier * countMultiplier);
+        }
 
         /// <summary>The current day length, or the 540 s default without a GameManager.</summary>
         private static float CurrentDayLengthSeconds() =>
@@ -109,10 +148,22 @@ namespace PetShop.Customer
             SpawnedToday = 0;
             DoorsClosed  = false;
             _dayActive   = true;
+            _dayElapsed  = 0f;
             _warnedNotTrading = false;
-            _timer       = BaseIntervalSeconds - FirstCustomerDelay;
-            TargetToday  = ShopManager == null ? MinCustomersPerDay : Mathf.RoundToInt(
-                Mathf.Lerp(MinCustomersPerDay, MaxCustomersPerDay, ShopManager.Reputation / 100f) * TargetMultiplier);
+
+            int target = ShopManager == null ? MinCustomersPerDay
+                : TargetFor(ShopManager.Reputation, TargetMultiplier, IntervalMultiplier,
+                            MinCustomersPerDay, MaxCustomersPerDay);
+            TargetToday = ArrivalSchedule.TotalFor(target);
+
+            float dayLength = CurrentDayLengthSeconds();
+            float lead = ArrivalSchedule.LeadGameHours(SpawnToQueueSeconds, dayLength);
+            if (!ArrivalSchedule.GuaranteeHolds(lead))
+                Debug.LogWarning($"[CustomerSpawner] A {dayLength:0.#} s day gives a {lead:0.##} h arrival lead " +
+                                 $"(over {ArrivalSchedule.MaxGuaranteedLeadHours} h): the guarantee of " +
+                                 $"{ArrivalSchedule.MinQueueJoinsPerHour} queue joins per hour can't hold at this day length.");
+            _pending.Clear();
+            _pending.AddRange(ArrivalSchedule.Slots(ArrivalSchedule.CountsPerHour(target), lead));
         }
 
         /// <summary>Stop letting new customers in, but let those inside finish shopping.</summary>
@@ -122,6 +173,7 @@ namespace PetShop.Customer
         {
             _dayActive  = false;
             DoorsClosed = true;
+            _pending.Clear();
         }
 
         private void Update()
@@ -129,22 +181,36 @@ namespace PetShop.Customer
             _censusTimer -= Time.deltaTime;
             if (_censusTimer <= 0f) { _censusTimer = 0.5f; LiveCustomers = CountLive(); }
 
-            if (!_dayActive || DoorsClosed || ShopManager == null) return;
-            if (!CanTradeNow) { WarnNotTradingOnce(); return; }
-            if (SpawnedToday >= TargetToday) return;
+            if (!_dayActive) return;
+            _dayElapsed += Time.deltaTime;
+            if (DoorsClosed || ShopManager == null) return;
 
-            if (LiveCustomers >= MaxConcurrent) return;
+            float now = CurrentGameHour();
+            if (!CanTradeNow)
+            {
+                WarnNotTradingOnce();
+                _pending.RemoveAll(s => s.Hour < now - MissedArrivalGraceHours);
+                return;
+            }
 
-            // The minimum gap is a floor applied after the event multiplier.
-            float interval = Mathf.Max(MinGapSeconds(CurrentDayLengthSeconds()),
-                                       BaseIntervalSeconds * (1f - ShopManager.Reputation / 160f) * IntervalMultiplier);
-
-            _timer += Time.deltaTime;
-            if (_timer < interval) return;
-
-            _timer = 0f;
-            SpawnCustomer();
+            // Due arrivals in order. Guaranteed buyers may exceed MaxConcurrent by up to
+            // GuaranteedOverflow; anyone else waits for room, without holding up the guaranteed
+            // buyers behind them.
+            for (int i = 0; i < _pending.Count && _pending[i].Hour <= now;)
+            {
+                var slot = _pending[i];
+                int cap  = slot.Guaranteed ? MaxConcurrent + GuaranteedOverflow : MaxConcurrent;
+                if (LiveCustomers >= cap) { i++; continue; }
+                _pending.RemoveAt(i);
+                SpawnCustomer(slot.Guaranteed);
+            }
         }
+
+        /// <summary>The shop clock in game hours (9..18), from the GameManager or the spawner's own day timer.</summary>
+        private float CurrentGameHour() =>
+            GameManager.Instance != null ? GameManager.Instance.CurrentGameHour
+                : ArrivalSchedule.FirstHour + ArrivalSchedule.TradingDayHours
+                  * Mathf.Clamp01(_dayElapsed / FallbackDayLengthSeconds);
 
         /// <summary>Tells the player, once per day, why no customers are coming.</summary>
         private void WarnNotTradingOnce()
@@ -162,7 +228,7 @@ namespace PetShop.Customer
             return n;
         }
 
-        private void SpawnCustomer()
+        private void SpawnCustomer(bool mustBuy)
         {
             Vector3 pos = SpawnPoint != null ? SpawnPoint.position : Vector3.zero;
             pos.x += Random.Range(-SpawnSpreadX, SpawnSpreadX);
@@ -186,6 +252,7 @@ namespace PetShop.Customer
             ai.Queue         = Queue;
             ai.Shelves       = new List<ShelfUnit>(Shelves);
             ai.PetPens       = new List<PetPen>(PetPens);
+            ai.MustBuy       = mustBuy;
             // Awake has run inside AddComponent; Start has not, so the archetype still takes effect.
             ai.Archetype     = CustomerProfile.Roll(ShopManager != null ? ShopManager.Reputation : 0f, CurrentMix());
             if (ai.Archetype == CustomerArchetype.ParentWithChild) SpawnChild(go);

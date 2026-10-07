@@ -52,5 +52,50 @@ namespace PetShop.Tests
             Assert.AreEqual(0, _roof.GetComponentsInChildren<Collider>(true).Length);
             Assert.AreEqual(GameLayers.Scenery, _roof.gameObject.layer);
         }
+
+        [Test]
+        public void RoofBottom_SitsOnWallPieceTops()
+        {
+            Assert.AreEqual(ShopLayout.WallPieceHeight, _roof.Renderer.bounds.min.y, 1e-4f);
+        }
+
+        [Test]
+        public void PlacingWindowWall_RebuildsRoof()
+        {
+            Bounds before = _roof.Renderer.bounds;
+            var window = new PlacedObjectData
+                { Id = BuildCatalog.WallWindow, Type = BuildCatalog.WallWindow, Size = Vector2Int.one };
+
+            Assert.IsTrue(_grid.PlaceObject(new Vector2Int(20, 0), window, Vector2Int.one));
+
+            Assert.Greater(_roof.Renderer.bounds.size.x, before.size.x);
+        }
+
+        [Test]
+        public void BuildView_HidesRoof_AndExitRestoresIt()
+        {
+            var camGo = new GameObject("BuildCam") { tag = "MainCamera" };
+            camGo.AddComponent<Camera>();
+            var viewGo = new GameObject("BuildView");
+            var view = viewGo.AddComponent<BuildCamera>();
+            try
+            {
+                Assert.AreSame(_roof, RoofBuilder.Instance);
+                view.Init(null, null, null);
+
+                view.Enter();
+                Assert.IsTrue(view.IsActive);
+                Assert.IsFalse(_roof.Renderer.enabled);
+
+                view.Exit();
+                Assert.IsFalse(view.IsActive);
+                Assert.IsTrue(_roof.Renderer.enabled);
+            }
+            finally
+            {
+                Object.DestroyImmediate(viewGo);
+                Object.DestroyImmediate(camGo);
+            }
+        }
     }
 }

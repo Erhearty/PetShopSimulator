@@ -20,7 +20,11 @@ namespace PetShop.Player
         public float CastRadius  = 0.5f;
         public float EyeHeight   = 1.1f;
 
+        /// <summary>Most overlapping interactables the fallback probe considers.</summary>
+        private const int MaxOverlaps = 8;
+
         private GameManager _game;
+        private readonly Collider[] _overlaps = new Collider[MaxOverlaps];
 
         /// <summary>The interact key's label, as shown in prompts ("E" by default).</summary>
         private static string Key => InputBindings.Label(GameAction.Interact);
@@ -46,7 +50,7 @@ namespace PetShop.Player
                 return;
             }
 
-            string label = FindTarget(out var hit) ? PromptFor(hit.collider) : null;
+            string label = FindTarget(out var target) ? PromptFor(target) : null;
             PromptText.text    = label ?? string.Empty;
             PromptText.enabled = !string.IsNullOrEmpty(label);
         }
@@ -56,20 +60,20 @@ namespace PetShop.Player
         {
             if (_game == null) _game = GameManager.Instance;
             if (_game != null && _game.IsBuildModeActive) return;
-            if (!FindTarget(out var hit)) return;
+            if (!FindTarget(out var target)) return;
 
             // Deliveries first: a pallet parked by a shelf should hand over its stock,
             // not silently restock the shelf behind it.
-            var crate = hit.collider.GetComponentInParent<DeliveryCrate>();
+            var crate = target.GetComponentInParent<DeliveryCrate>();
             if (crate != null) { _game?.CollectDelivery(crate); return; }
 
-            var shelf = hit.collider.GetComponentInParent<ShelfUnit>();
+            var shelf = target.GetComponentInParent<ShelfUnit>();
             if (shelf != null) { _game?.RestockShelf(shelf); return; }
 
-            var pen = hit.collider.GetComponentInParent<PetPen>();
+            var pen = target.GetComponentInParent<PetPen>();
             if (pen != null) { _game?.InspectPen(pen); return; }
 
-            var counter = hit.collider.GetComponentInParent<CounterInteractable>();
+            var counter = target.GetComponentInParent<CounterInteractable>();
             if (counter != null) { _game?.UseCounter(); }
         }
 
@@ -106,17 +110,50 @@ namespace PetShop.Player
                 if (queue != null && queue.AnyWaiting)
                     return $"[{Key}]  Serve {queue.Front.ShopperName}  —  {queue.Front.BasketCount} item(s), " +
                            $"€{queue.Front.BasketValue:N2}   ({queue.Length} waiting)";
-                return null;
+                return EmptyCounterPrompt;
             }
 
             return null;
         }
 
-        private bool FindTarget(out RaycastHit hit)
+        /// <summary>The counter's prompt while nobody is queueing, so the player knows E works there.</summary>
+        internal static string EmptyCounterPrompt => $"[{Key}]  Counter — no customers yet";
+
+        /// <summary>
+        /// The interactable the player is facing: the first one a sphere cast from the eyes hits,
+        /// else the nearest one overlapping a probe just ahead (see <see cref="NearestOverlap"/>).
+        /// </summary>
+        private bool FindTarget(out Collider target)
         {
             Vector3 origin = transform.position + Vector3.up * EyeHeight;
-            return Physics.SphereCast(origin, CastRadius, transform.forward, out hit,
-                                      Range, GameLayers.InteractMask, QueryTriggerInteraction.Ignore);
+            if (Physics.SphereCast(origin, CastRadius, transform.forward, out var hit,
+                                   Range, GameLayers.InteractMask, QueryTriggerInteraction.Ignore))
+            {
+                target = hit.collider;
+                return true;
+            }
+            target = NearestOverlap(origin);
+            return target != null;
+        }
+
+        /// <summary>
+        /// A sphere cast ignores colliders it starts inside, so standing pressed against the
+        /// counter found nothing. This catches an interactable overlapping a sphere just ahead of
+        /// the eyes, nearest first.
+        /// </summary>
+        private Collider NearestOverlap(Vector3 origin)
+        {
+            Vector3 probe = origin + transform.forward * CastRadius;
+            int count = Physics.OverlapSphereNonAlloc(probe, CastRadius, _overlaps,
+                                                      GameLayers.InteractMask, QueryTriggerInteraction.Ignore);
+            Collider best = null;
+            float bestDistance = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                float distance = (_overlaps[i].bounds.ClosestPoint(probe) - probe).sqrMagnitude;
+                if (distance < bestDistance) { bestDistance = distance; best = _overlaps[i]; }
+            }
+            return best;
         }
     }
 

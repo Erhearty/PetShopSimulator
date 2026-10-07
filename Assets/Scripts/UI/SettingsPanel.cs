@@ -27,7 +27,7 @@ namespace PetShop.UI
 
         private static readonly Vector2 Centre        = new(0.5f, 0.5f);
         private static readonly Vector2 PanelHalfSize = new(450f, 320f);
-        private static readonly Color   DimColor      = new(0.03f, 0.05f, 0.08f, 0.72f);
+        private static readonly Color   DimColor      = UIFactory.Dim;
         private static readonly KeyCode[] AllKeys     = (KeyCode[])Enum.GetValues(typeof(KeyCode));
 
         private GameObject  _root;
@@ -40,6 +40,8 @@ namespace PetShop.UI
         private TMP_Text    _autosaveLabel;
         private Button      _trackerButton;
         private TMP_Text    _trackerLabel;
+        private Button      _motionButton;
+        private TMP_Text    _motionLabel;
 
         private readonly Dictionary<GameAction, TMP_Text> _keyLabels = new();
         private readonly List<Button> _rebindButtons = new();
@@ -69,7 +71,7 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("SettingsDim", canvas, Vector2.zero, Vector2.one, DimColor);
-            var panel = UIFactory.Panel("Settings", _root.transform, Centre, Centre,
+            var panel = UIFactory.ModalPanel("Settings", _root.transform, Centre, Centre,
                                         UIFactory.PanelBg, -PanelHalfSize, PanelHalfSize).transform;
 
             BuildChrome(panel);
@@ -96,6 +98,7 @@ namespace PetShop.UI
             RefreshKeys();
             RefreshAutosaveLabel();
             RefreshTrackerLabel();
+            RefreshMotionLabel();
             _root.SetActive(true);
             _root.transform.SetAsLastSibling();
             SelectFirstRow();
@@ -118,11 +121,7 @@ namespace PetShop.UI
         /// <summary>Accent strip, header, close button, status line and reset button.</summary>
         private void BuildChrome(Transform panel)
         {
-            UIFactory.Panel("Accent", panel, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                            UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
-
-            UIFactory.Label("Header", panel, "Settings",
-                new Vector2(0.03f, 0.90f), new Vector2(0.5f, 0.97f), HeaderFont, UIFactory.Ink);
+            UIFactory.Header(panel, "Settings", new Vector2(0.03f, 0.90f), new Vector2(0.5f, 0.97f));
 
             _closeButton = UIFactory.Button("Close", panel, "Close  (Esc)",
                 new Vector2(0.79f, 0.905f), new Vector2(0.97f, 0.965f), RowFont);
@@ -185,6 +184,34 @@ namespace PetShop.UI
             _autosaveButton.onClick.AddListener(ToggleAutosave);
             RefreshAutosaveLabel();
             BuildTrackerToggle();
+            BuildMotionToggle();
+        }
+
+        /// <summary>The "Reduce motion" toggle, two rows under the autosave toggle.</summary>
+        private void BuildMotionToggle()
+        {
+            const int rowIndex = 2;
+            float top = 1f - rowIndex * (GeneralRowHeight + GeneralRowGap);
+            _motionButton = UIFactory.Button("ReduceMotion", GeneralSection, "",
+                new Vector2(0f, top - GeneralRowHeight), new Vector2(1f, top), RowFont);
+            _motionLabel = _motionButton.GetComponentInChildren<TMP_Text>();
+            _motionButton.onClick.AddListener(ToggleMotion);
+            RefreshMotionLabel();
+        }
+
+        /// <summary>Flips the reduce-motion setting (pops, bubble pops, counter ticks) and reports it.</summary>
+        private void ToggleMotion()
+        {
+            GameSettings.ReduceMotion = !GameSettings.ReduceMotion;
+            RefreshMotionLabel();
+            _status.text = GameSettings.ReduceMotion ? "Reduce motion on." : "Reduce motion off.";
+        }
+
+        /// <summary>Shows the current reduce-motion setting on its button.</summary>
+        private void RefreshMotionLabel()
+        {
+            if (_motionLabel == null) return;
+            _motionLabel.text = $"Reduce motion: {(GameSettings.ReduceMotion ? "on" : "off")}";
         }
 
         /// <summary>The "Show quest tracker" toggle, one row under the autosave toggle.</summary>
@@ -233,7 +260,7 @@ namespace PetShop.UI
         /// <summary>Explicit up/down navigation: rebind rows top to bottom, then the autosave and quest tracker toggles, Reset, Close.</summary>
         private void WireNavigation()
         {
-            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _trackerButton, _resetButton, _closeButton };
+            var chain = new List<Selectable>(_rebindButtons) { _autosaveButton, _trackerButton, _motionButton, _resetButton, _closeButton };
             for (int i = 0; i < chain.Count; i++)
             {
                 chain[i].navigation = new Navigation
@@ -337,6 +364,7 @@ namespace PetShop.UI
             foreach (var button in _rebindButtons) button.interactable = interactable;
             if (_autosaveButton != null) _autosaveButton.interactable = interactable;
             if (_trackerButton != null) _trackerButton.interactable = interactable;
+            if (_motionButton  != null) _motionButton.interactable  = interactable;
             if (_resetButton != null) _resetButton.interactable = interactable;
         }
 

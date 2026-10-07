@@ -5,7 +5,7 @@ using PetShop.UI;
 namespace PetShop.Tests
 {
     /// <summary>
-    /// EditMode tests for <see cref="HotkeyHelp"/>: the cheat-sheets name the ledger &amp; build key,
+    /// EditMode tests for <see cref="HotkeyHelp"/>: the cheat-sheets name the Shop book key,
     /// the build view key and the R / Shift+R / wheel rotate keys, using the current bindings.
     /// </summary>
     public class HotkeyHelpTests
@@ -19,7 +19,7 @@ namespace PetShop.Tests
         {
             string text = HotkeyHelp.Controls();
 
-            StringAssert.Contains($"{LedgerKey}  ledger & build", text);
+            StringAssert.Contains($"{LedgerKey}  Shop book", text);
             StringAssert.Contains($"{BuildKey}  build view", text);
             StringAssert.DoesNotContain("furniture catalogue", text);
             StringAssert.Contains($"{RotateKey} / Shift+{RotateKey} / wheel", text);
@@ -30,7 +30,7 @@ namespace PetShop.Tests
         {
             string text = HotkeyHelp.TitleHint();
 
-            StringAssert.Contains($"{LedgerKey} ledger & build", text);
+            StringAssert.Contains($"{LedgerKey} Shop book", text);
             StringAssert.Contains($"{BuildKey} build view", text);
             StringAssert.DoesNotContain("furniture catalogue", text);
             StringAssert.Contains($"{RotateKey} / Shift+{RotateKey} / wheel", text);

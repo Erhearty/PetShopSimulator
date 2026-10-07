@@ -33,9 +33,9 @@ namespace PetShop.UI
             _game = game;
 
             _root = UIFactory.Panel("StaffDim", canvas, Vector2.zero, Vector2.one,
-                                    new Color(0.03f, 0.05f, 0.08f, 0.62f));
+                                    UIFactory.Dim);
 
-            var panel = UIFactory.Panel("Staff", _root.transform,
+            var panel = UIFactory.ModalPanel("Staff", _root.transform,
                                         new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                                         UIFactory.PanelBg,
                                         new Vector2(-430f, -250f), new Vector2(430f, 250f));
@@ -156,7 +156,7 @@ namespace PetShop.UI
         {
             var card = UIFactory.Panel($"Card_{i}", _cardRoot,
                 new Vector2(x + 0.006f, 0f), new Vector2(x + w - 0.006f, 1f),
-                new Color(0.11f, 0.14f, 0.19f, 0.95f));
+                UIFactory.Raised);
             _spawned.Add(card);
 
             UIFactory.Label("Name", card.transform, candidate.Name,
@@ -176,16 +176,25 @@ namespace PetShop.UI
             BuildHireButton(i, card.transform, candidate);
         }
 
-        /// <summary>Hire button for a card, disabled when the shop is full.</summary>
+        /// <summary>Type size of a hire button that says why it is disabled; smaller to fit the reason.</summary>
+        private const float HireReasonFontSize = 12f;
+        /// <summary>Type size of an enabled hire button.</summary>
+        private const float HireFontSize = 15f;
+
+        /// <summary>
+        /// Hire button for a card, disabled with the reason on it when the applicant cannot be taken
+        /// on (the shop is full, or a cashier has no counter to work behind).
+        /// </summary>
         private void BuildHireButton(int i, Transform card, StaffCandidate candidate)
         {
-            bool room = _game.StaffCount < StaffRoster.MaxStaff;
+            bool canHire = _game.CanHire(candidate, out string reason);
             var hire = UIFactory.Button($"Hire_{i}", card,
-                room ? "Hire" : "No room",
-                new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f), 15f,
-                room ? UIFactory.ButtonOn : UIFactory.ButtonBg);
+                canHire ? "Hire" : reason,
+                new Vector2(0.12f, 0.05f), new Vector2(0.88f, 0.21f),
+                canHire ? HireFontSize : HireReasonFontSize,
+                canHire ? UIFactory.ButtonOn : UIFactory.ButtonBg);
 
-            hire.interactable = room;
+            hire.interactable = canHire;
             hire.onClick.AddListener(() => { _game.HireCandidate(candidate); Refresh(); });
         }
 

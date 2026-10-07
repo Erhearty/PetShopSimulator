@@ -19,6 +19,7 @@ public static class ShaderInclusion
         "Skybox/Procedural",
         "Legacy Shaders/Diffuse",
         "Sprites/Default",
+        "Unlit/Transparent Cutout",
         "UI/Default",
         "TextMeshPro/Distance Field",
         "TextMeshPro/Mobile/Distance Field",

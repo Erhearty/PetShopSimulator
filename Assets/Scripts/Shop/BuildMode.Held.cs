@@ -85,12 +85,13 @@ namespace PetShop.Shop
             var  def     = CurrentItem;
             bool swapped = SwapsFootprint(_rotation);
             Vector2Int size = FootprintSize(def, swapped);
-            if (RefusePlacement(def, cell, size)) return null;
+            if (RefusePlacement(def, cell, size, _rotation)) return null;
             PrepareFloor(def, cell, size);
 
             var go = Place(cell, def, HeldVariant(), _rotation, charge: false, footprintRotated: swapped);
             if (go == null && !GridManager.TryGetObject(cell, out _)) return null;
             if (!_heldPacked) AddStarterPair(go, def);
+            if (go != null) OnFurniturePlacedByPlayer.Invoke(go);
             IsHolding = false;
             TakeNextOrExit(def);
             return go;

@@ -14,6 +14,8 @@ namespace PetShop.Core
     internal sealed class SaveLoadController
     {
         private readonly GameManager _game;
+        /// <summary>True once the room walls have been laid as placed pieces in this game.</summary>
+        private bool _roomWallsSeeded;
 
         /// <summary>Creates the controller for <paramref name="game"/>; nothing is read yet.</summary>
         public SaveLoadController(GameManager game)
@@ -34,9 +36,22 @@ namespace PetShop.Core
             SaveQuests.ResetForNewGame(_game, skipTutorial);
             _game.Furniture.Clear();
             SaveReorder.ResetToDefaults(_game.AutoReorder);
+            SeedRoomWallsOnce(false);
             _game.Notify($"Welcome to your pet shop! {InputBindings.Label(GameAction.BuildMode)} to build, " +
                          $"{InputBindings.Label(GameAction.Interact)} to interact, " +
                          $"{InputBindings.Label(GameAction.EndDay)} to close up.");
+        }
+
+        /// <summary>
+        /// Lays the shop room's walls as placed pieces unless <paramref name="alreadySeeded"/> says this
+        /// game already has them, then records that it does. Walls the player removed stay removed.
+        /// </summary>
+        private void SeedRoomWallsOnce(bool alreadySeeded)
+        {
+            _roomWallsSeeded = alreadySeeded;
+            if (_roomWallsSeeded || _game.Layout == null || _game.Build == null) return;
+            _game.Layout.SeedRoomWalls(_game.Build);
+            _roomWallsSeeded = true;
         }
 
         // ── Save / load ───────────────────────────────────────────────────────
@@ -70,6 +85,10 @@ namespace PetShop.Core
                 StaffList       = _game.StaffToSave(),
                 PriceMultiplier = shop.PriceMultiplier,
                 ProgressionTier = _game.Progression?.Tier ?? 0,
+                roomWallsSeeded = _roomWallsSeeded,
+                layoutVersion   = ShopLayout.CurrentLayoutVersion,
+                // Every game this build saves has its back door: seeded, migrated, or left as the player edited it.
+                backDoorSeeded  = true,
             };
             _game.Events?.Capture(data);
 
@@ -161,38 +180,9 @@ namespace PetShop.Core
             _game.Progression?.Restore(data.ProgressionTier);
             _game.Events?.Restore(data);
 
-            foreach (var item in data.PlacedObjects)
-            {
-                var def = BuildCatalog.Get(item.catalogId);
-                if (def == null) continue;
-
-                // Saves from before lot stages could build anywhere in the yard; keep the
-                // ground under each saved piece so it is not silently dropped on load.
-                var cell = new Vector2Int(item.cellX, item.cellY);
-                _game.Build.GridManager.EnsureFloor(cell, BuildMode.FootprintSize(def, item.footprintRotated));
-
-                var go = _game.Build.Place(cell, def,
-                                           item.variant, item.rotation, charge: false,
-                                           footprintRotated: item.footprintRotated);
-                if (go == null) continue;
-
-                var shelf = go.GetComponent<ShelfUnit>();
-                if (shelf != null)
-                    foreach (var line in item.shelfStock)
-                    {
-                        var product = _game.Catalog?.Get(line.id);
-                        if (product != null) shelf.AddStock(product, line.qty);
-                    }
-
-                var pen = go.GetComponent<PetPen>();
-                if (pen != null)
-                    foreach (var petData in item.pets)
-                    {
-                        var pet = SaveSystem.SaveDataToPet(petData);
-                        loadedPets.Add(pet);
-                        pen.AddPet(pet);
-                    }
-            }
+            var migration = RestorePlacedObjects(data, loadedPets);
+            // The migration credited data.Balance after the shop's balance was set from it: pass the refund on.
+            if (migration.RefundTotal > 0f) shop.SetBalance(shop.Balance + migration.RefundTotal);
             SaveLineage.Apply(data, loadedPets, data.Day);
             SaveReorder.Apply(data, _game.AutoReorder);
             SaveFurniture.Apply(data, _game.Furniture);
@@ -203,6 +193,87 @@ namespace PetShop.Core
             shop.SetPriceMultiplier(data.PriceMultiplier <= 0f ? 1f : data.PriceMultiplier);
 
             _game.Notify($"Save loaded — day {data.Day}, €{data.Balance:N0}");
+            if (migration.HasChanges) _game.Notify(migration.Notice());
+            if (migration.RefundedPets.Count > 0) _game.Notify(migration.RefundNotice());
+        }
+
+        /// <summary>
+        /// Moves an older layout's cells onto the current one (<see cref="SaveLayoutMigration"/>), places every
+        /// saved piece, then lays the room walls if the save predates them. NavMesh bakes
+        /// are suspended meanwhile, so the whole load costs one bake rather than one per wall.
+        /// </summary>
+        /// <returns>What the layout migration moved or packed, for the load's one combined notice.</returns>
+        private LayoutMigrationReport RestorePlacedObjects(SaveData data, System.Collections.Generic.List<Pet> loadedPets)
+        {
+            var layout = _game.Layout;
+            var migration = new LayoutMigrationReport();
+            SaveLayoutMigration.Apply(data, layout, migration);
+            foreach (var item in migration.Evicted) SettleEvicted(item);
+            SaveLayoutMigration.SeedBackDoor(data, layout);
+            layout?.SuspendNavMeshBakes();
+            try
+            {
+                foreach (var item in data.PlacedObjects) RestorePlacedObject(item, loadedPets);
+                // After the saved pieces, so a save's own walls (or furniture on the border) win.
+                SeedRoomWallsOnce(data.roomWallsSeeded);
+            }
+            finally { layout?.ResumeNavMeshBakes(); }
+            return migration;
+        }
+
+        /// <summary>
+        /// Settles the contents of a piece the layout migration packed away instead of placing (it would have
+        /// stood off the yard): shelf stock goes to the warehouse, as when the Remove tool packs a shelf. A packed
+        /// pen is always empty: the migration relocates or empties an occupied pen (rehoming its pets, or selling
+        /// them back when no pen can hold them) rather than pack its pets.
+        /// </summary>
+        private void SettleEvicted(SaveData.PlacedItem item)
+        {
+            foreach (var line in item.shelfStock)
+            {
+                var product = _game.Catalog?.Get(line.id);
+                if (product != null && line.qty > 0) _game.Shop.AddToWarehouse(product.category, line.qty);
+            }
+            Debug.LogWarning($"[SaveLoad] layout migration: action=pack id='{item.catalogId}' " +
+                             $"cell=({item.cellX},{item.cellY}) reason=outside-yard shelfLines={item.shelfStock.Count}");
+        }
+
+        /// <summary>Places one saved piece and refills its shelf stock or pen residents.</summary>
+        private void RestorePlacedObject(SaveData.PlacedItem item, System.Collections.Generic.List<Pet> loadedPets)
+        {
+            var def = BuildCatalog.Get(item.catalogId);
+            if (def == null) return;
+
+            // Saves from before lot stages could build anywhere in the yard; keep the
+            // ground under each saved piece so it is not silently dropped on load.
+            var cell = new Vector2Int(item.cellX, item.cellY);
+            _game.Build.GridManager.EnsureFloor(cell, BuildMode.FootprintSize(def, item.footprintRotated));
+
+            var go = _game.Build.Place(cell, def,
+                                       item.variant, item.rotation, charge: false,
+                                       footprintRotated: item.footprintRotated);
+            if (go != null) RestoreContents(go, item, loadedPets);
+        }
+
+        /// <summary>Refills a loaded shelf's stock or a loaded pen's residents from its save entry.</summary>
+        private void RestoreContents(GameObject go, SaveData.PlacedItem item, System.Collections.Generic.List<Pet> loadedPets)
+        {
+            var shelf = go.GetComponent<ShelfUnit>();
+            if (shelf != null)
+                foreach (var line in item.shelfStock)
+                {
+                    var product = _game.Catalog?.Get(line.id);
+                    if (product != null) shelf.AddStock(product, line.qty);
+                }
+
+            var pen = go.GetComponent<PetPen>();
+            if (pen != null)
+                foreach (var petData in item.pets)
+                {
+                    var pet = SaveSystem.SaveDataToPet(petData);
+                    loadedPets.Add(pet);
+                    pen.AddPet(pet);
+                }
         }
     }
 }
