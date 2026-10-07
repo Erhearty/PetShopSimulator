@@ -107,8 +107,8 @@ namespace PetShop.Events
         private static string Headline(ShopEventKind kind, int daysLeft)
         {
             string name = ShopEventRules.DisplayName(kind);
-            if (daysLeft <= 0) return $"{name} ended";
-            return $"{name}: {daysLeft} day{(daysLeft == 1 ? "" : "s")} left";
+            if (daysLeft <= 0) return Localization.Loc.F("event.ended", name);
+            return Localization.Loc.Plural("event.days_left", daysLeft, name);
         }
 
         /// <summary>Parses a saved event id; null, empty or unknown ids become None.</summary>

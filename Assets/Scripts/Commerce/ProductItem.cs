@@ -32,6 +32,13 @@ namespace PetShop.Commerce
 
         public float DefaultMargin => basePrice - unitCost;
 
+        /// <summary>Localisation key of this product's name: <c>item.&lt;id&gt;.name</c>.</summary>
+        public string NameKey => $"item.{id}.name";
+
+        /// <summary>The name in the current language, or <see cref="displayName"/> when the product has no table entry.</summary>
+        public string LocalizedName =>
+            !string.IsNullOrEmpty(id) && PetShop.Localization.Loc.Has(NameKey) ? PetShop.Localization.Loc.T(NameKey) : displayName;
+
         /// <summary>Build a runtime product without needing an asset on disk.</summary>
         public static ProductItem Create(string id, string displayName, ProductCategory category,
                                          float unitCost, float basePrice, Color color,

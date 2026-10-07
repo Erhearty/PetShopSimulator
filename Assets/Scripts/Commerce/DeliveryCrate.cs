@@ -113,8 +113,9 @@ namespace PetShop.Commerce
 
         private void RefreshLabel() =>
             _label?.SetText(IsFurniture
-                ? $"furniture: {FurnitureName}\n<size=75%>[{InputBindings.Label(GameAction.Interact)}] to unpack</size>"
-                : $"delivery: {Category}\n<size=75%>{Units} units  ·  [{InputBindings.Label(GameAction.Interact)}] to collect</size>");
+                ? Localization.Loc.F("crate.label.furniture", FurnitureName, InputBindings.Label(GameAction.Interact))
+                : Localization.Loc.F("crate.label.stock", Localization.LocNames.Category(Category), Units,
+                                     InputBindings.Label(GameAction.Interact)));
 
         /// <summary>Moves the load into the stockroom and clears the forecourt. A furniture crate is left alone.</summary>
         public int Collect(ShopManager shop)
@@ -154,8 +155,9 @@ namespace PetShop.Commerce
 
         /// <summary>The interact prompt shown while the player looks at this crate.</summary>
         public string Prompt => IsFurniture
-            ? $"[{InputBindings.Label(GameAction.Interact)}]  Unpack the {FurnitureName} into your furniture inventory"
-            : $"[{InputBindings.Label(GameAction.Interact)}]  Collect {Units} {Category} units from the delivery";
+            ? Localization.Loc.F("crate.prompt.furniture", InputBindings.Label(GameAction.Interact), FurnitureName)
+            : Localization.Loc.F("crate.prompt.stock", InputBindings.Label(GameAction.Interact), Units,
+                                 Localization.LocNames.Category(Category));
     }
 }
 

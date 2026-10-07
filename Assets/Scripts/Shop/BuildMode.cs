@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using PetShop.Core;
 using PetShop.Commerce;
 using PetShop.Pets;
+using PetShop.Localization;
 
 namespace PetShop.Shop
 {
@@ -57,13 +58,16 @@ namespace PetShop.Shop
         /// <summary>Catalog type of pens, the only item whose species can be picked.</summary>
         private const string PenType = "pen";
         /// <summary>Shown when the Remove tool is used on a cell with nothing on it.</summary>
-        public const string NothingToRemoveNotice = "Nothing to remove there.";
+        public static string NothingToRemoveNotice => Loc.T("build.nothing_to_remove");
+
+        /// <summary>Label of the fixed key that cycles the legacy pen's species.</summary>
+        private const string PenVariantKeyLabel = "Q";
         /// <summary>Shown when an occupied pen refuses to be packed away.</summary>
-        public const string PenHasPetsNotice = "Move the pets out before packing this pen away.";
+        public static string PenHasPetsNotice => Loc.T("build.pen_has_pets");
         /// <summary>Shown when the Remove tool's aim meets neither a placed piece nor the floor (or there is no camera).</summary>
-        public const string AimToRemoveNotice = "Aim at a piece or the floor to remove it.";
+        public static string AimToRemoveNotice => Loc.T("build.aim_to_remove");
         /// <summary>Shown when the grid refuses to give up a piece it holds.</summary>
-        public const string CannotRemoveNotice = "That piece can't be removed right now.";
+        public static string CannotRemoveNotice => Loc.T("build.cannot_remove");
         /// <summary>Share of an item's cost refunded when removed without a furniture inventory.</summary>
         private const float SellBackShare = 0.5f;
         /// <summary>Index into the current pen variant options; wrapped on use.</summary>
@@ -159,7 +163,7 @@ namespace PetShop.Shop
             if (RefusePlacement(CurrentItem, cell, CurrentItem.Size, _rotation)) return;
             if (Shop != null && Shop.Balance < CurrentItem.Cost)
             {
-                OnBuildMessage.Invoke($"Not enough money — {CurrentItem.DisplayName} costs €{CurrentItem.Cost:N0}.");
+                OnBuildMessage.Invoke(Loc.F("build.no_money", CurrentItem.LocalizedName, CurrentItem.Cost));
                 return;
             }
 
@@ -197,7 +201,10 @@ namespace PetShop.Shop
         private void AnnouncePenVariant()
         {
             string name = CurrentPenVariant();
-            if (name != null) OnBuildMessage.Invoke($"Pen species: {name} — Q to change");
+            if (name != null)
+                OnBuildMessage.Invoke(Loc.F("build.pen_species",
+                    System.Enum.TryParse(name, out Pet.Species s) ? PetShop.Player.InteractionSystem.SpeciesName(s) : name,
+                    PenVariantKeyLabel));
         }
 
         /// <summary>
@@ -312,16 +319,16 @@ namespace PetShop.Shop
         /// <summary>Returns the removed item to the inventory, or refunds half its cost; gives the message.</summary>
         private string SettleRemoval(PlacedObjectData def)
         {
-            if (def == null) return "Removed.";
+            if (def == null) return Loc.T("build.removed");
             if (Supply != null)
             {
                 if (def.Type == PenType) Supply.AddPacked(def.Id);
                 else                     Supply.AddOwned(def.Id);
-                return $"Packed {def.DisplayName} back into your furniture inventory.";
+                return Loc.F("build.packed", def.LocalizedName);
             }
             float refund = def.Cost * SellBackShare;
             if (Shop != null) Shop.ChangeBalance(refund, $"Sold {def.DisplayName}");
-            return $"Removed {def.DisplayName} (+€{refund:N0})";
+            return Loc.F("build.sold", def.LocalizedName, refund);
         }
 
         /// <summary>True when <paramref name="go"/> is a pen with animals still in it.</summary>

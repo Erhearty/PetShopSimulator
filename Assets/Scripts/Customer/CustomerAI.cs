@@ -172,11 +172,13 @@ namespace PetShop.Customer
         /// </summary>
         private void BuildBubble()
         {
-            string want = WantsPet ? "wants a pet" : PreferredCategory.ToString().ToLowerInvariant();
+            string want = WantsPet ? Localization.Loc.T("customer.wants_pet") : Localization.LocNames.Category(PreferredCategory);
             Color colour = WantsPet ? new Color(0.98f, 0.78f, 0.38f) : UIFactory.Ink;
 
             _bubble = WorldLabel.Create(transform, new Vector3(0f, 2.15f, 0f),
-                                        $"<size=80%><b>{Profile.Label}</b>: {want}</size>", 0.085f, colour, width: 1.4f);
+                                        Localization.Loc.F("customer.bubble",
+                                            Localization.LocNames.Of("customer.type", Profile.Archetype), want),
+                                        0.085f, colour, width: 1.4f);
             _bubble.MaxVisibleDistance = 22f;
         }
 
@@ -264,7 +266,7 @@ namespace PetShop.Customer
             }
 
             Queue.Join(this, Profile.PatienceMultiplier);
-            SetBubble("waiting to pay", new Color(0.98f, 0.82f, 0.4f));
+            SetBubble(Localization.Loc.T("customer.waiting_to_pay"), new Color(0.98f, 0.82f, 0.4f));
             // People standing in line hold their ground; shoppers walking past steer round them.
             _walkingPriority = _agent.avoidancePriority;
             _agent.avoidancePriority = QueueAvoidancePriority;
@@ -310,8 +312,8 @@ namespace PetShop.Customer
                 // Abandon the basket: stock is lost from the shelf either way, and the
                 // shop's standing takes a real hit.
                 ShopManager?.ChangeReputation(-3.5f);
-                GameManager.Instance?.Notify($"{name} gave up waiting and walked out.");
-                SetBubble("gave up!", UIFactory.Bad);
+                GameManager.Instance?.Notify(Localization.Loc.F("customer.gave_up_notice", name));
+                SetBubble(Localization.Loc.T("customer.gave_up"), UIFactory.Bad);
                 FloatingText.Spawn(transform.position + Vector3.up * 2.4f, "−3.5 rep", UIFactory.Bad, 0.26f);
                 _basket.Clear();
                 GaveUp?.Invoke(this);
@@ -437,13 +439,13 @@ namespace PetShop.Customer
             if (price <= BudgetCap)
             {
                 _basket.Add((product.id, product.displayName, price));
-                SetBubble($"got {product.displayName}", UIFactory.Good);
+                SetBubble(Localization.Loc.F("customer.got", product.LocalizedName), UIFactory.Good);
                 return;
             }
             // Too dear: put it back, and let the player see why.
             _missedTooExpensive = true;
             shelf.AddStock(product, 1);
-            SetBubble("too expensive", UIFactory.Bad);
+            SetBubble(Localization.Loc.T("customer.too_expensive"), UIFactory.Bad);
         }
 
         /// <summary>
@@ -463,7 +465,7 @@ namespace PetShop.Customer
                 {
                     float price = ShopManager != null ? ShopManager.PriceOf(product.basePrice) : product.basePrice;
                     _basket.Add((product.id, product.displayName, price));
-                    SetBubble($"got {product.displayName}", UIFactory.Good);
+                    SetBubble(Localization.Loc.F("customer.got", product.LocalizedName), UIFactory.Good);
                     return;
                 }
             }
@@ -478,7 +480,7 @@ namespace PetShop.Customer
             float petPrice = ShopManager != null ? ShopManager.PriceOf(pet.SellPrice()) : pet.SellPrice();
             _basket.Add(($"pet_{pet.species}", pet.DisplayName(), petPrice));
             _boughtPet = true;
-            SetBubble($"buying a {pet.species}", UIFactory.Good);
+            SetBubble(Localization.Loc.F("customer.buying_pet", Localization.LocNames.Species(pet.species)), UIFactory.Good);
         }
 
         /// <summary>Adults only, filtered by the profile's rarity; price checked against PetBudget first.</summary>
@@ -497,13 +499,13 @@ namespace PetShop.Customer
             {
                 // Skip this pet but keep browsing: shelf items may still sell (as before archetypes).
                 _missedTooExpensive = true;
-                SetBubble($"{pet.species}? too pricey", UIFactory.Bad);
+                SetBubble(Localization.Loc.F("customer.pet_too_pricey", Localization.LocNames.Species(pet.species)), UIFactory.Bad);
                 return;
             }
             if (!pen.RemovePet(pet)) return;
             _basket.Add(($"pet_{pet.species}", pet.DisplayName(), price));
             _boughtPet = true;
-            SetBubble($"buying a {pet.species}", UIFactory.Good);
+            SetBubble(Localization.Loc.F("customer.buying_pet", Localization.LocNames.Species(pet.species)), UIFactory.Good);
         }
 
         /// <summary>Rep hits for an empty basket, or for never seeing an acceptable animal.</summary>
@@ -532,8 +534,8 @@ namespace PetShop.Customer
             if (_basket.Count >= 3) _visual?.PlayTrigger("happy_dance");
 
             // The "+€" float is FeedbackFX's, at the till; the customer only says thanks.
-            SetBubble("thanks!", UIFactory.Good);
-            GameManager.Instance?.Notify($"Sold {_basket.Count} item(s) for €{total:N2}");
+            SetBubble(Localization.Loc.T("customer.thanks"), UIFactory.Good);
+            GameManager.Instance?.Notify(Localization.Loc.Plural("customer.sold", _basket.Count, total));
             AudioManager.Instance?.PlaySfx("sale");
 
             DistanceToTillAtCheckout = HorizontalDistanceToTill();

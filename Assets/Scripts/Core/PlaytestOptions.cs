@@ -32,6 +32,9 @@ namespace PetShop.Core
         /// <summary>Furnishes the empty shop of a new game (dev/test runs only), see Dev.DevFurnisher.</summary>
         public const string FurnishFlag = "-furnish";
 
+        /// <summary>Starts in this UI language ("en"/"uk") for this run only; the saved choice is untouched.</summary>
+        public const string LangFlag = "-lang";
+
         /// <summary>The parsed values of the playtest switches. Default means "no flags given".</summary>
         public struct Settings
         {
@@ -52,6 +55,9 @@ namespace PetShop.Core
 
             /// <summary>True to place the dev starter furniture when a new game starts.</summary>
             public bool Furnish;
+
+            /// <summary>Language code ("en"/"uk") for this run, or null to use the saved setting.</summary>
+            public string Language;
         }
 
         /// <summary>The settings most recently passed to <see cref="Apply"/>.</summary>
@@ -119,10 +125,17 @@ namespace PetShop.Core
                 SaveSystem.PathOverride = settings.SavePath;
                 Debug.Log($"[Game] Save path set to {settings.SavePath} from the command line.");
             }
+
+            if (!string.IsNullOrEmpty(settings.Language))
+            {
+                PetShop.Localization.Loc.SetLanguageWithoutSaving(PetShop.Localization.Loc.FromCode(settings.Language));
+                Debug.Log($"[Game] Language set to {settings.Language} from the command line (not saved).");
+            }
         }
 
         private static bool IsValueFlag(string flag) =>
-            flag == SeedFlag || flag == SavePathFlag || flag == TelemetryFlag || flag == QuitAfterDaysFlag;
+            flag == SeedFlag || flag == SavePathFlag || flag == TelemetryFlag || flag == QuitAfterDaysFlag
+            || flag == LangFlag;
 
         private static bool IsKnownFlag(string arg)
         {
@@ -155,6 +168,12 @@ namespace PetShop.Core
                 case QuitAfterDaysFlag: settings.QuitAfterDays = ParseInt(flag, value, requirePositive: true);  break;
                 case SavePathFlag:      settings.SavePath      = value; break;
                 case TelemetryFlag:     settings.TelemetryPath = value; break;
+                case LangFlag:
+                    if (PetShop.Localization.Loc.TryParse(value, out var language))
+                        settings.Language = PetShop.Localization.Loc.Code(language);
+                    else
+                        Debug.LogWarning($"[Game] Ignoring {flag}: '{value}' is not a language (en, uk).");
+                    break;
             }
         }
 

@@ -59,8 +59,7 @@ namespace PetShop.Commerce
         private bool _away;
 
         /// <summary>The notice shown, once for the whole shop, when the last counter goes and cashiers stop serving.</summary>
-        public const string NoCounterNotice =
-            "Your cashiers have no counter to serve from — place a counter to open the till again.";
+        public static string NoCounterNotice => Localization.Loc.T("assistant.no_counter");
 
         /// <summary>Builds an assistant standing at the till, facing the queue.</summary>
         public static Assistant Create(Transform parent, Vector3 position, Vector3 facing,
@@ -183,7 +182,7 @@ namespace PetShop.Commerce
             float value = shopper.BasketValue;
             Queue.ServeFront();
             AudioManager.Instance?.PlaySfx("sale", 0.6f);
-            GameManager.Instance?.Notify($"{name.Replace('_', ' ')} served {shopper.ShopperName} — €{value:N2}");
+            GameManager.Instance?.Notify(Localization.Loc.F("assistant.served", name.Replace('_', ' '), shopper.ShopperName, value));
         }
 
         /// <summary>

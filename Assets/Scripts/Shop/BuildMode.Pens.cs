@@ -12,7 +12,7 @@ namespace PetShop.Shop
     public partial class BuildMode
     {
         /// <summary>Notice shown when a pen is aimed at the shop room.</summary>
-        public const string PenInShopNotice = "Pens go in the yard";
+        public static string PenInShopNotice => PetShop.Localization.Loc.T("build.pen_in_shop");
 
         /// <summary>
         /// The scene layout, used to let pens stand anywhere in the yard but never in the shop room
@@ -28,7 +28,7 @@ namespace PetShop.Shop
             def != null && def.Id == BuildCatalog.PetPen;
 
         /// <summary>Notice shown when a non-pen item does not fit where it is aimed.</summary>
-        private const string CantBuildNotice = "Can't build there.";
+        private static string CantBuildNotice => PetShop.Localization.Loc.T("build.cant_build");
 
         /// <summary>
         /// True when <paramref name="def"/> is a pen placed by the yard rule

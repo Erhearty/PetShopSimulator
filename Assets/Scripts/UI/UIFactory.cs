@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using PetShop.Localization;
 
 namespace PetShop.UI
 {
@@ -129,6 +130,9 @@ namespace PetShop.UI
         private static readonly Color PressedTint  = new(0.85f, 0.85f, 0.85f, 1f);
         private static readonly Color DisabledTint = new(0.6f, 0.6f, 0.6f, 0.5f);
         private const float ButtonFadeSeconds = 0.08f;
+
+        /// <summary>Smallest auto-size, as a fraction of the design size, for single-line text and buttons.</summary>
+        public const float AutoSizeMinFraction = 0.8f;
 
         private const int SpriteSize = 48;
         private const float SpritePixelsPerUnit = 100f;
@@ -286,8 +290,50 @@ namespace PetShop.UI
         }
 
         /// <summary>
+        /// A <see cref="Label"/> showing localisation <paramref name="key"/> (formatted with
+        /// <paramref name="args"/>), re-read whenever the language changes, and auto-sized down to
+        /// <see cref="AutoSizeMinFraction"/> of <paramref name="fontSize"/> so longer translations fit.
+        /// </summary>
+        public static TMP_Text LabelKey(string name, Transform parent, string key,
+                                        Vector2 anchorMin, Vector2 anchorMax,
+                                        float fontSize = TextBody, Color? color = null,
+                                        TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft,
+                                        params object[] args)
+        {
+            var tmp = Label(name, parent, "", anchorMin, anchorMax, fontSize, color, align);
+            AutoFit(tmp);
+            LocalizedText.Bind(tmp, key, args);
+            return tmp;
+        }
+
+        /// <summary>A <see cref="Button"/> whose label shows localisation <paramref name="key"/> and follows language changes.</summary>
+        public static Button ButtonKey(string name, Transform parent, string key,
+                                       Vector2 anchorMin, Vector2 anchorMax,
+                                       float fontSize = 17f, Color? bg = null, params object[] args)
+        {
+            var btn = Button(name, parent, "", anchorMin, anchorMax, fontSize, bg);
+            LocalizedText.Bind(btn.GetComponentInChildren<TMP_Text>(), key, args);
+            return btn;
+        }
+
+        /// <summary>Binds an existing label to <paramref name="key"/> so it follows language changes.</summary>
+        public static void Localize(TMP_Text label, string key, params object[] args) =>
+            LocalizedText.Bind(label, key, args);
+
+        /// <summary>Lets <paramref name="text"/> shrink to <see cref="AutoSizeMinFraction"/> of its size instead of truncating.</summary>
+        public static void AutoFit(TMP_Text text)
+        {
+            if (text == null) return;
+            float size = text.fontSize;
+            text.fontSizeMax      = size;
+            text.fontSizeMin      = size * AutoSizeMinFraction;
+            text.enableAutoSizing = true;
+        }
+
+        /// <summary>
         /// A rounded button with hover/pressed/selected/disabled states and an accent outline while
-        /// keyboard-selected. An accent fill gets panel-coloured text for contrast.
+        /// keyboard-selected. An accent fill gets panel-coloured text for contrast. The label
+        /// auto-sizes down to <see cref="AutoSizeMinFraction"/> of <paramref name="fontSize"/>.
         /// </summary>
         public static Button Button(string name, Transform parent, string text,
                                     Vector2 anchorMin, Vector2 anchorMax,
@@ -303,8 +349,9 @@ namespace PetShop.UI
             btn.colors = ButtonStates();
             go.AddComponent<FocusOutline>();
 
-            Label($"{name}_Label", go.transform, text, Vector2.zero, Vector2.one,
-                  fontSize, LabelColourOn(fill), TextAlignmentOptions.Center);
+            var label = Label($"{name}_Label", go.transform, text, Vector2.zero, Vector2.one,
+                              fontSize, LabelColourOn(fill), TextAlignmentOptions.Center);
+            AutoFit(label);
             return btn;
         }
 

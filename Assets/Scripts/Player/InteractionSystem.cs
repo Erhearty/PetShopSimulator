@@ -3,6 +3,7 @@ using TMPro;
 using PetShop.Core;
 using PetShop.Commerce;
 using PetShop.Pets;
+using PetShop.Localization;
 
 namespace PetShop.Player
 {
@@ -87,29 +88,29 @@ namespace PetShop.Player
             {
                 var shop  = _game != null ? _game.Shop : null;
                 int ready = shop != null ? shop.Warehouse(shelf.Category) : 0;
-                string source = ready > 0 ? $"  ·  {ready} in the stockroom" : "  ·  stockroom empty, cash-and-carry prices";
+                string source = ready > 0 ? Loc.F("prompt.source.stockroom", ready) : Loc.T("prompt.source.cash_and_carry");
 
                 return shelf.IsEmpty
-                    ? $"[{Key}]  Restock shelf{source}"
-                    : $"[{Key}]  Restock {shelf.Category} shelf  ({shelf.TotalUnits} units left){source}";
+                    ? Loc.F("prompt.restock_shelf", Key, source)
+                    : Loc.F("prompt.restock_category", Key, CategoryName(shelf.Category), shelf.TotalUnits, source);
             }
 
             var pen = col.GetComponentInParent<PetPen>();
             if (pen != null)
             {
                 if (pen.NeedsService)
-                    return $"[{Key}]  Feed & clean the {pen.PenSpecies} pen  (€{pen.ServiceCost:N0})";
+                    return Loc.F("prompt.pen_service", Key, SpeciesName(pen.PenSpecies), pen.ServiceCost);
                 return pen.HasSpace
-                    ? $"[{Key}]  Buy a {pen.PenSpecies}  (€{Pet.WholesalePrice(pen.PenSpecies):N0})   ·  {pen.Count}/{pen.Capacity} stalls filled"
-                    : $"[{Key}]  {pen.PenSpecies} pen — full ({pen.Count}/{pen.Capacity})";
+                    ? Loc.F("prompt.pen_buy", Key, SpeciesName(pen.PenSpecies), Pet.WholesalePrice(pen.PenSpecies), pen.Count, pen.Capacity)
+                    : Loc.F("prompt.pen_full", Key, SpeciesName(pen.PenSpecies), pen.Count, pen.Capacity);
             }
 
             if (col.GetComponentInParent<CounterInteractable>() != null)
             {
                 var queue = _game != null ? _game.Queue : null;
                 if (queue != null && queue.AnyWaiting)
-                    return $"[{Key}]  Serve {queue.Front.ShopperName}  —  {queue.Front.BasketCount} item(s), " +
-                           $"€{queue.Front.BasketValue:N2}   ({queue.Length} waiting)";
+                    return Loc.F("prompt.serve", Key, queue.Front.ShopperName, queue.Front.BasketCount,
+                                 queue.Front.BasketValue, queue.Length);
                 return EmptyCounterPrompt;
             }
 
@@ -117,7 +118,18 @@ namespace PetShop.Player
         }
 
         /// <summary>The counter's prompt while nobody is queueing, so the player knows E works there.</summary>
-        internal static string EmptyCounterPrompt => $"[{Key}]  Counter — no customers yet";
+        internal static string EmptyCounterPrompt => Loc.F("prompt.counter_empty", Key);
+
+        /// <summary>A species' name in the current language.</summary>
+        internal static string SpeciesName(Pet.Species species) =>
+            Loc.T("species." + species.ToString().ToLowerInvariant());
+
+        /// <summary>A product category's name in the current language, falling back to the enum name.</summary>
+        internal static string CategoryName(ProductCategory category)
+        {
+            string key = "category." + category.ToString().ToLowerInvariant();
+            return Loc.Has(key) ? Loc.T(key) : category.ToString();
+        }
 
         /// <summary>
         /// The interactable the player is facing: the first one a sphere cast from the eyes hits,

@@ -93,7 +93,8 @@ namespace PetShop.Commerce
 
             if (_lines.Count == 0)
             {
-                _priceTag.SetText($"{Category}\n<size=70%>empty — press {InputBindings.Label(GameAction.Interact)}</size>");
+                _priceTag.SetText(Localization.Loc.F("shelf.tag.empty", Localization.LocNames.CategoryTitle(Category),
+                                                     InputBindings.Label(GameAction.Interact)));
                 _priceTag.SetColour(UIFactory.Bad);
                 return;
             }
@@ -115,7 +116,8 @@ namespace PetShop.Commerce
                 ? $"€ {lowest:0.00}"
                 : $"€ {lowest:0.00} – {highest:0.00}";
 
-            _priceTag.SetText($"{Category}   {priceText}\n<size=75%>{TotalUnits} / {capacity} in stock</size>");
+            _priceTag.SetText(Localization.Loc.F("shelf.tag.stock", Localization.LocNames.CategoryTitle(Category),
+                                                 priceText, TotalUnits, capacity));
             _priceTag.SetColour(fill <= 0.01f ? UIFactory.Bad
                               : fill < 0.3f   ? new Color(0.95f, 0.72f, 0.35f)
                                               : UIFactory.Ink);
@@ -223,10 +225,11 @@ namespace PetShop.Commerce
         /// <summary>Human-readable contents, for the interaction panel.</summary>
         public string Describe()
         {
-            if (_lines.Count == 0) return $"{Category} shelf — empty";
-            var sb = new System.Text.StringBuilder($"{Category} shelf\n");
+            string title = Localization.LocNames.CategoryTitle(Category);
+            if (_lines.Count == 0) return Localization.Loc.F("shelf.describe.empty", title);
+            var sb = new System.Text.StringBuilder(Localization.Loc.F("shelf.describe.title", title) + "\n");
             foreach (var l in _lines)
-                sb.AppendLine($"  {l.Product.displayName}  {l.Units}/{MaxPerLine}   €{l.Product.basePrice:0.00}");
+                sb.AppendLine($"  {l.Product.LocalizedName}  {l.Units}/{MaxPerLine}   €{l.Product.basePrice:0.00}");
             return sb.ToString().TrimEnd();
         }
 
