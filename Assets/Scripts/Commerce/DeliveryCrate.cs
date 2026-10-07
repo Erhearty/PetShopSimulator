@@ -38,6 +38,12 @@ namespace PetShop.Commerce
         public string FurnitureName =>
             IsFurniture ? BuildCatalog.Get(FurnitureOrder.CatalogId)?.DisplayName ?? FurnitureOrder.CatalogId : null;
 
+        /// <summary>
+        /// <see cref="FurnitureName"/> in the current language, for the label and prompt only; null for a stock pallet.
+        /// </summary>
+        public string LocalizedFurnitureName =>
+            IsFurniture ? BuildCatalog.Get(FurnitureOrder.CatalogId)?.LocalizedName ?? FurnitureName : null;
+
         /// <summary>Builds a crate stack sized to the order and labels it.</summary>
         public static DeliveryCrate Spawn(Vector3 position, ProductCategory category, int units)
         {
@@ -113,7 +119,7 @@ namespace PetShop.Commerce
 
         private void RefreshLabel() =>
             _label?.SetText(IsFurniture
-                ? Localization.Loc.F("crate.label.furniture", FurnitureName, InputBindings.Label(GameAction.Interact))
+                ? Localization.Loc.F("crate.label.furniture", LocalizedFurnitureName, InputBindings.Label(GameAction.Interact))
                 : Localization.Loc.F("crate.label.stock", Localization.LocNames.Category(Category), Units,
                                      InputBindings.Label(GameAction.Interact)));
 
@@ -155,7 +161,7 @@ namespace PetShop.Commerce
 
         /// <summary>The interact prompt shown while the player looks at this crate.</summary>
         public string Prompt => IsFurniture
-            ? Localization.Loc.F("crate.prompt.furniture", InputBindings.Label(GameAction.Interact), FurnitureName)
+            ? Localization.Loc.F("crate.prompt.furniture", InputBindings.Label(GameAction.Interact), LocalizedFurnitureName)
             : Localization.Loc.F("crate.prompt.stock", InputBindings.Label(GameAction.Interact), Units,
                                  Localization.LocNames.Category(Category));
     }

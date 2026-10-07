@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using PetShop.Localization;
 
 namespace PetShop.Pets
 {
@@ -115,19 +116,19 @@ namespace PetShop.Pets
         /// </summary>
         public static string DescribeExpected(Pet a, Pet b)
         {
-            if (a == null || b == null) return "Pick two adults of the same species.";
-            if (a == b)                 return "Pick two different animals.";
-            if (a.species != b.species) return "They have to be the same species.";
-            if (!a.CanBreed || !b.CanBreed) return "Both parents have to be fully grown.";
+            if (a == null || b == null) return Loc.T("breed.pick_two_adults");
+            if (a == b)                 return Loc.T("breed.pick_different");
+            if (a.species != b.species) return Loc.T("breed.same_species");
+            if (!a.CanBreed || !b.CanBreed) return Loc.T("breed.both_adult");
 
             var rarity = (Pet.Rarity)Mathf.Min((int)a.rarity, (int)b.rarity);
-            return $"Expected: a baby {a.species}, {rarity} or better " +
-                   $"({UpgradeChance(a.rarity, b.rarity) * 100f:0}% chance of a step up; " +
-                   $"{MatchedTierUpgradeChance * 100f:0}% when both share a tier)\n" +
-                   $"temperament {(a.temperament + b.temperament) * 0.5f:0.00}   ·   " +
-                   $"energy {(a.energyLevel + b.energyLevel) * 0.5f:0.00}   ·   " +
-                   $"friendliness {(a.friendliness + b.friendliness) * 0.5f:0.00}\n" +
-                   $"list price around € {(a.basePrice + b.basePrice) * 0.5f:N0} before rarity and growth";
+            return Loc.F("breed.expected",
+                         LocNames.Species(a.species), LocNames.Rarity(rarity),
+                         UpgradeChance(a.rarity, b.rarity) * 100f, MatchedTierUpgradeChance * 100f,
+                         (a.temperament + b.temperament) * 0.5f,
+                         (a.energyLevel + b.energyLevel) * 0.5f,
+                         (a.friendliness + b.friendliness) * 0.5f,
+                         (a.basePrice + b.basePrice) * 0.5f);
         }
 
         /// <summary>Whether these two can actually be paired.</summary>

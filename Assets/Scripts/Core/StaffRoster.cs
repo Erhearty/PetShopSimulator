@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using PetShop.Commerce;
+using PetShop.Localization;
 
 namespace PetShop.Core
 {
@@ -82,9 +83,7 @@ namespace PetShop.Core
             if (candidate == null) return false;
             if (!CanHire(candidate, out string reason))
             {
-                _game.Notify(reason == NoCounterReason
-                    ? $"{NoCounterReason} — a cashier needs a counter to work behind."
-                    : "There is no room behind that counter for another assistant.");
+                _game.Notify(Loc.T(reason == NoCounterReason ? "staff.hire.no_counter" : "staff.hire.no_room"));
                 return false;
             }
             if (!PaySignOnFee(candidate)) return false;
@@ -92,8 +91,8 @@ namespace PetShop.Core
             Spawn(candidate);
             _candidates.Remove(candidate);
             PushToShop();
-            _game.Notify($"Hired {candidate.Name} — {candidate.Role}, {candidate.SkillWord}, " +
-                         $"€{candidate.DailyWage:N0} a day, {_assistants.Count} on the payroll.");
+            _game.Notify(Loc.F("staff.hired", candidate.Name, LocNames.Role(candidate.Role), candidate.SkillWord,
+                               candidate.DailyWage, _assistants.Count));
             return true;
         }
 
@@ -117,7 +116,7 @@ namespace PetShop.Core
             if (candidate.SignOnFee <= 0f) return true;
             if (_game.Shop.ChangeBalance(-candidate.SignOnFee, $"Sign-on fee for {candidate.Name}"))
                 return true;
-            _game.Notify($"You cannot cover {candidate.Name}'s €{candidate.SignOnFee:N0} sign-on fee.");
+            _game.Notify(Loc.F("staff.sign_on_no_money", candidate.Name, candidate.SignOnFee));
             _game.Audio?.PlaySfx("deny");
             return false;
         }
@@ -167,7 +166,7 @@ namespace PetShop.Core
         /// <summary>Lets the most recently hired assistant go.</summary>
         public bool FireAssistant()
         {
-            if (_assistants.Count == 0) { _game.Notify("There is nobody to let go."); return false; }
+            if (_assistants.Count == 0) { _game.Notify(Loc.T("staff.nobody_to_fire")); return false; }
             return FireAssistant(_assistants[_assistants.Count - 1]);
         }
 
@@ -176,7 +175,7 @@ namespace PetShop.Core
         {
             if (member == null || !_assistants.Contains(member))
             {
-                _game.Notify("There is nobody to let go.");
+                _game.Notify(Loc.T("staff.nobody_to_fire"));
                 return false;
             }
 
@@ -187,7 +186,7 @@ namespace PetShop.Core
 
             // People talk: sacking staff costs you a little standing locally.
             _game.Shop.ChangeReputation(-FireReputationCost);
-            _game.Notify($"Let {name} go — {_assistants.Count} left on the payroll.");
+            _game.Notify(Loc.F("staff.fired", name, _assistants.Count));
             return true;
         }
 

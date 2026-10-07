@@ -311,10 +311,11 @@ namespace PetShop.Customer
             {
                 // Abandon the basket: stock is lost from the shelf either way, and the
                 // shop's standing takes a real hit.
-                ShopManager?.ChangeReputation(-3.5f);
+                ShopManager?.ChangeReputation(-GaveUpReputationLoss);
                 GameManager.Instance?.Notify(Localization.Loc.F("customer.gave_up_notice", name));
                 SetBubble(Localization.Loc.T("customer.gave_up"), UIFactory.Bad);
-                FloatingText.Spawn(transform.position + Vector3.up * 2.4f, "−3.5 rep", UIFactory.Bad, 0.26f);
+                FloatingText.Spawn(transform.position + Vector3.up * 2.4f,
+                                   Localization.Loc.F("customer.rep_loss", GaveUpReputationLoss), UIFactory.Bad, 0.26f);
                 _basket.Clear();
                 GaveUp?.Invoke(this);
             }
@@ -322,6 +323,9 @@ namespace PetShop.Customer
 
         /// <summary>Avoidance priority while standing in line: lower numbers are given way to.</summary>
         private const int QueueAvoidancePriority = 10;
+
+        /// <summary>Reputation the shop loses when a shopper gives up and walks out.</summary>
+        private const float GaveUpReputationLoss = 3.5f;
 
         /// <summary>
         /// Avoidance priority from leaving the line until stepped aside off it: below

@@ -61,7 +61,7 @@ namespace PetShop.Shop
         public static string NothingToRemoveNotice => Loc.T("build.nothing_to_remove");
 
         /// <summary>Label of the fixed key that cycles the legacy pen's species.</summary>
-        private const string PenVariantKeyLabel = "Q";
+        internal const string PenVariantKeyLabel = "Q";
         /// <summary>Shown when an occupied pen refuses to be packed away.</summary>
         public static string PenHasPetsNotice => Loc.T("build.pen_has_pets");
         /// <summary>Shown when the Remove tool's aim meets neither a placed piece nor the floor (or there is no camera).</summary>
@@ -203,7 +203,7 @@ namespace PetShop.Shop
             string name = CurrentPenVariant();
             if (name != null)
                 OnBuildMessage.Invoke(Loc.F("build.pen_species",
-                    System.Enum.TryParse(name, out Pet.Species s) ? PetShop.Player.InteractionSystem.SpeciesName(s) : name,
+                    System.Enum.TryParse(name, out Pet.Species s) ? LocNames.Species(s) : name,
                     PenVariantKeyLabel));
         }
 

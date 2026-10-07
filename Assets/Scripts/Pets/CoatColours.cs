@@ -41,6 +41,18 @@ namespace PetShop.Pets
         /// <summary>Every coat name the classifier can return.</summary>
         public static IReadOnlyList<string> Names => NameList;
 
+        /// <summary>
+        /// The player-facing name of the coat <paramref name="coatName"/> (one of <see cref="Names"/>) in
+        /// the current language, or the name itself when the table has no entry. Display only:
+        /// compare and save the English name.
+        /// </summary>
+        public static string DisplayName(string coatName)
+        {
+            if (string.IsNullOrEmpty(coatName)) return string.Empty;
+            string key = "coat." + coatName.ToLowerInvariant();
+            return PetShop.Localization.Loc.Has(key) ? PetShop.Localization.Loc.T(key) : coatName;
+        }
+
         /// <summary>Name of the palette entry nearest to <paramref name="c"/>.</summary>
         public static string Classify(Color c)
         {

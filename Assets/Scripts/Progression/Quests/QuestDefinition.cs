@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using PetShop.Core;
+using PetShop.Localization;
 
 namespace PetShop.Progression.Quests
 {
@@ -47,13 +49,48 @@ namespace PetShop.Progression.Quests
         /// <summary>Optional counter (current, target) for goals like "Own 3 shelves"; null when none.</summary>
         public Func<QuestContext, (int current, int target)> Progress { get; }
 
+        /// <summary>
+        /// Values for the <c>{0}</c>, <c>{1}</c>… placeholders in the localized title and description
+        /// (targets, tier names); evaluated on every read so they follow the language. Null when none.
+        /// </summary>
+        public Func<object[]> TextArgs { get; }
+
         /// <summary>The instruction with the player's current key bindings filled in.</summary>
         public string Instruction => InstructionText(InputBindings.Label);
 
-        /// <summary>Creates a quest. <paramref name="progress"/> may be null.</summary>
+        /// <summary>Table key of the title: <c>quest.&lt;id&gt;.title</c>.</summary>
+        public string TitleKey => $"quest.{Id}.title";
+
+        /// <summary>Table key of the description: <c>quest.&lt;id&gt;.desc</c>.</summary>
+        public string DescriptionKey => $"quest.{Id}.desc";
+
+        /// <summary>The title in the current language, or <see cref="Title"/> when the table has no entry.</summary>
+        public string LocalizedTitle =>
+            Loc.Has(TitleKey) ? Loc.F(TitleKey, TextArgs?.Invoke() ?? Array.Empty<object>()) : Title ?? string.Empty;
+
+        /// <summary>
+        /// The how-to text in the current language with the player's current key bindings filled in, or
+        /// <see cref="InstructionTemplate"/> with its key tokens replaced when the table has no entry.
+        /// </summary>
+        public string LocalizedDescription => LocalizedInstructionText(InputBindings.Label);
+
+        /// <summary>
+        /// The actions whose keys the instruction names, in the order <see cref="InstructionTemplate"/> first
+        /// names them. The localized description takes their labels as positional arguments right after
+        /// <see cref="TextArgs"/>: with two text arguments, the first key is <c>{2}</c>.
+        /// </summary>
+        public IReadOnlyList<GameAction> KeyActions => _keyActions ??= KeyActionsIn(InstructionTemplate);
+
+        private IReadOnlyList<GameAction> _keyActions;
+
+        /// <summary>The localized description with the player's current key bindings filled in.</summary>
+        public string LocalizedInstruction => LocalizedInstructionText(InputBindings.Label);
+
+        /// <summary>Creates a quest. <paramref name="progress"/> and <paramref name="textArgs"/> may be null.</summary>
         public QuestDefinition(string id, QuestChapter chapter, string title, string instruction, float reward,
                                Func<QuestContext, bool> condition,
-                               Func<QuestContext, (int current, int target)> progress = null)
+                               Func<QuestContext, (int current, int target)> progress = null,
+                               Func<object[]> textArgs = null)
         {
             Id                  = id;
             Chapter             = chapter;
@@ -62,6 +99,7 @@ namespace PetShop.Progression.Quests
             Reward              = reward;
             Condition           = condition;
             Progress            = progress;
+            TextArgs            = textArgs;
         }
 
         /// <summary>The token an instruction uses for <paramref name="action"/>'s key, e.g. "{Interact}".</summary>
@@ -72,9 +110,47 @@ namespace PetShop.Progression.Quests
             InputBindings.KeyLabel(InputBindings.Default(action));
 
         /// <summary>The instruction with every key token replaced by <paramref name="keyLabel"/>.</summary>
-        public string InstructionText(Func<GameAction, string> keyLabel)
+        public string InstructionText(Func<GameAction, string> keyLabel) => ReplaceKeyTokens(InstructionTemplate, keyLabel);
+
+        /// <summary>
+        /// The localized description formatted with <see cref="TextArgs"/> followed by <paramref name="keyLabel"/>
+        /// of each of <see cref="KeyActions"/>; the English instruction when the table has no entry. A broken
+        /// pattern is logged and returned as is (see <see cref="Loc.F"/>), never swapped for English.
+        /// </summary>
+        public string LocalizedInstructionText(Func<GameAction, string> keyLabel)
         {
-            string text = InstructionTemplate ?? string.Empty;
+            if (!Loc.Has(DescriptionKey)) return InstructionText(keyLabel);
+            return Loc.F(DescriptionKey, DescriptionArgs(keyLabel));
+        }
+
+        /// <summary><see cref="TextArgs"/>, then the label of each of <see cref="KeyActions"/>.</summary>
+        private object[] DescriptionArgs(Func<GameAction, string> keyLabel)
+        {
+            object[] text = TextArgs?.Invoke() ?? Array.Empty<object>();
+            var keys = KeyActions;
+            var all = new object[text.Length + keys.Count];
+            Array.Copy(text, all, text.Length);
+            for (int i = 0; i < keys.Count; i++) all[text.Length + i] = keyLabel(keys[i]);
+            return all;
+        }
+
+        /// <summary>The actions whose tokens appear in <paramref name="template"/>, by first appearance.</summary>
+        private static IReadOnlyList<GameAction> KeyActionsIn(string template)
+        {
+            var found = new List<(int index, GameAction action)>();
+            if (!string.IsNullOrEmpty(template))
+                foreach (var action in InputBindings.AllActions)
+                {
+                    int at = template.IndexOf(KeyToken(action), StringComparison.Ordinal);
+                    if (at >= 0) found.Add((at, action));
+                }
+            found.Sort((a, b) => a.index.CompareTo(b.index));
+            return found.ConvertAll(f => f.action);
+        }
+
+        private static string ReplaceKeyTokens(string template, Func<GameAction, string> keyLabel)
+        {
+            string text = template ?? string.Empty;
             foreach (var action in InputBindings.AllActions)
                 text = text.Replace(KeyToken(action), keyLabel(action));
             return text;
@@ -89,10 +165,10 @@ namespace PetShop.Progression.Quests
         /// </summary>
         public string ProgressText(QuestContext ctx)
         {
-            if (Progress == null || ctx == null) return Title;
+            if (Progress == null || ctx == null) return LocalizedTitle;
             var (current, target) = Progress(ctx);
             int shown = Math.Max(0, Math.Min(current, target));
-            return $"{Title} ({shown}/{target})";
+            return $"{LocalizedTitle} ({shown}/{target})";
         }
     }
 }

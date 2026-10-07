@@ -50,6 +50,24 @@ namespace PetShop.Localization.Strings
             uk["counter.served.many"] = "Обслуговано: {1} — {0} товарів, €{2:N2}";
             Add("counter.still_waiting", "{0} still waiting (€{1:N0}).", "Ще чекають: {0} (€{1:N0}).");
 
+            // Staff: {0} is the person's name unless noted.
+            Add("staff.hire.no_counter", "Place a counter first — a cashier needs a counter to work behind.", "Спершу поставте прилавок — касирові потрібен прилавок, за яким працювати.");
+            Add("staff.hire.no_room", "There is no room behind that counter for another assistant.", "За цим прилавком немає місця для ще одного помічника.");
+            // {0} name, {1} role, {2} skill word, {3} daily wage, {4} head count.
+            Add("staff.hired", "Hired {0} — {1}, {2}, €{3:N0} a day, {4} on the payroll.", "Найнято: {0} — {1}, {2}, €{3:N0} на день, у штаті: {4}.");
+            Add("staff.sign_on_no_money", "You cannot cover {0}'s €{1:N0} sign-on fee.", "Не вистачає грошей на вступну виплату €{1:N0} ({0}).");
+            Add("staff.nobody_to_fire", "There is nobody to let go.", "Немає кого звільнити.");
+            // {0} name, {1} head count left.
+            Add("staff.fired", "Let {0} go — {1} left on the payroll.", "{0}: звільнено — у штаті лишилося: {1}.");
+
+            // New game and saves. Welcome: {0} build key, {1} interact key, {2} end-day key.
+            Add("game.welcome", "Welcome to your pet shop! {0} to build, {1} to interact, {2} to close up.", "Ласкаво просимо до вашої зоокрамниці! {0} — будувати, {1} — взаємодіяти, {2} — зачинити на ніч.");
+            Add("save.saved", "Game saved.", "Гру збережено.");
+            Add("save.autosaved", "Autosaved.", "Автозбереження виконано.");
+            Add("save.failed", "Save FAILED — progress not written. Check disk space/permissions.", "Збереження НЕ ВДАЛОСЯ — прогрес не записано. Перевірте місце на диску та права доступу.");
+            // {0} day, {1} balance.
+            Add("save.loaded", "Save loaded — day {0}, €{1:N0}", "Збереження завантажено — день {0}, €{1:N0}");
+
             // Interaction prompts ({0} is always the interact key)
             Add("prompt.source.stockroom", "  ·  {0} in the stockroom", "  ·  на складі: {0}");
             Add("prompt.source.cash_and_carry", "  ·  stockroom empty, cash-and-carry prices", "  ·  склад порожній, ціни гуртівні");

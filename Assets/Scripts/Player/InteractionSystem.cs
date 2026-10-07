@@ -92,17 +92,17 @@ namespace PetShop.Player
 
                 return shelf.IsEmpty
                     ? Loc.F("prompt.restock_shelf", Key, source)
-                    : Loc.F("prompt.restock_category", Key, CategoryName(shelf.Category), shelf.TotalUnits, source);
+                    : Loc.F("prompt.restock_category", Key, LocNames.Category(shelf.Category), shelf.TotalUnits, source);
             }
 
             var pen = col.GetComponentInParent<PetPen>();
             if (pen != null)
             {
                 if (pen.NeedsService)
-                    return Loc.F("prompt.pen_service", Key, SpeciesName(pen.PenSpecies), pen.ServiceCost);
+                    return Loc.F("prompt.pen_service", Key, LocNames.Species(pen.PenSpecies), pen.ServiceCost);
                 return pen.HasSpace
-                    ? Loc.F("prompt.pen_buy", Key, SpeciesName(pen.PenSpecies), Pet.WholesalePrice(pen.PenSpecies), pen.Count, pen.Capacity)
-                    : Loc.F("prompt.pen_full", Key, SpeciesName(pen.PenSpecies), pen.Count, pen.Capacity);
+                    ? Loc.F("prompt.pen_buy", Key, LocNames.Species(pen.PenSpecies), Pet.WholesalePrice(pen.PenSpecies), pen.Count, pen.Capacity)
+                    : Loc.F("prompt.pen_full", Key, LocNames.Species(pen.PenSpecies), pen.Count, pen.Capacity);
             }
 
             if (col.GetComponentInParent<CounterInteractable>() != null)
@@ -119,17 +119,6 @@ namespace PetShop.Player
 
         /// <summary>The counter's prompt while nobody is queueing, so the player knows E works there.</summary>
         internal static string EmptyCounterPrompt => Loc.F("prompt.counter_empty", Key);
-
-        /// <summary>A species' name in the current language.</summary>
-        internal static string SpeciesName(Pet.Species species) =>
-            Loc.T("species." + species.ToString().ToLowerInvariant());
-
-        /// <summary>A product category's name in the current language, falling back to the enum name.</summary>
-        internal static string CategoryName(ProductCategory category)
-        {
-            string key = "category." + category.ToString().ToLowerInvariant();
-            return Loc.Has(key) ? Loc.T(key) : category.ToString();
-        }
 
         /// <summary>
         /// The interactable the player is facing: the first one a sphere cast from the eyes hits,

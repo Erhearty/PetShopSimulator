@@ -3,7 +3,6 @@ using PetShop.Commerce;
 using PetShop.Pets;
 using PetShop.Shop;
 using PetShop.Localization;
-using static PetShop.Player.InteractionSystem;
 
 namespace PetShop.Core
 {
@@ -45,7 +44,7 @@ namespace PetShop.Core
                 return false;
             }
 
-            _game.Notify(Loc.F("order.placed", units, CategoryName(category), order.Cost));
+            _game.Notify(Loc.F("order.placed", units, LocNames.Category(category), order.Cost));
             _game.Audio?.PlaySfx("restock");
             return true;
         }
@@ -56,7 +55,7 @@ namespace PetShop.Core
             ByTruck(() =>
             {
                 DeliveryCrate.Spawn(ForecourtSpot(), order.Category, order.Units);
-                _game.Notify(Loc.F("delivery.stock", order.Units, CategoryName(order.Category),
+                _game.Notify(Loc.F("delivery.stock", order.Units, LocNames.Category(order.Category),
                                    InputBindings.Label(GameAction.Interact)));
                 _game.Audio?.PlaySfx("restock");
             });
@@ -160,12 +159,12 @@ namespace PetShop.Core
             if (result.Units <= 0)
                 _game.Notify(Loc.T(shelf.HasSpace ? "restock.no_money" : "restock.full"));
             else if (result.Spent <= 0.01f)
-                _game.Notify(Loc.F("restock.from_stockroom", result.Units, CategoryName(shelf.Category),
+                _game.Notify(Loc.F("restock.from_stockroom", result.Units, LocNames.Category(shelf.Category),
                                    shop.Warehouse(shelf.Category)));
             else if (result.FromWarehouse > 0)
                 _game.Notify(Loc.F("restock.mixed", result.FromWarehouse, result.Units - result.FromWarehouse, result.Spent));
             else
-                _game.Notify(Loc.F("restock.cash_and_carry", CategoryName(shelf.Category), result.Spent,
+                _game.Notify(Loc.F("restock.cash_and_carry", LocNames.Category(shelf.Category), result.Spent,
                                    (1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f));
 
             _game.Audio?.PlaySfx(result.Units > 0 ? "restock" : "deny");
@@ -189,7 +188,7 @@ namespace PetShop.Core
                 if (shop.ChangeBalance(-cost, "Pen upkeep"))
                 {
                     pen.Service();
-                    _game.Notify(Loc.F("pen.serviced", SpeciesName(pen.PenSpecies), cost));
+                    _game.Notify(Loc.F("pen.serviced", LocNames.Species(pen.PenSpecies), cost));
                     _game.Audio?.PlaySfx("restock");
                 }
                 else
@@ -215,7 +214,7 @@ namespace PetShop.Core
                 }
                 else
                 {
-                    _game.Notify(Loc.F("pen.buy_no_money", SpeciesName(pen.PenSpecies), price));
+                    _game.Notify(Loc.F("pen.buy_no_money", LocNames.Species(pen.PenSpecies), price));
                     _game.Audio?.PlaySfx("deny");
                 }
             }

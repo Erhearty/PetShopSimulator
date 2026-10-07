@@ -57,7 +57,7 @@ namespace PetShop.Localization.Strings
 
             // Staff words
             Add("staff.role.cashier", "Cashier", "Касир");
-            Add("staff.role.restocker", "Restocker", "Викладач");
+            Add("staff.role.restocker", "Restocker", "Комірник");
             Add("staff.role.feeder", "Feeder", "Доглядач");
             Add("staff.skill.1", "green", "новачок");
             Add("staff.skill.2", "learning", "учень");
@@ -71,13 +71,15 @@ namespace PetShop.Localization.Strings
 
             // Customers
             Add("customer.type.regular", "Regular", "Звичайний");
-            Add("customer.type.bargain_hunter", "Bargain hunter", "Мисливець знижок");
+            Add("customer.type.bargain_hunter", "Bargain hunter", "Мисливець за знижками");
             Add("customer.type.rare_collector", "Collector", "Колекціонер");
             Add("customer.type.parent_with_child", "Parent", "Батько з дитиною");
             Add("customer.wants_pet", "wants a pet", "хоче тваринку");
             Add("customer.bubble", "<size=80%><b>{0}</b>: {1}</size>", "<size=80%><b>{0}</b>: {1}</size>");
             Add("customer.waiting_to_pay", "waiting to pay", "чекає на оплату");
             Add("customer.gave_up", "gave up!", "набридло!");
+            // {0} reputation lost, e.g. 3.5.
+            Add("customer.rep_loss", "−{0:0.#} rep", "−{0:0.#} репутації");
             Add("customer.gave_up_notice", "{0} gave up waiting and walked out.", "{0} не дочекався(-лася) і пішов(-ла).");
             Add("customer.got", "got {0}", "взяв(-ла): {0}");
             Add("customer.too_expensive", "too expensive", "задорого");
