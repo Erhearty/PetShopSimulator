@@ -4,6 +4,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -101,48 +102,71 @@ namespace PetShop.UI
             BuildGuidePage();
 
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rewrites the page bodies in the new language while the book is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (IsOpen) Refresh();
         }
 
         /// <summary>Title, divider, nav hint and the Close button.</summary>
         private void BuildChrome()
         {
-            UIFactory.Label("Title", _panel, "Shop book", new Vector2(NavLeft, 0.89f),
+            UIFactory.LabelKey("Title", _panel, "tabs.title", new Vector2(NavLeft, 0.89f),
                 new Vector2(NavRight, 0.97f), UIFactory.TextHeading, UIFactory.Ink);
             UIFactory.Panel("Divider", _panel, new Vector2(NavRight + UIFactory.Gap / (2f * PanelHalfWidth), 0.03f),
                 new Vector2(NavRight + UIFactory.Gap / (2f * PanelHalfWidth), 0.97f), UIFactory.Border,
                 Vector2.zero, new Vector2(BorderWidth, 0f));
-            UIFactory.Label("NavHint", _panel, "Up/Down, Tab or 1–6 to switch pages. Esc closes.",
+            UIFactory.LabelKey("NavHint", _panel, "tabs.nav_hint",
                 new Vector2(NavLeft, 0.03f), new Vector2(NavRight, 0.14f), UIFactory.TextSmall, UIFactory.InkMuted,
                 TextAlignmentOptions.BottomLeft);
 
-            var close = UIFactory.Button("Close", _panel, "Close  (Esc)",
+            var close = UIFactory.ButtonKey("Close", _panel, "common.close_esc",
                 new Vector2(ContentMin.x + (ContentMax.x - ContentMin.x) * CloseLeft, 0.9f),
-                new Vector2(ContentMax.x, 0.96f), UIFactory.TextSmall);
+                new Vector2(ContentMax.x, 0.96f), UIFactory.TextSmall, null, "Esc");
             close.onClick.AddListener(Hide);
         }
 
-        /// <summary>Adds a page with its heading, purpose line, body text and nav button.</summary>
-        private BookPage AddPage(string title, string purpose, float bodySize)
+        /// <summary>
+        /// Adds page <paramref name="id"/> (English, used for object names and the <c>tabs.&lt;id&gt;</c>
+        /// keys) with its heading, purpose line (<c>tabs.&lt;id&gt;.purpose</c>), body text and nav button.
+        /// </summary>
+        private BookPage AddPage(string id, float bodySize) => AddPage(id, null, bodySize);
+
+        /// <summary>
+        /// Adds page <paramref name="id"/>; its heading and nav button show <c>tabs.&lt;id&gt;</c>. The purpose
+        /// line shows <paramref name="purpose"/> as given, or <c>tabs.&lt;id&gt;.purpose</c> when it is null.
+        /// </summary>
+        private BookPage AddPage(string id, string purpose, float bodySize)
         {
             int index = _pages.Count;
-            var root = UIFactory.Node($"Page_{title}", _panel, ContentMin, ContentMax);
-            UIFactory.Label("Heading", root.transform, title, new Vector2(0f, HeadingBottom),
+            string key = "tabs." + id.ToLowerInvariant();
+            var root = UIFactory.Node($"Page_{id}", _panel, ContentMin, ContentMax);
+            UIFactory.LabelKey("Heading", root.transform, key, new Vector2(0f, HeadingBottom),
                 new Vector2(CloseLeft, 1f), UIFactory.TextHeading, UIFactory.Ink);
-            UIFactory.Label("Purpose", root.transform, purpose, new Vector2(0f, PurposeBottom),
-                new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
+            if (purpose == null)
+                UIFactory.LabelKey("Purpose", root.transform, key + ".purpose", new Vector2(0f, PurposeBottom),
+                    new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
+            else
+                UIFactory.Label("Purpose", root.transform, purpose, new Vector2(0f, PurposeBottom),
+                    new Vector2(1f, HeadingBottom), UIFactory.TextSmall, UIFactory.InkMuted);
             var body = UIFactory.Label("Body", root.transform, "", new Vector2(0f, BodyBottom),
                 new Vector2(1f, BodyTop), bodySize, UIFactory.Ink, TextAlignmentOptions.TopLeft);
             body.richText = true;
 
-            var page = new BookPage { Root = root, Body = body, Nav = MakeNav(title, index) };
+            var page = new BookPage { Root = root, Body = body, Nav = MakeNav(id, key, index) };
             _pages.Add(page);
             return page;
         }
 
-        private Button MakeNav(string title, int index)
+        private Button MakeNav(string id, string key, int index)
         {
             float top = NavTop - index * (NavRowHeight + NavRowGap);
-            var btn = UIFactory.Button($"Tab_{title}", _panel, title, new Vector2(NavLeft, top - NavRowHeight),
+            var btn = UIFactory.ButtonKey($"Tab_{id}", _panel, key, new Vector2(NavLeft, top - NavRowHeight),
                 new Vector2(NavRight, top), UIFactory.TextBody);
             btn.navigation = new Navigation { mode = Navigation.Mode.None };   // the book drives the keys
             var label = btn.GetComponentInChildren<TMP_Text>();

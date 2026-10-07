@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using PetShop.Localization;
 using PetShop.Progression.Quests;
 using PetShop.UI;
 
@@ -9,6 +10,14 @@ namespace PetShop.Tests
     public class QuestTextFormatterTests
     {
         private const int OneShelf = 1;
+
+        private LocTestScope _loc;
+
+        [SetUp]
+        public void SetUp() => _loc = LocTestScope.Begin(Language.En);
+
+        [TearDown]
+        public void TearDown() => _loc.End();
 
         private static QuestBook EarlyBook()
         {
@@ -30,8 +39,8 @@ namespace PetShop.Tests
             string text = QuestTextFormatter.TrackerText(book, null);
 
             StringAssert.Contains("Tutorial 1/", text);
-            StringAssert.Contains(book.CurrentTutorialStep.Title, text);
-            StringAssert.Contains(book.CurrentTutorialStep.Instruction, text);
+            StringAssert.Contains(book.CurrentTutorialStep.LocalizedTitle, text);
+            StringAssert.Contains(book.CurrentTutorialStep.LocalizedInstruction, text);
         }
 
         [Test]

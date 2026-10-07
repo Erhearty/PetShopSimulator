@@ -120,7 +120,7 @@ namespace PetShop.Localization
         /// <summary>True when <paramref name="key"/> has text in English (the reference table).</summary>
         public static bool Has(string key) => Has(key, Language.En);
 
-        /// <summary><see cref="T"/> formatted with <paramref name="args"/> in the invariant culture.</summary>
+        /// <summary><see cref="T"/> formatted with <paramref name="args"/> in the current culture, exactly like a plain <c>$"{x:N2}"</c> interpolation.</summary>
         public static string F(string key, params object[] args) =>
             Format(T(key), args);
 
@@ -160,7 +160,7 @@ namespace PetShop.Localization
         private static string Format(string pattern, object[] args)
         {
             if (args == null || args.Length == 0) return pattern;
-            try { return string.Format(CultureInfo.InvariantCulture, pattern, args); }
+            try { return string.Format(CultureInfo.CurrentCulture, pattern, args); }
             catch (FormatException)
             {
                 Debug.LogWarning($"[Loc] Bad format string '{pattern}'.");

@@ -23,16 +23,22 @@ namespace PetShop.Tests
         }
 
         private IBindingStore _saved;
+        private LocTestScope  _loc;
 
         [SetUp]
         public void SetUp()
         {
+            _loc   = LocTestScope.Begin();
             _saved = InputBindings.Store;
             InputBindings.Store = new MemoryStore();
         }
 
         [TearDown]
-        public void TearDown() => InputBindings.Store = _saved;
+        public void TearDown()
+        {
+            InputBindings.Store = _saved;
+            _loc.End();
+        }
 
         [Test]
         public void EverySection_HasTitleAndBody()

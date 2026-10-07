@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using UnityEngine;
+using PetShop.Localization;
 using PetShop.Progression.Quests;
 
 namespace PetShop.UI
@@ -28,31 +29,31 @@ namespace PetShop.UI
         public const int MaxTrackedQuests = 3;
 
         /// <summary>Tracker text once every quest is done.</summary>
-        public const string AllDoneText = "All quests complete";
+        public static string AllDoneText => Loc.T("tracker.all_done");
 
         /// <summary>Journal text when there is no quest book.</summary>
-        public const string UnavailableText = "Quests are not available.";
+        public static string UnavailableText => Loc.T("journal.unavailable");
 
         /// <summary>Journal note above a chapter that has not unlocked.</summary>
-        public const string LockedNotice = "Locked: finish the previous chapter to unlock this one.";
+        public static string LockedNotice => Loc.T("journal.locked_notice");
 
-        /// <summary>The player-facing name of <paramref name="chapter"/>.</summary>
+        /// <summary>The player-facing name of <paramref name="chapter"/> in the current language.</summary>
         public static string ChapterName(QuestChapter chapter) => chapter switch
         {
-            QuestChapter.Tutorial => "Tutorial",
-            QuestChapter.Early    => "Early game",
-            QuestChapter.Mid      => "Mid game",
-            QuestChapter.End      => "End game",
+            QuestChapter.Tutorial => Loc.T("journal.chapter.tutorial"),
+            QuestChapter.Early    => Loc.T("journal.chapter.early"),
+            QuestChapter.Mid      => Loc.T("journal.chapter.mid"),
+            QuestChapter.End      => Loc.T("journal.chapter.end"),
             _                     => chapter.ToString(),
         };
 
-        /// <summary>The lower-case word shown for <paramref name="state"/>.</summary>
+        /// <summary>The lower-case word shown for <paramref name="state"/>, in the current language.</summary>
         public static string StateLabel(QuestJournalState state) => state switch
         {
-            QuestJournalState.Locked   => "locked",
-            QuestJournalState.Upcoming => "up next",
-            QuestJournalState.Active   => "active",
-            _                          => "done",
+            QuestJournalState.Locked   => Loc.T("journal.state.locked"),
+            QuestJournalState.Upcoming => Loc.T("journal.state.upcoming"),
+            QuestJournalState.Active   => Loc.T("journal.state.active"),
+            _                          => Loc.T("journal.state.done"),
         };
 
         /// <summary>Where <paramref name="quest"/> stands in <paramref name="book"/>.</summary>
@@ -109,7 +110,7 @@ namespace PetShop.UI
         {
             var steps = QuestCatalog.InChapter(book.Quests, QuestChapter.Tutorial);
             int number = steps.FindIndex(q => q.Id == step.Id) + 1;
-            return $"<b>Tutorial {number}/{steps.Count}: {step.Title}</b>\n{step.Instruction}";
+            return $"<b>{Loc.F("tracker.tutorial", number, steps.Count, step.LocalizedTitle)}</b>\n{step.LocalizedInstruction}";
         }
 
         private static string ChapterText(QuestBook book, QuestContext ctx)
@@ -119,7 +120,7 @@ namespace PetShop.UI
             int shown = Math.Min(active.Count, MaxTrackedQuests);
             for (int i = 0; i < shown; i++) sb.Append("\n- ").Append(active[i].ProgressText(ctx));
             if (active.Count > shown)
-                sb.Append($"\n+{active.Count - shown} more ({QuestJournalPanel.OpenKeyLabel})");
+                sb.Append('\n').Append(Loc.F("tracker.more", active.Count - shown, QuestJournalPanel.OpenKeyLabel));
             return sb.ToString();
         }
 
@@ -128,17 +129,17 @@ namespace PetShop.UI
             var state = StateOf(book, quest);
             string titleHex = ColorUtility.ToHtmlStringRGB(StateColor(state));
             string bodyHex  = ColorUtility.ToHtmlStringRGB(state == QuestJournalState.Locked ? UIFactory.InkMuted : UIFactory.Ink);
-            return $"<color=#{titleHex}><b>[{StateLabel(state)}] {quest.Title}</b></color>\n" +
-                   $"<color=#{bodyHex}>{quest.Instruction}\n{ProgressLine(state, quest, ctx)}\n" +
-                   $"Reward: €{quest.Reward:N0}</color>\n";
+            return $"<color=#{titleHex}><b>[{StateLabel(state)}] {quest.LocalizedTitle}</b></color>\n" +
+                   $"<color=#{bodyHex}>{quest.LocalizedInstruction}\n{ProgressLine(state, quest, ctx)}\n" +
+                   $"{Loc.F("journal.reward", quest.Reward)}</color>\n";
         }
 
         private static string ProgressLine(QuestJournalState state, QuestDefinition quest, QuestContext ctx)
         {
-            if (state == QuestJournalState.Done) return "Progress: complete";
-            if (state == QuestJournalState.Locked) return "Progress: locked";
+            if (state == QuestJournalState.Done) return Loc.T("journal.progress.complete");
+            if (state == QuestJournalState.Locked) return Loc.T("journal.progress.locked");
             string counter = CounterText(quest, ctx);
-            return counter != null ? $"Progress: {counter}" : "Progress: not done yet";
+            return counter != null ? Loc.F("journal.progress.counter", counter) : Loc.T("journal.progress.pending");
         }
 
         private static Color StateColor(QuestJournalState state) => state switch

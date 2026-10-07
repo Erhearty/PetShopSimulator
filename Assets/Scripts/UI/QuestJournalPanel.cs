@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using PetShop.Core;
+using PetShop.Localization;
 using PetShop.Progression.Quests;
 
 namespace PetShop.UI
@@ -23,7 +24,6 @@ namespace PetShop.UI
         /// <summary>The label of <see cref="OpenKey"/> for help text.</summary>
         public const string OpenKeyLabel = "J";
 
-        private const string FooterText = "Up/Down: chapter  ·  PageUp/PageDown or wheel: scroll  ·  J or Esc: close";
         private const float HeaderFont = 24f;
         private const float ButtonFont = 15f;
         private const float BodyFont   = 16f;
@@ -66,6 +66,17 @@ namespace PetShop.UI
             BuildPane(panel);
             WireNavigation();
             _root.SetActive(false);
+            Loc.LanguageChanged += OnLanguageChanged;
+        }
+
+        private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>Rewrites the chapter list and page in the new language while the journal is open.</summary>
+        private void OnLanguageChanged()
+        {
+            if (!IsOpen) return;
+            RefreshChapterLabels();
+            if (_shown >= 0) ShowChapter(_shown);
         }
 
         /// <summary>When it returns true (the guide is open over the journal) the journal ignores the keyboard.</summary>
@@ -106,13 +117,14 @@ namespace PetShop.UI
         {
             UIFactory.Panel("Accent", panel, new Vector2(0f, 1f), new Vector2(1f, 1f),
                             UIFactory.Accent, new Vector2(0f, -4f), Vector2.zero);
-            UIFactory.Label("Header", panel, "Quest journal",
+            UIFactory.LabelKey("Header", panel, "journal.title",
                 new Vector2(0.03f, 0.90f), new Vector2(0.5f, 0.97f), HeaderFont, UIFactory.Ink);
-            _closeButton = UIFactory.Button("Close", panel, $"Close  ({OpenKeyLabel} / Esc)",
-                new Vector2(0.74f, 0.905f), new Vector2(0.97f, 0.965f), ButtonFont);
+            _closeButton = UIFactory.ButtonKey("Close", panel, "common.close_esc",
+                new Vector2(0.74f, 0.905f), new Vector2(0.97f, 0.965f), ButtonFont, null, $"{OpenKeyLabel} / Esc");
             _closeButton.onClick.AddListener(Hide);
-            UIFactory.Label("Footer", panel, FooterText,
-                new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.08f), HintFont, UIFactory.InkMuted);
+            UIFactory.LabelKey("Footer", panel, "journal.footer",
+                new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.08f), HintFont, UIFactory.InkMuted,
+                TextAlignmentOptions.MidlineLeft, OpenKeyLabel);
         }
 
         private void BuildChapterButtons(Transform panel)

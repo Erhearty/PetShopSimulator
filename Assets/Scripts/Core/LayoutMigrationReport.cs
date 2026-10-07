@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using PetShop.Localization;
 
 namespace PetShop.Core
 {
@@ -9,10 +10,10 @@ namespace PetShop.Core
     internal sealed class LayoutMigrationReport
     {
         /// <summary>Opening words of <see cref="Notice"/>.</summary>
-        public const string NoticePrefix = "Your shop was rebuilt at the front of the yard";
+        public static string NoticePrefix => Loc.T("layout.notice_prefix");
 
         /// <summary>Opening words of <see cref="RefundNotice"/>.</summary>
-        public const string RefundNoticePrefix = "No room was left for a pen pushed off the yard, so its pets were sold back";
+        public static string RefundNoticePrefix => Loc.T("layout.refund_prefix");
 
         /// <summary>One pet sold back because its pen had no valid spot and no other pen had room.</summary>
         public sealed class RefundedPet
@@ -55,11 +56,11 @@ namespace PetShop.Core
         public string Notice()
         {
             var parts = new List<string>();
-            if (Evicted.Count > 0)       parts.Add($"{Count(Evicted.Count, "item")} moved to your furniture inventory");
-            if (Relocated.Count > 0)     parts.Add($"{Count(Relocated.Count, "pen")} moved");
-            if (RehomedPets > 0)         parts.Add($"{Count(RehomedPets, "pet")} moved to another pen");
-            if (KeptUnshifted.Count > 0) parts.Add($"{Count(KeptUnshifted.Count, "pen")} left where it stood");
-            return $"{NoticePrefix}: {string.Join(", ", parts)}";
+            if (Evicted.Count > 0)       parts.Add(Loc.Plural("layout.items_packed", Evicted.Count));
+            if (Relocated.Count > 0)     parts.Add(Loc.Plural("layout.pens_moved", Relocated.Count));
+            if (RehomedPets > 0)         parts.Add(Loc.Plural("layout.pets_rehomed", RehomedPets));
+            if (KeptUnshifted.Count > 0) parts.Add(Loc.Plural("layout.pens_kept", KeptUnshifted.Count));
+            return Loc.F("layout.notice", NoticePrefix, string.Join(", ", parts));
         }
 
         /// <summary>
@@ -70,10 +71,7 @@ namespace PetShop.Core
         {
             if (RefundedPets.Count == 0) return string.Empty;
             var names = RefundedPets.ConvertAll(p => p.Name);
-            return $"{RefundNoticePrefix}: {string.Join(", ", names)} for €{RefundTotal:N2}";
+            return Loc.F("layout.refund", RefundNoticePrefix, string.Join(", ", names), RefundTotal);
         }
-
-        /// <summary>"1 pen" / "2 pens".</summary>
-        private static string Count(int n, string noun) => n == 1 ? $"{n} {noun}" : $"{n} {noun}s";
     }
 }

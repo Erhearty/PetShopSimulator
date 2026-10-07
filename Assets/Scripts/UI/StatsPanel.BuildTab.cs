@@ -18,14 +18,14 @@ namespace PetShop.UI
         private const float ToolRowBottom = 0.015f, ToolRowTop = 0.085f;
         private const float OpenViewWidth = 0.22f;
 
-        /// <summary>Wall tools in the order of the build view's strip, with their button text.</summary>
-        private static readonly (string id, string text)[] WallTools =
+        /// <summary>Wall tools in the order of the build view's strip, with their object name and text key.</summary>
+        private static readonly (string id, string name, string key)[] WallTools =
         {
-            (BuildCatalog.Wall,       "Wall"),
-            (BuildCatalog.WallWindow, "Window wall"),
-            (BuildCatalog.WallDoor,   "Doorway"),
-            (BuildCatalog.Fence,      "Fence"),
-            (null,                    "Remove"),
+            (BuildCatalog.Wall,       "Wall",        "tabs.build.wall"),
+            (BuildCatalog.WallWindow, "Window wall", "tabs.build.window_wall"),
+            (BuildCatalog.WallDoor,   "Doorway",     "tabs.build.doorway"),
+            (BuildCatalog.Fence,      "Fence",       "tabs.build.fence"),
+            (null,                    "Remove",      "tabs.build.remove"),
         };
 
         private GameObject _buildPage;
@@ -42,7 +42,7 @@ namespace PetShop.UI
         /// <summary>Creates the Build page and builds the catalogue content into it.</summary>
         private void BuildBuildPage(BuildMode build)
         {
-            var page = AddPage("Build", "Order furniture, place what you own, and change the walls.", UIFactory.TextSmall);
+            var page = AddPage("Build", UIFactory.TextSmall);
             _buildPage = UIFactory.Node("BuildPage", page.Root.transform, BuildPageMin, BuildPageMax);
             Catalogue  = gameObject.AddComponent<FurnitureCatalogPanel>();
             Catalogue.BuildContent(_buildPage.transform, _game, build, ShowBuild, Hide);
@@ -52,16 +52,16 @@ namespace PetShop.UI
 
         private void BuildToolRow(Transform page)
         {
-            var open = UIFactory.Button("OpenBuildView", page, "Open build view", new Vector2(0f, ToolRowBottom),
+            var open = UIFactory.ButtonKey("OpenBuildView", page, "tabs.build.open_view", new Vector2(0f, ToolRowBottom),
                 new Vector2(OpenViewWidth, ToolRowTop), UIFactory.TextSmall, UIFactory.Accent);
             open.onClick.AddListener(() => EnterBuildView(null));
 
             float w = (1f - OpenViewWidth) / WallTools.Length;
             for (int i = 0; i < WallTools.Length; i++)
             {
-                var (id, text) = WallTools[i];
+                var (id, name, key) = WallTools[i];
                 float x = OpenViewWidth + ButtonGap + i * w;
-                var btn = UIFactory.Button($"Wall_{text}", page, text, new Vector2(x, ToolRowBottom),
+                var btn = UIFactory.ButtonKey($"Wall_{name}", page, key, new Vector2(x, ToolRowBottom),
                     new Vector2(x + w - ButtonGap, ToolRowTop), UIFactory.TextSmall);
                 btn.onClick.AddListener(() => EnterBuildView(() => PickTool(id)));
             }

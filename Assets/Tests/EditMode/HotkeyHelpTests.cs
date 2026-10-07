@@ -14,6 +14,14 @@ namespace PetShop.Tests
         private static string LedgerKey => InputBindings.Label(GameAction.Ledger);
         private static string RotateKey => InputBindings.Label(GameAction.BuildRotate);
 
+        private LocTestScope _loc;
+
+        [SetUp]
+        public void SetUp() => _loc = LocTestScope.Begin();
+
+        [TearDown]
+        public void TearDown() => _loc.End();
+
         [Test]
         public void Controls_MentionsLedgerBuildViewAndRotateKeys()
         {

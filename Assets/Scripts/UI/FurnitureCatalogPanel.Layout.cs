@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using PetShop.Localization;
 using PetShop.Shop;
 
 namespace PetShop.UI
@@ -43,8 +44,9 @@ namespace PetShop.UI
             {
                 var   category = Tabs[i];
                 float x0       = Left + i * (width + TabGap);
-                var   btn = UIFactory.Button($"Tab_{category}", panel, category.ToString(),
+                var   btn = UIFactory.Button($"Tab_{category}", panel, "",
                     new Vector2(x0, TabBottom), new Vector2(x0 + width, TabTop), ButtonFont);
+                LocalizedText.Bind(btn.GetComponentInChildren<TMP_Text>(), () => LocNames.Of("catalog.tab", category));
                 btn.onClick.AddListener(() => SelectTab(category));
                 _tabButtons.Add(btn);
             }
@@ -72,10 +74,10 @@ namespace PetShop.UI
                 NameFont, UIFactory.Ink, TextAlignmentOptions.Right);
             row.Counts = UIFactory.Label("Counts", t, "", new Vector2(0.62f, 0f), new Vector2(0.76f, 1f),
                 BodyFont, UIFactory.Ink, TextAlignmentOptions.Center);
-            row.Order = UIFactory.Button("Order", t, "Order", new Vector2(0.77f, 0.15f),
+            row.Order = UIFactory.ButtonKey("Order", t, "catalog.order", new Vector2(0.77f, 0.15f),
                 new Vector2(0.87f, 0.85f), ButtonFont);
             row.Order.onClick.AddListener(() => Order(row.Id));
-            row.Place = UIFactory.Button("Place", t, "Place", new Vector2(0.88f, 0.15f),
+            row.Place = UIFactory.ButtonKey("Place", t, "catalog.place", new Vector2(0.88f, 0.15f),
                 new Vector2(0.99f, 0.85f), ButtonFont, UIFactory.ButtonOn);
             row.Place.onClick.AddListener(() => Place(row.Id));
             return row;
@@ -83,12 +85,12 @@ namespace PetShop.UI
 
         private void BuildFooter(Transform panel)
         {
-            _prev = UIFactory.Button("PrevPage", panel, "‹ Prev", new Vector2(Left, FooterBottom),
+            _prev = UIFactory.ButtonKey("PrevPage", panel, "catalog.prev", new Vector2(Left, FooterBottom),
                 new Vector2(0.14f, FooterTop), ButtonFont);
             _prev.onClick.AddListener(() => ChangePage(-1));
             _pageLabel = UIFactory.Label("Page", panel, "", new Vector2(0.15f, FooterBottom),
                 new Vector2(0.29f, FooterTop), BodyFont, UIFactory.InkMuted, TextAlignmentOptions.Center);
-            _next = UIFactory.Button("NextPage", panel, "Next ›", new Vector2(0.30f, FooterBottom),
+            _next = UIFactory.ButtonKey("NextPage", panel, "catalog.next", new Vector2(0.30f, FooterBottom),
                 new Vector2(0.41f, FooterTop), ButtonFont);
             _next.onClick.AddListener(() => ChangePage(1));
             _status = UIFactory.Label("Status", panel, "", new Vector2(0.43f, FooterBottom),

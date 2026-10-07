@@ -85,12 +85,19 @@ namespace PetShop.Tests
         }
 
         [Test]
-        public void F_UsesInvariantCulture()
+        public void F_UsesCurrentCulture()
         {
-            var previous = System.Threading.Thread.CurrentThread.CurrentCulture;
-            System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("uk-UA");
-            try { Assert.AreEqual("Day 1.5", Loc.F("common.day", 1.5)); }
-            finally { System.Threading.Thread.CurrentThread.CurrentCulture = previous; }
+            var previous = System.Globalization.CultureInfo.CurrentCulture;
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+            try
+            {
+                Assert.AreEqual("Day 1,5", Loc.F("common.day", 1.5));
+                Assert.AreEqual(
+                    string.Format(System.Globalization.CultureInfo.CurrentCulture, "Day {0:N2}", 1234.5),
+                    Loc.F("common.day", 1234.5.ToString("N2", System.Globalization.CultureInfo.CurrentCulture)));
+                Assert.AreEqual($"Day {1.5}", Loc.F("common.day", 1.5), "Matches plain interpolation.");
+            }
+            finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
         }
 
         [TestCase(1, ".one")]
