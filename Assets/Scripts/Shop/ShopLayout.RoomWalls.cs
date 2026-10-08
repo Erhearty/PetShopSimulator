@@ -52,7 +52,8 @@ namespace PetShop.Shop
         /// excluded) gets doorway pieces in the doorway's columns (<see cref="DoorwayCells"/>) and window walls
         /// elsewhere — doorway pieces have no jambs, so adjacent ones form one opening centred on the door; the back
         /// row gets doorway pieces in the back door's columns (<see cref="BackDoorwayCells"/>, into the yard); every
-        /// other ring cell, corners included, gets a plain wall. Cells already occupied are left alone.
+        /// other ring cell gets a plain wall. The four corner cells get plain walls too, which
+        /// <see cref="ShapeRoomWallPiece"/> turns into an L so the walls meet with no gap. Cells already occupied are left alone.
         /// </summary>
         /// <returns>How many wall pieces were placed.</returns>
         /// <remarks>NavMesh bakes are suspended while seeding, so the whole ring costs one bake.</remarks>

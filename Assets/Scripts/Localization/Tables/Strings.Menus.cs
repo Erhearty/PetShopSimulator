@@ -47,6 +47,7 @@ namespace PetShop.Localization.Strings
             Add("action.build_rotate", "Rotate (build)", "Обертати (будівництво)");
             Add("action.build_remove", "Remove (build)", "Прибрати (будівництво)");
             Add("action.guide", "Guide", "Довідник");
+            Add("action.debug_console", "Debug console", "Консоль налагодження");
 
             // Title screen
             Add("title.kicker", "A COSY MANAGEMENT SIM", "ЗАТИШНИЙ СИМУЛЯТОР КРАМНИЦІ");
@@ -112,7 +113,6 @@ namespace PetShop.Localization.Strings
             Add("hud.reputation", "Reputation", "Репутація");
             Add("hud.shoppers", "shoppers  {0}", "покупців  {0}");
             Add("hud.queue", "till: {0} waiting  €{1:N0}", "каса: у черзі {0}  €{1:N0}");
-            Add("hud.thanks", "Thanks!", "Дякую!");
             Add("hud.build_hint.remove", "Remove tool — {0} / middle-click / {1} remove · {2} cancel",
                 "Прибирання — {0} / середня кнопка / {1} прибрати · {2} скасувати");
             Add("hud.build_hint.place", "Placing {0} — {1} place · middle-click / {2} remove · {3} cancel",

@@ -207,7 +207,6 @@ namespace PetShop.Pets
                                                new Color(0.25f,0.50f,0.85f), new Color(0.95f,0.78f,0.20f) },
                 Pet.Species.Fish    => new[] { new Color(0.95f,0.60f,0.20f), new Color(0.30f,0.60f,0.90f),
                                                new Color(0.90f,0.85f,0.35f) },
-                Pet.Species.Fox     => new[] { new Color(0.88f,0.45f,0.18f), new Color(0.80f,0.38f,0.15f) },
                 Pet.Species.Chicken => new[] { new Color(0.95f,0.92f,0.86f), new Color(0.72f,0.50f,0.30f) },
                 Pet.Species.Penguin => new[] { new Color(0.20f,0.22f,0.26f) },
                 Pet.Species.Deer    => new[] { new Color(0.72f,0.55f,0.36f), new Color(0.62f,0.46f,0.30f) },

@@ -123,7 +123,11 @@ namespace PetShop.Core
                 cellX     = entry.Root.x,
                 cellY     = entry.Root.y,
                 variant   = entry.Variant,
-                rotation  = entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
+                rotation  = entry.IsFree ? entry.Yaw
+                          : entry.Instance != null ? entry.Instance.transform.eulerAngles.y : 0f,
+                free      = entry.IsFree,
+                posX      = entry.Position.x,
+                posZ      = entry.Position.z,
                 footprintRotated = BuildMode.IsFootprintRotated(entry),
             };
             if (entry.Instance != null) AddInstanceContents(item, entry.Instance);
@@ -246,6 +250,15 @@ namespace PetShop.Core
 
             // Saves from before lot stages could build anywhere in the yard; keep the
             // ground under each saved piece so it is not silently dropped on load.
+            if (item.free)
+            {
+                var at = new Vector3(item.posX, 0f, item.posZ);
+                _game.Build.PrepareFloorFree(def, at, item.rotation);
+                var freeGo = _game.Build.PlaceFree(at, def, item.variant, item.rotation, charge: false);
+                if (freeGo != null) RestoreContents(freeGo, item, loadedPets);
+                return;
+            }
+
             var cell = new Vector2Int(item.cellX, item.cellY);
             _game.Build.GridManager.EnsureFloor(cell, BuildMode.FootprintSize(def, item.footprintRotated));
 

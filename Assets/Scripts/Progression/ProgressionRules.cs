@@ -84,7 +84,7 @@ namespace PetShop.Progression
         // Only species with real models — the same set the starter layout uses.
         private static readonly Pet.Species[] StarterPenSpecies =
         {
-            Pet.Species.Dog, Pet.Species.Cat, Pet.Species.Fox,
+            Pet.Species.Dog, Pet.Species.Cat,
             Pet.Species.Chicken, Pet.Species.Penguin, Pet.Species.Deer,
         };
 

@@ -75,18 +75,18 @@ namespace PetShop.Tests
             RectInt room = _game.Layout.RoomCells();
             var def = BuildCatalog.Get(BuildCatalog.Counter);
 
-            // A back-row spot that fits a counter whose back faces into the room (clear of the doorways).
+            // A back-row spot that fits a counter whose customer side faces the back wall (yaw 0) and cashier side the room (clear of the doorways).
             Vector2Int? spot = null;
             for (int x = room.xMin + WallCounterColumn; x + def.Size.x <= room.xMax && spot == null; x++)
             {
                 var cell = new Vector2Int(x, room.yMin);
-                if (_game.Build.CanPlaceItem(def, cell, def.Size, HalfTurn)) spot = cell;
+                if (_game.Build.CanPlaceItem(def, cell, def.Size, NoTurn)) spot = cell;
             }
             Assert.IsTrue(spot.HasValue, "No back-row spot fits a counter facing the back wall.");
             Assert.IsTrue(_game.Layout.IsRoomWallCell(spot.Value + Vector2Int.down),
                           $"The cell behind back-row spot {spot.Value} is not the back wall.");
 
-            Assert.IsFalse(_game.Build.CanPlaceItem(def, spot.Value, def.Size, NoTurn),
+            Assert.IsFalse(_game.Build.CanPlaceItem(def, spot.Value, def.Size, HalfTurn),
                            $"A counter at {spot.Value} with its back to the back wall was allowed.");
         }
 

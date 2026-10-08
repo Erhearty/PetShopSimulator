@@ -37,7 +37,6 @@ namespace PetShop.Core
         public UnityEvent<DaySummary> OnDayEnded     = new();
         public UnityEvent<int>        OnDayStarted   = new();
         public UnityEvent<string>     OnNotification = new();
-        public UnityEvent<string>     OnInfoPanel    = new();   // long text for the info popup
         public UnityEvent<string>     OnGameOver     = new();
 
         [Header("Day length")]
@@ -177,6 +176,7 @@ namespace PetShop.Core
 
             Shop?.PollDeliveries(DayProgress);
             TickFurniture();
+            _floor.FlushTrucks();   // everything due this frame (e.g. one Tab session's orders) rides one truck
 
             // Stop letting new customers in shortly before closing time
             if (Spawner != null && !Spawner.DoorsClosed && DayProgress > 0.88f)
@@ -277,6 +277,9 @@ namespace PetShop.Core
         /// </summary>
         public void InspectPen(PetPen pen) => _floor.InspectPen(pen);
 
+        /// <summary>Feeds and cleans <paramref name="pen"/>'s pets (the pen's feed pad was clicked).</summary>
+        public void FeedPen(PetPen pen) => _floor.FeedPen(pen);
+
         /// <summary>
         /// Interacting with the counter serves whoever is next in line; with nobody waiting
         /// it does nothing.
@@ -319,9 +322,10 @@ namespace PetShop.Core
 
             var born = BreedingSystem.AdvanceDay(_pens, Events?.CareDrainMultiplier ?? 1f);
             if (born.Count > 0)
-                Notify(born.Count == 1 ? "A pet was born overnight!" : $"{born.Count} pets were born overnight!");
+                Notify(PetShop.Localization.Loc.Plural("day.born", born.Count));
 
             // Loads still on a truck land now, so the save below sees every crate.
+            _floor.DropWaitingLoads();
             Traffic.DeliveryTruck.FlushAll();
             LandFurnitureOvernight();
             ShowJudging.Run(this);
@@ -339,10 +343,8 @@ namespace PetShop.Core
                 IsGameOver = true;
                 Spawner?.EndDay();
                 Debug.Log($"[Game] GAME OVER on day {summary.Day} — balance €{summary.ClosingBalance:N2}.");
-                OnGameOver.Invoke(
-                    $"You could not cover day {summary.Day}'s bills — " +
-                    $"€{summary.Rent:N0} rent and €{summary.Wages:N0} in wages.\n" +
-                    $"The shop closed with €{summary.ClosingBalance:N2}.");
+                OnGameOver.Invoke(PetShop.Localization.Loc.F("day.game_over",
+                    summary.Day, summary.Rent, summary.Wages, summary.ClosingBalance));
                 yield break;
             }
 

@@ -51,6 +51,7 @@ namespace PetShop.Tests
             Assert.AreEqual(KeyCode.E, InputBindings.Get(GameAction.Interact));
             Assert.AreEqual(KeyCode.Return, InputBindings.Get(GameAction.EndDay));
             Assert.AreEqual(KeyCode.Delete, InputBindings.Get(GameAction.BuildRemove));
+            Assert.AreEqual(KeyCode.F2, InputBindings.Get(GameAction.DebugConsole));
             foreach (var action in InputBindings.AllActions)
                 Assert.AreEqual(InputBindings.Default(action), InputBindings.Get(action));
         }
@@ -130,6 +131,7 @@ namespace PetShop.Tests
             Assert.AreEqual("Space", InputBindings.Label(GameAction.Jump));
             Assert.AreEqual("Del", InputBindings.Label(GameAction.BuildRemove));
             Assert.AreEqual("F5", InputBindings.Label(GameAction.QuickSave));
+            Assert.AreEqual("F2", InputBindings.Label(GameAction.DebugConsole));
         }
     }
 }

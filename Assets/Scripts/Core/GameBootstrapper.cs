@@ -96,6 +96,7 @@ namespace PetShop.Core
             bool guideOpen = _ui != null && _ui.Guide != null && _ui.Guide.IsOpen;
             if (RouteCatalogueInput(_ui != null ? _ui.Catalogue : null,
                                     InputBindings.GetKeyDown(GameAction.BuildMode), guideOpen)) return;
+            if (Dev.DebugConsole.IsAnyOpen) return;
             if (_ui != null && _ui.AnyModalOpen) return;
             // Number keys 1-9 belong to the inventory bar (place an owned piece); the build key
             // toggles the top-down build view.
@@ -322,7 +323,6 @@ namespace PetShop.Core
             _ui.Catalogue.BuildView = _buildView;
 
             _game.OnDayEnded.AddListener(_ui.Results.Show);
-            _game.OnInfoPanel.AddListener(_ui.Info.Show);
             _game.OnGameOver.AddListener(_ui.GameOver.Show);
 
             var player = _layout.Player;
@@ -331,6 +331,8 @@ namespace PetShop.Core
                 var interaction = player.GetComponent<Player.InteractionSystem>();
                 if (interaction != null) interaction.PromptText = _ui.HUD.PromptLabel;
             }
+
+            gameObject.AddComponent<Dev.DebugConsole>().Init(_game, _ui.CanvasRoot, () => !_ui.Title.IsOpen);
 
             AttachTelemetry();
         }

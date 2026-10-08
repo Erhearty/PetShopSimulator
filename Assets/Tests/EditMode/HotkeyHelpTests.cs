@@ -27,6 +27,8 @@ namespace PetShop.Tests
         {
             string text = HotkeyHelp.Controls();
 
+            StringAssert.DoesNotContain("cell", text);
+            StringAssert.DoesNotContain("snap", text);
             StringAssert.Contains($"{LedgerKey}  Shop book", text);
             StringAssert.Contains($"{BuildKey}  build view", text);
             StringAssert.DoesNotContain("furniture catalogue", text);

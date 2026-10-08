@@ -77,16 +77,28 @@ namespace PetShop.Tests
             Assert.IsTrue(found);
         }
 
-        /// <summary>The guide explains the street front, the back door, yard walls and the cashier's counter.</summary>
+        /// <summary>The guide explains the street front and the cashier's counter.</summary>
         [Test]
         public void Guide_CoversLayoutDoorsWallsAndCashierCounter()
         {
             var all = string.Join("\n", GuideContent.Sections().Select(s => s.Body));
             StringAssert.Contains("onto the street", all);
-            StringAssert.Contains("back door", all);
-            StringAssert.Contains("anywhere in the yard", all);
             StringAssert.Contains("cashier needs a counter", all);
             StringAssert.Contains("behind the counter", all);
+        }
+
+        /// <summary>Building is gridless and pets can be locked from the pen plaque panel.</summary>
+        [Test]
+        public void Guide_DescribesGridlessBuildingAndPenPlaque()
+        {
+            var all = string.Join("\n", GuideContent.Sections().Select(s => s.Body));
+            StringAssert.Contains("no grid", all);
+            StringAssert.Contains("closed corners", all);
+            StringAssert.Contains("plaque", all);
+            StringAssert.Contains("lock a pet", all);
+            StringAssert.DoesNotContain("snap", all);
+            StringAssert.DoesNotContain("cell", all);
+            StringAssert.DoesNotContain("Fox", all);
         }
 
         [Test]

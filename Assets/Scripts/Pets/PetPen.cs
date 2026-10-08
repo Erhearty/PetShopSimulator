@@ -44,7 +44,6 @@ namespace PetShop.Pets
         private Transform  _visualRoot;
         private Transform  _upkeepRoot;
         private Transform  _stallRoot;
-        private WorldLabel _signLabel;
         private Transform  _foodBar;
         private Transform  _cleanBar;
         private Renderer   _foodBarRenderer;
@@ -81,6 +80,8 @@ namespace PetShop.Pets
         public bool HasSpace   => _residents.Count < Capacity;
         public bool HasAdults  => _residents.Exists(p => p.IsAdult);
         public int  AdultCount => _residents.FindAll(p => p.IsAdult).Count;
+        /// <summary>True when an adult that is not <see cref="Pet.Locked"/> lives here.</summary>
+        public bool HasSellableAdults => _residents.Exists(p => p.IsAdult && !p.Locked);
 
         // ── Population ──────────────────────────────────────────────────────────
 
@@ -98,10 +99,10 @@ namespace PetShop.Pets
             return true;
         }
 
-        /// <summary>Remove and return an adult for sale. Null when there is none.</summary>
+        /// <summary>Remove and return an unlocked adult for sale. Null when there is none.</summary>
         public Pet TakeAdult()
         {
-            var adult = _residents.Find(p => p.IsAdult);
+            var adult = _residents.Find(p => p.IsAdult && !p.Locked);
             if (adult == null) return null;
             _residents.Remove(adult);
             RefreshVisuals();
@@ -109,8 +110,10 @@ namespace PetShop.Pets
             return adult;
         }
 
+        /// <summary>Removes <paramref name="pet"/> for a sale. Refuses (false) a locked pet or one not living here.</summary>
         public bool RemovePet(Pet pet)
         {
+            if (pet == null || pet.Locked) return false;
             if (!_residents.Remove(pet)) return false;
             RefreshVisuals();
             OnPetRemoved.Invoke(this, pet);
@@ -189,6 +192,8 @@ namespace PetShop.Pets
         private void Start()
         {
             BuildPenSign();
+            RemoveBakedVegetation();
+            BuildFixtures();
             RefreshDecor();
             RefreshLabel();
             Loc.LanguageChanged += OnLanguageChanged;
@@ -196,7 +201,7 @@ namespace PetShop.Pets
 
         private void OnDestroy() => Loc.LanguageChanged -= OnLanguageChanged;
 
-        /// <summary>Re-reads the gate sign and the stall name plaques in the new language.</summary>
+        /// <summary>Rebuilds the stalls in the new language.</summary>
         private void OnLanguageChanged()
         {
             RefreshLabel();
@@ -204,17 +209,13 @@ namespace PetShop.Pets
         }
 
         /// <summary>
-        /// A sign on the gate plus two upkeep bars. The whole yard has to be readable from
-        /// the path without walking up to every pen and pressing E.
+        /// Two upkeep bars on the gate (no text: names and prices live in the pen info panel).
         /// </summary>
         private void BuildPenSign()
         {
             // Eye level, not scaled off the pen: any higher and the sign leaves the frame
             // when you stand next to the gate (and hides above the pergola beams).
             const float y = 1.32f;
-            _signLabel = WorldLabel.Create(transform, new Vector3(0f, y, PenSize * 0.5f),
-                                           "", 0.09f, UIFactory.Ink, width: 1.6f);
-
             var barRoot = new GameObject("UpkeepBars").transform;
             barRoot.SetParent(transform, false);
             barRoot.localPosition = new Vector3(0f, y - 0.26f, PenSize * 0.5f - 0.005f);
@@ -264,40 +265,11 @@ namespace PetShop.Pets
             renderer.SetPropertyBlock(block);
         }
 
-        private static Color RarityColour(Pet.Rarity rarity) => rarity switch
-        {
-            Pet.Rarity.Uncommon  => new Color(0.55f, 0.85f, 0.55f),
-            Pet.Rarity.Rare      => new Color(0.55f, 0.74f, 0.98f),
-            Pet.Rarity.Legendary => new Color(0.98f, 0.82f, 0.38f),
-            _                    => UIFactory.Ink
-        };
-
-        /// <summary>Species, asking price and condition — refreshed whenever the pen changes.</summary>
+        /// <summary>Redraws the upkeep bars — refreshed whenever the pen changes.</summary>
         public void RefreshLabel()
         {
-            if (_signLabel == null) return;
-
             SetBar(_foodBar,  _foodBarRenderer,  FoodLevel);
             SetBar(_cleanBar, _cleanBarRenderer, Cleanliness);
-
-            if (_residents.Count == 0)
-            {
-                _signLabel.SetText(Loc.F("pen.sign.empty", LocNames.Species(PenSpecies)));
-                _signLabel.SetColour(UIFactory.InkMuted);
-                return;
-            }
-
-            Pet best = _residents[0];
-            foreach (var p in _residents)
-                if (p.SellPrice() > best.SellPrice()) best = p;
-
-            var shop  = GameManager.Instance != null ? GameManager.Instance.Shop : null;
-            float ask = shop != null ? shop.PriceOf(best.SellPrice()) : best.SellPrice();
-
-            string plan = HasValidPlan ? Loc.T("pen.sign.paired") : string.Empty;
-            _signLabel.SetText(Loc.F("pen.sign.stocked", LocNames.Species(PenSpecies), ask,
-                                     _residents.Count, Capacity, LocNames.Rarity(best.rarity), plan));
-            _signLabel.SetColour(RarityColour(best.rarity));
         }
 
         // ── Visuals ─────────────────────────────────────────────────────────────
@@ -356,13 +328,14 @@ namespace PetShop.Pets
         {
             animator = null;
 
-            // Animal packs name their prefabs inconsistently (Fox, Kitty, dog_01 ...), so try
+            // Animal packs name their prefabs inconsistently (Kitty, Pinguin, dog_01 ...), so try
             // the species name and a few known aliases before falling back to the blocky
             // stand-in. Missing packs must never break a pen.
+            float scale = Pet.VisualScale(pet.species);
             string model = ModelLibrary.FirstAvailable(AnimalModelPaths(pet.species));
             if (model != null)
             {
-                float height = Mathf.Clamp(0.85f * size, 0.45f, 1.5f);
+                float height = Mathf.Clamp(0.85f * size, 0.45f, 1.5f) * scale;
                 var modelled = ModelLibrary.Spawn(model, _visualRoot, _visualRoot.position,
                                                   0f, ModelLibrary.Fit.Height, height);
                 if (modelled != null)
@@ -373,7 +346,7 @@ namespace PetShop.Pets
                 }
             }
 
-            var go = MeshBuilder.CreatePet(pet.species, pet.coat, size);
+            var go = MeshBuilder.CreatePet(pet.species, pet.coat, size * scale);
             go.transform.SetParent(_visualRoot, false);
             return go;
         }
@@ -430,7 +403,6 @@ namespace PetShop.Pets
             {
                 Pet.Species.Cat     => new[] { "Cat", "Kitty" },
                 Pet.Species.Dog     => new[] { "Dog" },
-                Pet.Species.Fox     => new[] { "Fox" },
                 Pet.Species.Chicken => new[] { "Chicken", "Hen" },
                 // "Pinguin" is the ithappy pack's spelling, not a typo here.
                 Pet.Species.Penguin => new[] { "Penguin", "Pinguin" },
@@ -463,7 +435,7 @@ namespace PetShop.Pets
 
         /// <summary>
         /// Low dividers split the pen into one stall per slot, each with its own straw bed; an
-        /// occupied stall also carries a small name plaque. Rebuilt whenever the pen changes.
+        /// occupied stall carries no text (names are in the pen info panel). Rebuilt whenever the pen changes.
         /// </summary>
         private void RefreshStalls()
         {
@@ -505,14 +477,6 @@ namespace PetShop.Pets
                 bed.transform.SetParent(_stallRoot, false);
                 bed.transform.localPosition = new Vector3(centre.x, 0.05f, centre.z);
                 MeshBuilder.StripColliders(bed);
-
-                if (i < _residents.Count)
-                {
-                    var pet = _residents[i];
-                    var plaque = WorldLabel.Create(_stallRoot, new Vector3(centre.x, 0.62f, centre.z),
-                                                   pet.DisplayName(), 0.055f, UIFactory.Ink, width: stall);
-                    plaque.SetColour(RarityColour(pet.rarity));
-                }
             }
             MeshBuilder.SetLayerRecursive(_stallRoot.gameObject, gameObject.layer);
         }

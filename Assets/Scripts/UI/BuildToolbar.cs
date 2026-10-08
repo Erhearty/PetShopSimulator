@@ -31,9 +31,9 @@ namespace PetShop.UI
         /// <summary>Hotkey for the Remove tool.</summary>
         public const KeyCode RemoveKey     = KeyCode.G;
 
-        private const float ButtonWidth  = 132f;
-        private const float ButtonHeight = 46f;
-        private const float FontSize     = 15f;
+        private const float ButtonWidth  = 150f;
+        private const float ButtonHeight = 64f;
+        private const float FontSize     = 16f;
 
         /// <summary>One button: the catalogue id it places (null for Remove) and its hotkey.</summary>
         private sealed class Tool
@@ -93,7 +93,7 @@ namespace PetShop.UI
                                        new Vector2(index / (float)count, 0f), new Vector2((index + 1) / (float)count, 1f),
                                        FontSize);
             LocalizedText.Bind(btn.GetComponentInChildren<TMP_Text>(), () => def != null
-                ? $"{def.LocalizedName}  €{def.Cost:N0}\n[{KeyLabel(key)}]"
+                ? $"{def.LocalizedName}\n€{def.Cost:N0}  [{KeyLabel(key)}]"
                 : Loc.F("toolbar.remove", KeyLabel(key)));
             var rt = (RectTransform)btn.transform;
             rt.offsetMin = new Vector2(UIFactory.Gap * 0.5f, 0f);

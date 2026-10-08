@@ -127,7 +127,6 @@ namespace PetShop.Tests
             yield return Visit("Day results",
                 () => ui.Results.Show(game.Shop.GetCurrentDaySummary()), ui.Results.Hide);
             yield return Visit("Quest journal", ui.Journal.Show, ui.Journal.Hide);
-            yield return Visit("Info panel", () => ui.Info.Show(PenDescription()), ui.Info.Hide);
             yield return Visit("Staff panel", ui.StaffBoard.Show, ui.StaffBoard.Hide);
             yield return Visit("Breeding", ui.Breeding.Show, ui.Breeding.Hide);
 
@@ -147,13 +146,12 @@ namespace PetShop.Tests
             // In batch mode the bootstrapper hides the title without building it; build it here.
             yield return Visit("Title screen", () => ui.Title.Build(ui.CanvasRoot, (_, _) => { }), ui.Title.Hide);
 
-            yield return Visit("World labels and a FeedbackFX sale float",
+            yield return Visit("World labels and a FeedbackFX sale burst",
                 () =>
                 {
                     var fx = Object.FindAnyObjectByType<FeedbackFX>();
                     Assert.IsNotNull(fx, "No FeedbackFX in the world.");
                     fx.PlaySale(Vector3.up, 12.40f);
-                    fx.PlayCustomerMood(Vector3.up * 2f);
                 }, null);
 
             // Last: it pauses the game for good.
@@ -270,12 +268,6 @@ namespace PetShop.Tests
             if (ui.Guide != null) ui.Guide.Hide();
             if (ui.Catalogue != null) ui.Catalogue.Hide();
             if (ui.BuildView != null && ui.BuildView.IsActive) ui.BuildView.Exit();
-        }
-
-        private static string PenDescription()
-        {
-            var pen = Object.FindAnyObjectByType<PetPen>();
-            return pen != null ? pen.Describe() : "No pens.";
         }
     }
 }

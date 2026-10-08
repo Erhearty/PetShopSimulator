@@ -7,8 +7,9 @@ namespace PetShop.Pets
     /// <summary>
     /// Pen dressing, so a pen reads as somebody's home rather than a sand box with a fence: a bedding
     /// mat tinted per species, a food bowl and a water bowl that show empty or filled with the pen's
-    /// feeding state, a species prop (hut, scratching post, chew toy, perch, rock, plant, hay rack), a
-    /// corner plant or hay bundle and a low trim inside the fence.
+    /// feeding state, a species prop (hut, scratching post, chew toy, perch, rock, hay rack), a
+    /// corner hay bundle for hay eaters and a low trim inside the fence. There is no vegetation: no plants,
+    /// grass or bushes (the grass baked into the pen prefab is removed too, see <see cref="RemoveBakedVegetation"/>).
     ///
     /// Everything is procedural <see cref="MeshBuilder"/> geometry in <see cref="MaterialFactory.Palette"/>
     /// colours, on <see cref="FurnitureFactory.DecorationLayer"/>, with no colliders — so it never blocks
@@ -28,7 +29,7 @@ namespace PetShop.Pets
         public const string DecorWaterBowlName = "DecorWaterBowl";
         /// <summary>Name of the species prop's root.</summary>
         public const string DecorSpeciesPropName = "DecorSpeciesProp";
-        /// <summary>Name of the corner plant or hay bundle's root.</summary>
+        /// <summary>Name of the corner hay bundle's root (hay eaters only).</summary>
         public const string DecorCornerName = "DecorCorner";
         /// <summary>Name of each low trim strip along the fence.</summary>
         public const string DecorTrimName = "DecorTrim";
@@ -81,7 +82,6 @@ namespace PetShop.Pets
         private const float ToyBallSize = 0.12f, ToyBoneRadius = 0.025f, ToyBoneLength = 0.18f, ToyBoneKnob = 0.06f;
         private const float PerchPostRadius = 0.025f, PerchHeight = 0.32f, PerchSpan = 0.36f, PerchBarRadius = 0.02f;
         private const float RockSize = 0.3f, RockSquash = 0.55f;
-        private const float PlantPotRadius = 0.08f, PlantPotHeight = 0.12f, PlantLeafSize = 0.2f;
         private const float RackWidth = 0.36f, RackHeight = 0.18f, RackDepth = 0.16f, RackHayHeight = 0.06f;
         private const float HayRadius = 0.12f, HayLength = 0.28f;
         private const float QuarterTurn = 90f;
@@ -151,7 +151,7 @@ namespace PetShop.Pets
         private static Color BedColour(Pet.Species species) => species switch
         {
             Pet.Species.Rabbit or Pet.Species.Hamster  => MaterialFactory.Palette.OakLight,
-            Pet.Species.Cat or Pet.Species.Dog or Pet.Species.Fox or Pet.Species.Tiger => MaterialFactory.Palette.Sage,
+            Pet.Species.Cat or Pet.Species.Dog or Pet.Species.Tiger => MaterialFactory.Palette.Sage,
             Pet.Species.Penguin                        => MaterialFactory.Palette.CreamWall,
             Pet.Species.Fish                           => MaterialFactory.Palette.PenSand,
             _                                          => MaterialFactory.Palette.Straw,
@@ -183,10 +183,10 @@ namespace PetShop.Pets
             {
                 case Pet.Species.Rabbit: case Pet.Species.Hamster:              BuildHut(prop);   break;
                 case Pet.Species.Cat: case Pet.Species.Tiger:                   BuildScratchPost(prop); break;
-                case Pet.Species.Dog: case Pet.Species.Fox:                     BuildChewToy(prop); break;
+                case Pet.Species.Dog:                                           BuildChewToy(prop); break;
                 case Pet.Species.Chicken: case Pet.Species.Parrot:              BuildPerch(prop); break;
                 case Pet.Species.Penguin:                                       BuildRock(prop);  break;
-                case Pet.Species.Fish:                                          BuildPlant(prop); break;
+                case Pet.Species.Fish:                                          BuildRock(prop);  break;
                 default:                                                        BuildHayRack(prop); break;
             }
         }
@@ -250,16 +250,6 @@ namespace PetShop.Pets
             rock.localPosition = new Vector3(0f, RockSize * RockSquash * 0.5f, 0f);
         }
 
-        /// <summary>A potted plant.</summary>
-        private static void BuildPlant(Transform prop)
-        {
-            var pot = Piece(MeshBuilder.CreateCylinder(PlantPotRadius, PlantPotHeight,
-                                                       DecorMaterial(MaterialFactory.Palette.OakDark), "PlantPot"), prop);
-            pot.localPosition = new Vector3(0f, PlantPotHeight * 0.5f, 0f);
-            var leaves = Piece(MeshBuilder.CreateSphere(PlantLeafSize, DecorMaterial(MaterialFactory.Palette.Sage), "PlantLeaves"), prop);
-            leaves.localPosition = new Vector3(0f, PlantPotHeight + PlantLeafSize * 0.5f, 0f);
-        }
-
         /// <summary>A low wooden rack with hay on top, for grazers.</summary>
         private static void BuildHayRack(Transform prop)
         {
@@ -269,21 +259,33 @@ namespace PetShop.Pets
             hay.localPosition = new Vector3(0f, RackHeight + RackHayHeight * 0.5f, 0f);
         }
 
-        /// <summary>A hay bundle for grazers and small animals, a potted plant for everyone else.</summary>
+        /// <summary>A hay bundle in the corner for grazers and small animals; nothing for everyone else.</summary>
         private void BuildCorner()
         {
+            if (!EatsHay(PenSpecies)) return;
+
             var corner = new GameObject(DecorCornerName).transform;
             corner.SetParent(_decorRoot, false);
             corner.localPosition = new Vector3(-PenSize * CornerShare, FloorTop, PenSize * CornerShare);
 
-            if (EatsHay(PenSpecies))
+            var hay = Piece(MeshBuilder.CreateCylinder(HayRadius, HayLength, DecorMaterial(MaterialFactory.Palette.Straw),
+                                                       "HayBundle"), corner);
+            hay.localPosition    = new Vector3(0f, HayRadius, 0f);
+            hay.localEulerAngles = new Vector3(0f, 0f, QuarterTurn);
+        }
+
+        /// <summary>Name prefix of the grass objects baked into the pen prefab.</summary>
+        private const string BakedGrassPrefix = "Grass";
+
+        /// <summary>Removes the grass baked into the pen prefab, so no pen shows vegetation.</summary>
+        private void RemoveBakedVegetation()
+        {
+            foreach (var t in GetComponentsInChildren<Transform>(true))
             {
-                var hay = Piece(MeshBuilder.CreateCylinder(HayRadius, HayLength, DecorMaterial(MaterialFactory.Palette.Straw),
-                                                           "HayBundle"), corner);
-                hay.localPosition    = new Vector3(0f, HayRadius, 0f);
-                hay.localEulerAngles = new Vector3(0f, 0f, QuarterTurn);
+                if (t == null || t == transform || !t.name.StartsWith(BakedGrassPrefix)) continue;
+                t.gameObject.SetActive(false);
+                Destroy(t.gameObject);
             }
-            else BuildPlant(corner);
         }
 
         /// <summary>Species that get a hay bundle in the corner.</summary>

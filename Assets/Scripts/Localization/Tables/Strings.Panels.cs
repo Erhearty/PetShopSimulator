@@ -37,19 +37,11 @@ namespace PetShop.Localization.Strings
             Add("tabs.staff.purpose", "Your assistants, their wages, and hiring.",
                                       "Ваші помічники, їхні зарплати та наймання.");
             Add("tabs.build", "Build", "Будівництво");
-            Add("tabs.build.purpose", "Order furniture, place what you own, and change the walls.",
-                                      "Замовляйте меблі, розставляйте придбане та змінюйте стіни.");
+            Add("tabs.build.purpose", "Order furniture and place what you own.",
+                                      "Замовляйте меблі та розставляйте придбане.");
             Add("tabs.guide", "Guide", "Довідник");
             Add("tabs.guide.purpose", "How every part of running the shop works.",
                                       "Як влаштована кожна частина роботи крамниці.");
-
-            // Build page tools
-            Add("tabs.build.open_view", "Open build view", "Режим будівництва");
-            Add("tabs.build.wall", "Wall", "Стіна");
-            Add("tabs.build.window_wall", "Window wall", "Стіна з вікном");
-            Add("tabs.build.doorway", "Doorway", "Дверний отвір");
-            Add("tabs.build.fence", "Fence", "Паркан");
-            Add("tabs.build.remove", "Remove", "Прибрати");
 
             // Overview page
             Add("overview.balance", "Balance  € {0:N2}", "Баланс  € {0:N2}");
@@ -99,6 +91,12 @@ namespace PetShop.Localization.Strings
             Add("animals.note.needs_adults", "Needs two adults to breed", "Для розведення потрібні дві дорослі тварини");
             Add("animals.note.full", "Full — no room for young", "Заповнено — немає місця для малят");
 
+            Add("animals.lock", "Lock", "Заблокувати");
+            Add("animals.unlock", "Unlock", "Розблокувати");
+            Add("animals.locked_tag", "(locked)", "(заблоковано)");
+            Add("animals.lock_hint", "Locked animals are never sold to customers.",
+                                     "Заблоковані тварини ніколи не продаються покупцям.");
+
             // Stock page
             // {0} units per order, {1} category.
             Add("stock.order", "Order {0} {1}", "Замовити {1} ×{0}");
@@ -119,6 +117,18 @@ namespace PetShop.Localization.Strings
             Plural("stock.units", "{0} unit", "{0} units", "{0} шт.", "{0} шт.", "{0} шт.");
             Add("stock.refill_hint", "Walk up to a shelf and press {0} to refill it from the stockroom.",
                                      "Підійдіть до полиці й натисніть {0}, щоб поповнити її зі складу.");
+            // {0} shelf number, {1} category, {2} units text, {3} refill cost.
+            Add("stock.section.title", "Shelf {0} — {1}: {2}, refill € {3:N2}",
+                                       "Полиця {0} — {1}: {2}, поповнення € {3:N2}");
+            // {0} product, {1} units on shelf, {2} capacity, {3} price each.
+            Add("stock.line", "{0}   {1}/{2}   € {3:N2} each", "{0}   {1}/{2}   € {3:N2} за шт.");
+            Add("stock.sell", "Sell", "Продати");
+            Add("stock.sell_all", "Sell shelf", "Продати полицю");
+            Add("stock.shelf_empty", "Nothing on this shelf.", "На цій полиці нічого немає.");
+            // {0} units, {1} product, {2} revenue.
+            Add("stock.sold", "Sold {0} × {1} for € {2:N2}", "Продано {0} × {1} за € {2:N2}");
+            // {0} units, {1} revenue.
+            Add("stock.sold_all", "Sold {0} units for € {1:N2}", "Продано {0} шт. за € {1:N2}");
             // {0} units, {1} category, {2} seconds.
             Add("stock.on_van", "On the van: {0} {1} — arriving in about {2} s",
                                 "У фургоні: {0} од. ({1}) — прибуде приблизно за {2} с");
@@ -236,7 +246,6 @@ namespace PetShop.Localization.Strings
 
             // Furniture catalogue (Build page)
             Add("catalog.tab.furniture", "Furniture", "Меблі");
-            Add("catalog.tab.structure", "Structure", "Конструкції");
             Add("catalog.tab.decoration", "Decoration", "Декор");
             Add("catalog.order", "Order", "Замовити");
             Add("catalog.place", "Place", "Поставити");

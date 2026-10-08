@@ -15,7 +15,8 @@ namespace PetShop.UI
     public class GameUI : MonoBehaviour
     {
         public ShopHUD         HUD       { get; private set; }
-        public InfoPanel       Info      { get; private set; }
+        /// <summary>A pen's info panel, opened from the pen's plaque.</summary>
+        public PenInfoPanel    PenInfo   { get; private set; }
         public DayResultsPanel Results   { get; private set; }
         public GameOverPanel   GameOver  { get; private set; }
         public PauseMenu       Pause     { get; private set; }
@@ -59,6 +60,7 @@ namespace PetShop.UI
 
         public bool AnyModalOpen =>
             (Results  != null && Results.IsOpen)  ||
+            (PenInfo  != null && PenInfo.IsOpen)  ||
             (Pause    != null && Pause.IsOpen)    ||
             (Stats    != null && Stats.IsOpen)    ||
             (FamilyTree != null && FamilyTree.IsOpen) ||
@@ -103,7 +105,7 @@ namespace PetShop.UI
             CanvasRoot = canvasGO.transform;
 
             HUD      = canvasGO.AddComponent<ShopHUD>();
-            Info     = canvasGO.AddComponent<InfoPanel>();
+            PenInfo  = canvasGO.AddComponent<PenInfoPanel>();
             Results  = canvasGO.AddComponent<DayResultsPanel>();
             GameOver = canvasGO.AddComponent<GameOverPanel>();
             Stats    = canvasGO.AddComponent<StatsPanel>();
@@ -121,7 +123,8 @@ namespace PetShop.UI
             Guide    = canvasGO.AddComponent<GuidePanel>();
 
             HUD.Build(canvasGO.transform, shop, game, build);
-            Info.Build(canvasGO.transform);
+            PenInfo.Build(canvasGO.transform, game);
+            PetShop.Player.InteractionSystem.OpenPenInfo = PenInfo.Show;
             Results.Build(canvasGO.transform, game);
             GameOver.Build(canvasGO.transform, game);
             Stats.Build(canvasGO.transform, game, Reorder, build);
@@ -130,8 +133,6 @@ namespace PetShop.UI
             HUD.Catalogue = Catalogue;
             Inventory.Build(canvasGO.transform, game.Furniture, shop, build, () => AnyModalOpen || game.IsGameOver);
             Toolbar.Build(canvasGO.transform, game, shop, build, () => BuildView, () => AnyModalOpen || game.IsGameOver);
-            Stats.BuildView = () => BuildView;
-            Stats.Toolbar   = Toolbar;
             Breeding.Build(canvasGO.transform, game, FamilyTree, Showcase);
             FamilyTree.Build(canvasGO.transform, game);   // after Breeding so it draws on top
             Showcase.Build(canvasGO.transform, game);
@@ -140,6 +141,7 @@ namespace PetShop.UI
             Journal.Build(canvasGO.transform, game);
             Guide.Build(canvasGO.transform, game);
             Stats.OpenGuide = Guide.Show;
+            PetShop.Player.InteractionSystem.OpenGuide = Guide.Show;
             Stats.GuideOpen = () => Guide.IsOpen;
             Journal.InputBlocked = () => Guide.IsOpen;
             Pause.Build(canvasGO.transform, game, audio, Settings, Guide);
@@ -161,6 +163,7 @@ namespace PetShop.UI
         private void Update()
         {
             if (_game == null || Title == null) return;
+            if (PetShop.Dev.DebugConsole.IsAnyOpen) return;
             if (Title.IsOpen)
             {
                 // Over the title screen only the guide (opened from it) answers Esc.
@@ -221,7 +224,7 @@ namespace PetShop.UI
             if (Reorder != null && Reorder.IsOpen) { Reorder.Hide(); return; }
             if (Catalogue != null && Catalogue.IsOpen) { Catalogue.Hide(); return; }
             if (_build != null && _build.IsActive) { _build.ExitBuildMode(); return; }
-            if (Info  != null && Info.IsOpen)      { Info.Hide();            return; }
+            if (PenInfo != null && PenInfo.IsOpen) { PenInfo.Hide();         return; }
             if (Showcase != null && Showcase.IsOpen) { Showcase.Hide();        return; }
             if (FamilyTree != null && FamilyTree.IsOpen) { FamilyTree.Hide();  return; }
             if (Breeding != null && Breeding.IsOpen) { Breeding.Hide();        return; }

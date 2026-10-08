@@ -25,7 +25,7 @@ namespace PetShop.Localization.Strings
             Add("order.furniture.placed", "Ordered a {0} for €{1:N0} — it arrives on the forecourt later today.", "Замовлено «{0}» за €{1:N0} — привезуть до входу сьогодні пізніше.");
             Add("delivery.furniture", "Delivery: a {0} crate is on the forecourt. Press {1} to unpack it.", "Доставка: ящик «{0}» біля входу. Натисніть {1}, щоб розпакувати.");
             Add("crate.empty", "There is nothing left in that crate.", "У цьому ящику нічого не лишилося.");
-            Add("crate.unpacked", "Unpacked the {0} — it is in your furniture inventory. Press {1} to place it.", "«{0}» розпаковано — це у вашому запасі меблів. Натисніть {1}, щоб поставити.");
+            Add("crate.unpacked", "Unpacked the {0} — it is in your inventory bar. Press its number key (1-9) to place it.", "«{0}» розпаковано — він на панелі інвентарю. Натисніть його цифрову клавішу (1-9), щоб поставити.");
             Add("delivery.collected", "Collected {0} units — they are in the stockroom, ready to shelve.", "Забрано {0} од. — вони на складі, готові до викладки.");
 
             // Restocking
@@ -72,11 +72,14 @@ namespace PetShop.Localization.Strings
             Add("prompt.source.stockroom", "  ·  {0} in the stockroom", "  ·  на складі: {0}");
             Add("prompt.source.cash_and_carry", "  ·  stockroom empty, cash-and-carry prices", "  ·  склад порожній, ціни гуртівні");
             Add("prompt.restock_shelf", "[{0}]  Restock shelf{1}", "[{0}]  Поповнити полицю{1}");
-            Add("prompt.restock_category", "[{0}]  Restock {1} shelf  ({2} units left){3}", "[{0}]  Поповнити полицю «{1}»  (лишилося {2} од.){3}");
+            Add("prompt.restock_category", "[{0}]  Restock {1} shelf  ({2} units left, {4}){3}", "[{0}]  Поповнити полицю «{1}»  (лишилося {2} од., {4}){3}");
             Add("prompt.pen_service", "[{0}]  Feed & clean the {1} pen  (€{2:N0})", "[{0}]  Нагодувати й прибрати вольєр «{1}»  (€{2:N0})");
+            Add("prompt.pen_feed", "[{0}]  Feed the {1} pen  (€{2:N0})", "[{0}]  Нагодувати вольєр «{1}»  (€{2:N0})");
+            Add("prompt.pen_plaque", "[{0}]  Pen info & pet locks", "[{0}]  Інформація про вольєр і блокування тварин");
             Add("prompt.pen_buy", "[{0}]  Buy a {1}  (€{2:N0})   ·  {3}/{4} stalls filled", "[{0}]  Купити: {1}  (€{2:N0})   ·  зайнято {3}/{4} місць");
             Add("prompt.pen_full", "[{0}]  {1} pen — full ({2}/{3})", "[{0}]  Вольєр «{1}» — повний ({2}/{3})");
             Add("prompt.serve", "[{0}]  Serve {1}  —  {2} item(s), €{3:N2}   ({4} waiting)", "[{0}]  Обслужити {1}  —  товарів: {2}, €{3:N2}   (чекають: {4})");
+            Add("prompt.guide_book", "[{0}]  Read the guide", "[{0}]  Читати посібник");
             Add("prompt.counter_empty", "[{0}]  Counter — no customers yet", "[{0}]  Прилавок — покупців поки немає");
 
             // Build mode
@@ -101,6 +104,12 @@ namespace PetShop.Localization.Strings
             Add("furniture.shelf_small.desc", "Holds up to two product lines.", "Вміщує до двох видів товару.");
             Add("furniture.shelf_large.name", "Large Shelf", "Велика полиця");
             Add("furniture.shelf_large.desc", "A wide shelf with room for more stock per line.", "Широка полиця, більше товару на кожен вид.");
+            Add("furniture.shelf_toys.name", "Toy Shelf", "Полиця для іграшок");
+            Add("furniture.shelf_toys.desc", "A shelf for pet toys.", "Полиця для іграшок для тварин.");
+            Add("furniture.shelf_accessories.name", "Accessory Shelf", "Полиця для аксесуарів");
+            Add("furniture.shelf_accessories.desc", "A shelf for collars, leads and other accessories.", "Полиця для нашийників, повідків та інших аксесуарів.");
+            Add("furniture.shelf_medicine.name", "Medicine Shelf", "Полиця для ліків");
+            Add("furniture.shelf_medicine.desc", "A shelf for pet medicine.", "Полиця для ліків для тварин.");
             Add("furniture.pet_pen.name", "Pet Pen", "Вольєр");
             Add("furniture.pet_pen.desc", "Four individual stalls, one per pet, all of one species.", "Чотири окремі місця, по одному на тварину, усі одного виду.");
             Add("furniture.species_pen.name", "{0} Pen", "Вольєр: {0}");
@@ -108,13 +117,13 @@ namespace PetShop.Localization.Strings
             Add("furniture.counter.name", "Counter", "Прилавок");
             Add("furniture.counter.desc", "Where customers queue and pay. Needed to open the shop.", "Тут покупці стоять у черзі й платять. Потрібен, щоб відчинити крамницю.");
             Add("furniture.wall.name", "Wall", "Стіна");
-            Add("furniture.wall.desc", "One cell of solid wall.", "Одна клітинка суцільної стіни.");
+            Add("furniture.wall.desc", "A solid wall. Place it anywhere, at any angle.", "Суцільна стіна. Ставте де завгодно й під будь-яким кутом.");
             Add("furniture.wall_window.name", "Window Wall", "Стіна з вікном");
-            Add("furniture.wall_window.desc", "One cell of wall with a window.", "Одна клітинка стіни з вікном.");
+            Add("furniture.wall_window.desc", "A wall with a window. Place it anywhere, at any angle.", "Стіна з вікном. Ставте де завгодно й під будь-яким кутом.");
             Add("furniture.wall_door.name", "Doorway", "Дверний проріз");
-            Add("furniture.wall_door.desc", "One cell of wall with an open doorway.", "Одна клітинка стіни з відкритим проходом.");
+            Add("furniture.wall_door.desc", "A wall with an open doorway. Place it anywhere, at any angle.", "Стіна з відкритим проходом. Ставте де завгодно й під будь-яким кутом.");
             Add("furniture.fence.name", "Fence", "Паркан");
-            Add("furniture.fence.desc", "One cell of low fence, for enclosures and the yard.", "Одна клітинка низького паркану для загонів і двору.");
+            Add("furniture.fence.desc", "A low fence for enclosures and the yard. Place it anywhere, at any angle.", "Низький паркан для загонів і двору. Ставте де завгодно й під будь-яким кутом.");
             Add("furniture.decor_plant_pot.name", "Potted Plant", "Рослина в горщику");
             Add("furniture.decor_plant_pot.desc", "A leafy plant in a pot.", "Листяна рослина в горщику.");
             Add("furniture.decor_flowers.name", "Flowers", "Квіти");

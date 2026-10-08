@@ -44,7 +44,6 @@ public static class SpawnVerify
         ("Packs/Furniture/Cupboards/Cupboards",                   ModelLibrary.Fit.Height, 1.1f, "Y=1.1"),
         ("Packs/Furniture/Book Shelve/BookShelve",                ModelLibrary.Fit.Height, 2.0f, "Y=2.0"),
         ("Packs/Nature/Tree_01",                                  ModelLibrary.Fit.Height, 6f,  "tall"),
-        ("Packs/Animals/Fox",                                     ModelLibrary.Fit.Height, 0.7f, "Y=0.7"),
         ("Packs/Animals/Dog_001",                                 ModelLibrary.Fit.Height, 0.7f, "Y=0.7"),
         ("Packs/Animals/Kitty_001",                               ModelLibrary.Fit.Height, 0.5f, "Y=0.5"),
         ("Packs/Animals/Pinguin_001",                             ModelLibrary.Fit.Height, 0.8f, "Y=0.8"),

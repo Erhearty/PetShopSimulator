@@ -52,7 +52,7 @@ namespace PetShop.Tests
             yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
             var game = PlaytestHarness.Game;
             int perimeter = PerimeterCellCount(game.Layout.RoomWallCells());
-            Assert.AreEqual(perimeter, CountRoomWalls(game), "A new game should wall every border cell of the room.");
+            Assert.AreEqual(perimeter, CountRoomWalls(game), "A new game should wall every border cell of the room including its four corners.");
             Assert.Greater(CountPieces(game, BuildCatalog.WallDoor), 0, "The shopfront has no doorway piece.");
 
             StartWatchingLogs();
@@ -161,29 +161,20 @@ namespace PetShop.Tests
         }
 
         /// <summary>
-        /// Each wall-ring corner is closed along the back/front row line by the corner cell's own grid piece, so
-        /// removing that piece opens the corner; no static corner fillers exist, even across reloads, re-seeding and
-        /// lot-stage changes.
+        /// A new game's wall ring is closed at all four corners, still closed after a save/load, and no static
+        /// corner fillers exist.
         /// </summary>
         [UnityTest]
-        public IEnumerator RoomWallCorners_ClosedByTheirGridPiece_AndNoStaticFillers()
+        public IEnumerator RoomWallCorners_StartClosed_AndStayClosedAfterSaveLoad()
         {
             yield return PlaytestHarness.Boot(false, Seed, TimeScale, DayLength, furnish: false);
             var game = PlaytestHarness.Game;
             StartWatchingLogs();
+            yield return null;
             AssertCornersClosed(game);
             AssertNoCornerFillers();
 
-            RectInt ring = game.Layout.RoomWallCells();
-            var corner = new Vector2Int(ring.xMin, ring.yMin);
-            game.Build.RemoveAtWorldPos(game.Grid.GridToWorld(corner));
-            yield return null;   // let the removed piece's destruction land
-            Assert.IsFalse(game.Grid.TryGetObject(corner, out _), "The corner piece was not removed.");
-            Assert.IsFalse(CornerHit(game, corner), "Removing the corner piece left something closing its corner.");
-
             Reload(game, SaveAndRead(game));
-            game.Layout.SeedRoomWalls(game.Build);
-            game.Layout.ApplyLotStage(ShopLayout.StarterLotStage);
             yield return null;
             AssertCornersClosed(game);
             AssertNoCornerFillers();
@@ -231,17 +222,6 @@ namespace PetShop.Tests
                 pairs++;
             }
             Assert.Greater(pairs, 0, "No adjacent ring pieces were compared.");
-
-            foreach (var corner in Corners(ring))
-            {
-                Bounds bounds = PieceBounds(game, corner);
-                Vector3 centre = game.Grid.GridToWorld(corner);
-                float reach = ShopLayout.WallPieceThickness * 0.5f + SkirtingOverhang + JoinTolerance;
-                float outX = corner.x == ring.xMin ? centre.x - bounds.min.x : bounds.max.x - centre.x;
-                float outZ = corner.y == ring.yMin ? centre.z - bounds.min.z : bounds.max.z - centre.z;
-                Assert.LessOrEqual(outX, reach, $"The corner piece at {corner} overhangs its side row by {outX:F3} m.");
-                Assert.LessOrEqual(outZ, reach, $"The corner piece at {corner} overhangs its front/back row by {outZ:F3} m.");
-            }
         }
 
         /// <summary>
@@ -297,7 +277,7 @@ namespace PetShop.Tests
         /// <summary>How far a wall piece's skirting stands proud of its face, in metres.</summary>
         private const float SkirtingOverhang = 0.025f;
 
-        /// <summary>Every cell of the room's wall ring.</summary>
+        /// <summary>Every seeded cell of the room's wall ring: corners included.</summary>
         private static System.Collections.Generic.IEnumerable<Vector2Int> RingCells(GameManager game)
         {
             RectInt ring = game.Layout.RoomWallCells();
@@ -329,14 +309,14 @@ namespace PetShop.Tests
             Assert.AreEqual(0, fillers, "Static RoomWallCorner fillers should no longer exist.");
         }
 
-        /// <summary>
-        /// Asserts a collider fills the strip between each corner cell's piece (centred, 0.24 m thick) and
-        /// the cell edge where the adjacent row's first piece starts.
-        /// </summary>
+        /// <summary>Asserts a piece stands on, and a collider fills the strip of, each of the ring's four corner cells.</summary>
         private static void AssertCornersClosed(GameManager game)
         {
             foreach (var corner in Corners(game.Layout.RoomWallCells()))
+            {
+                Assert.IsTrue(game.Grid.TryGetObject(corner, out _), $"No piece stands on corner cell {corner}.");
                 Assert.IsTrue(CornerHit(game, corner), $"The wall corner at cell {corner} is open.");
+            }
         }
 
         /// <summary>True when a collider fills the strip between corner cell <paramref name="corner"/>'s centre and its room-side X edge.</summary>

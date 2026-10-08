@@ -131,10 +131,11 @@ namespace PetShop.Shop
         private void HandleRotationInput()
         {
             if (InputBindings.GetKeyDown(GameAction.BuildRotate)) Rotate(ShiftHeld ? -1 : 1);
-            if (!IsHolding) return;
+            bool free = IsFreeItem(CurrentItem);
+            if (!IsHolding && !free) return;
             float wheel = Input.GetAxis(ScrollAxis);
-            if (wheel > 0f)      Rotate(1);
-            else if (wheel < 0f) Rotate(-1);
+            if (wheel > 0f)      { if (free) RotateFine(1);  else Rotate(1); }
+            else if (wheel < 0f) { if (free) RotateFine(-1); else Rotate(-1); }
         }
 
         private static bool ShiftHeld =>

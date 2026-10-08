@@ -122,6 +122,12 @@ namespace PetShop.Shop
                 foreach (var entry in _grid.GetAllPlaced())
                 {
                     if (!CarriesRoof(entry.Data)) continue;
+                    if (entry.IsFree)
+                    {
+                        // A free wall roofs the cells its centre line runs through.
+                        foreach (var c in BuildMode.FreeCellsFor(entry.Data, entry.Position, entry.Yaw)) walls.Add(c);
+                        continue;
+                    }
                     for (int x = 0; x < entry.Size.x; x++)
                         for (int z = 0; z < entry.Size.y; z++)
                             walls.Add(entry.Root + new Vector2Int(x, z));

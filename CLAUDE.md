@@ -144,9 +144,9 @@ to place them. The counter count comes from the `GameManager` furniture registry
 
 **The till follows the counter.** Whenever counters are registered or removed,
 `GameManager.PlaceTillAtCounter` moves the register point to the first counter's front edge, points
-the queue out along its +Z and puts the staff station (and every assistant) behind it. Every furniture
-prefab's customer side is **+Z**; the counter prefab's model sits under a `Model` child turned 180°
-so its screen and cupboard doors face the staff. (The till used to stay at a fixed layout spot, so
+the queue out along its **−Z** and puts the staff station (and every assistant) on its +Z. Other furniture
+prefabs' customer side is **+Z**, but the counter is flipped: customers queue on the side the cashier used
+to stand, and the cashier stands where customers used to queue (its `Model` child is turned 180°). (The till used to stay at a fixed layout spot, so
 customers queued metres away from wherever the player put the counter.)
 
 **Only a shopper standing at the till can be served.** `CheckoutQueue.NextReady` is the first shopper in
