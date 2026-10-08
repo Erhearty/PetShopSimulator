@@ -533,7 +533,7 @@ namespace PetShop.Customer
                 }
             }
 
-            var pens = PetPens.FindAll(p => p != null && p.HasAdults);
+            var pens = PetPens.FindAll(p => p != null && p.HasSellableAdults);
             if (pens.Count == 0) return;
             var pen = pens[Random.Range(0, pens.Count)];
             Pet pet = Profile.FirstWantedPet(pen);

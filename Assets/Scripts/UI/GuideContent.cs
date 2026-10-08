@@ -43,7 +43,6 @@ namespace PetShop.UI
     public static class GuideContent
     {
         private static string L(GameAction a) => InputBindings.Label(a);
-        private static string K(UnityEngine.KeyCode key) => BuildToolbar.KeyLabel(key);
 
         /// <summary>The localisation key of section <paramref name="id"/>'s title.</summary>
         public static string TitleKey(string id) => "guide." + id + ".title";
@@ -54,7 +53,7 @@ namespace PetShop.UI
         /// <summary>Every guide section, in reading order.</summary>
         public static IReadOnlyList<GuideSection> Sections() => new List<GuideSection>
         {
-            Serving(), Restocking(), Deliveries(), Furniture(), Walls(), Animals(),
+            Serving(), Restocking(), Deliveries(), Furniture(), Animals(),
             Staff(), Reputation(), Day(), Quests(), Tiers(), Saving(),
         };
 
@@ -76,11 +75,6 @@ namespace PetShop.UI
         private static GuideSection Furniture() => Make("furniture",
             new[] { GameAction.Ledger, GameAction.Interact, GameAction.BuildRotate, GameAction.BuildRemove },
             L(GameAction.Ledger), L(GameAction.Interact), HotkeyHelp.RotateKeys(), L(GameAction.BuildRemove));
-
-        private static GuideSection Walls() => Make("walls",
-            new[] { GameAction.BuildMode },
-            L(GameAction.BuildMode), K(BuildToolbar.WallKey), K(BuildToolbar.WindowWallKey),
-            K(BuildToolbar.DoorwayKey), K(BuildToolbar.FenceKey), K(BuildToolbar.RemoveKey));
 
         private static GuideSection Animals() => Make("animals",
             new[] { GameAction.Interact },

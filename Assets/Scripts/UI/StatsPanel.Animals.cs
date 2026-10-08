@@ -1,5 +1,7 @@
 using System.Text;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using PetShop.Core;
 using PetShop.Localization;
 using PetShop.Pets;
@@ -16,12 +18,23 @@ namespace PetShop.UI
         private const float LinkWidth = 0.32f, LinkStep = 0.34f;
         private const int   AdultsToBreed = 2;
 
-        private BookPage _animals;
+        private const float PetRowPx = 30f;
+
+        private BookPage  _animals;
+        private Transform _petHost;
+        private TMP_Text  _animalsText;
 
         private void BuildAnimalsPage()
         {
             _animals = AddPage("Animals", UIFactory.TextSmall);
             var page = _animals.Root.transform;
+            _animals.Body.gameObject.SetActive(false);
+            var content = BuildScrollContent(page);
+            _animalsText = UIFactory.Label("Pens", content, "", Vector2.zero, Vector2.one,
+                UIFactory.TextSmall, UIFactory.Ink, TextAlignmentOptions.TopLeft);
+            _animalsText.richText     = true;
+            _animalsText.overflowMode = TextOverflowModes.Overflow;
+            _petHost = AddColumn(content, "Pets");
             AddLink(page, 0, "Plan tonight's breeding", "animals.link.breeding", true, () => HandOff(() => GetComponent<BreedingPanel>()?.Show()));
             AddLink(page, 1, "Family tree", "animals.link.family_tree", false, OpenFamilyTree);
             AddLink(page, 2, "Showcase", "animals.link.showcase", false, () => HandOff(() => GetComponent<ShowcasePanel>()?.Show()));
@@ -67,7 +80,31 @@ namespace PetShop.UI
             sb.AppendLine(UIFactory.Tint(Loc.T("animals.prices"), UIFactory.InkMuted));
             foreach (Pet.Species species in System.Enum.GetValues(typeof(Pet.Species)))
                 sb.Append($"{LocNames.Species(species)} € {Pet.WholesalePrice(species):N0}    ");
-            _animals.Body.text = sb.ToString();
+            sb.AppendLine();
+            sb.AppendLine(UIFactory.Tint(Loc.T("animals.lock_hint"), UIFactory.InkMuted));
+            _animalsText.text = sb.ToString();
+            RebuildPetRows();
+        }
+
+        /// <summary>One row per animal with a Lock / Unlock toggle; a locked animal is never sold.</summary>
+        private void RebuildPetRows()
+        {
+            ClearChildren(_petHost);
+            foreach (var pen in _game.Pens)
+            {
+                if (pen == null) continue;
+                foreach (var pet in pen.Residents)
+                {
+                    var row = AddRow(_petHost, "Pet", PetRowPx).transform;
+                    string text = pet.DisplayName() + (pet.Locked ? " " + Loc.T("animals.locked_tag") : "");
+                    UIFactory.Label("Name", row, text, Vector2.zero, new Vector2(0.74f, 1f), UIFactory.TextSmall,
+                        pet.Locked ? UIFactory.Accent : UIFactory.Ink);
+                    var toggle = UIFactory.ButtonKey("Lock", row, pet.Locked ? "animals.unlock" : "animals.lock",
+                        new Vector2(0.76f, 0.08f), new Vector2(1f, 0.92f), UIFactory.TextSmall);
+                    var captured = pet;
+                    toggle.onClick.AddListener(() => { captured.Locked = !captured.Locked; Refresh(); });
+                }
+            }
         }
 
         private string PenLine(PetPen pen)

@@ -168,7 +168,7 @@ namespace PetShop.Tests
                 Assert.IsNotNull(def, $"{id}: missing.");
                 Assert.AreEqual(BuildCatalog.PenType, def.Type, $"{id}: type.");
                 Assert.AreEqual(BuildCategory.Furniture, def.Category, $"{id}: category.");
-                Assert.AreEqual(new Vector2Int(2, 2), def.Size, $"{id}: size.");
+                Assert.AreEqual(BuildCatalog.PenFootprintFor(species), def.Size, $"{id}: size.");
                 Assert.IsFalse(def.Hidden, $"{id}: hidden.");
                 float expected = BuildCatalog.Get(BuildCatalog.PetPen).Cost + 2 * Pet.WholesalePrice(species);
                 Assert.AreEqual(expected, def.Cost, 0.001f, $"{id}: cost.");
@@ -196,9 +196,9 @@ namespace PetShop.Tests
         [Test]
         public void Spawn_SpeciesPen_TakesSpeciesFromId()
         {
-            var pen = Spawn(BuildCatalog.PenIdFor(Pet.Species.Fox)).GetComponent<PetPen>();
+            var pen = Spawn(BuildCatalog.PenIdFor(Pet.Species.Deer)).GetComponent<PetPen>();
             Assert.IsNotNull(pen);
-            Assert.AreEqual(Pet.Species.Fox, pen.PenSpecies);
+            Assert.AreEqual(Pet.Species.Deer, pen.PenSpecies);
             Assert.AreEqual(4, pen.Capacity);
         }
 

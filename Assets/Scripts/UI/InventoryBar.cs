@@ -23,7 +23,7 @@ namespace PetShop.UI
         public const int MaxSlots = 9;
 
         private const float SlotWidth  = 96f;
-        private const float SlotHeight = 74f;
+        private const float SlotHeight = 88f;
         private const float BarBottom  = 14f;
         private const float StripHeight = 24f;
 
@@ -120,13 +120,13 @@ namespace PetShop.UI
 
             slot.Key = UIFactory.Label("Key", card.transform, (index + 1).ToString(), new Vector2(0.55f, 0.55f), new Vector2(0.96f, 0.96f),
                                        13f, UIFactory.InkMuted, TextAlignmentOptions.TopRight);
-            slot.Count = UIFactory.Label("Count", card.transform, "", new Vector2(0.45f, 0.40f), new Vector2(0.96f, 0.70f),
+            slot.Count = UIFactory.Label("Count", card.transform, "", new Vector2(0.45f, 0.46f), new Vector2(0.96f, 0.74f),
                                          17f, UIFactory.Accent, TextAlignmentOptions.MidlineRight);
-            slot.Name = UIFactory.Label("Name", card.transform, "", new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.36f),
-                                        12f, UIFactory.Ink, TextAlignmentOptions.Center);
+            slot.Name = UIFactory.Label("Name", card.transform, "", new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.42f),
+                                        14f, UIFactory.Ink, TextAlignmentOptions.Center);
             slot.Name.enableAutoSizing = true;
-            slot.Name.fontSizeMin      = 8f;
-            slot.Name.fontSizeMax      = 12f;
+            slot.Name.fontSizeMin      = 9f;
+            slot.Name.fontSizeMax      = 14f;
             card.SetActive(false);
             return slot;
         }

@@ -40,7 +40,7 @@ namespace PetShop.Tests
         [Test]
         public void ThemeFor_SameDay_IsStable()
         {
-            var owned = new[] { Pet.Species.Cat, Pet.Species.Dog, Pet.Species.Fox };
+            var owned = new[] { Pet.Species.Cat, Pet.Species.Dog, Pet.Species.Deer };
             var a = PetShow.ThemeFor(TestDay, owned);
             var b = PetShow.ThemeFor(TestDay, owned);
             Assert.AreEqual(a.species, b.species);

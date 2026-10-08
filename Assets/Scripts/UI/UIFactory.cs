@@ -285,7 +285,7 @@ namespace PetShop.UI
             tmp.alignment            = align;
             tmp.textWrappingMode     = TextWrappingModes.Normal;
             tmp.raycastTarget        = false;
-            tmp.overflowMode         = TextOverflowModes.Truncate;
+            tmp.overflowMode         = TextOverflowModes.Ellipsis;
             return tmp;
         }
 

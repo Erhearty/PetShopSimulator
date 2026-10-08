@@ -93,10 +93,10 @@ namespace PetShop.Tests
         }
 
         [Test]
-        public void PickableSpecies_Tier0_IsStarterSix()
+        public void PickableSpecies_Tier0_IsStarterFive()
         {
             CollectionAssert.AreEquivalent(
-                new[] { Pet.Species.Dog, Pet.Species.Cat, Pet.Species.Fox,
+                new[] { Pet.Species.Dog, Pet.Species.Cat,
                         Pet.Species.Chicken, Pet.Species.Penguin, Pet.Species.Deer },
                 ProgressionRules.PickableSpecies(0));
         }

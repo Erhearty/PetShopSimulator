@@ -11,7 +11,7 @@ namespace PetShop.Pets
     [CreateAssetMenu(fileName = "NewPet", menuName = "PetShop/Pet")]
     public class Pet : ScriptableObject
     {
-        public enum Species      { Cat, Dog, Fox, Chicken, Penguin, Deer, Horse, Tiger, Rabbit, Hamster, Parrot, Fish }
+        public enum Species      { Cat, Dog, Chicken, Penguin, Deer, Horse, Tiger, Rabbit, Hamster, Parrot, Fish }
         public enum GrowthStage  { Baby, Juvenile, Adult }
         public enum Rarity       { Common, Uncommon, Rare, Legendary }
 
@@ -45,6 +45,8 @@ namespace PetShop.Pets
         [Header("Commerce")]
         public float basePrice = 50f;
         public int   ribbons   = 0;   // pet show first-place ribbons; each adds to SellPrice
+        [Tooltip("A locked pet is never sold: customers skip it and it cannot be removed for a sale.")]
+        public bool  Locked    = false;
 
         // ── Queries ──────────────────────────────────────────────────
 
@@ -128,6 +130,17 @@ namespace PetShop.Pets
 
         public static string SpeciesLabel(Species s) => s.ToString();
 
+        /// <summary>How much bigger (&gt;1) or smaller (&lt;1) a species is drawn than its base model size.</summary>
+        public static float VisualScale(Species s) => s switch
+        {
+            Species.Penguin => 1.5f,
+            Species.Chicken => 0.5f,
+            Species.Dog     => 1.2f,
+            Species.Cat     => 0.7f,
+            Species.Deer    => 2f,
+            _               => 1f
+        };
+
         /// <summary>What the breeder charges you for a young pet of this species.</summary>
         public static float WholesalePrice(Species s) => Mathf.Round(SpeciesBasePrice(s) * 0.55f);
 
@@ -135,7 +148,6 @@ namespace PetShop.Pets
         {
             Species.Cat     => 80f,
             Species.Dog     => 120f,
-            Species.Fox     => 220f,
             Species.Chicken => 25f,
             Species.Penguin => 320f,
             Species.Deer    => 260f,

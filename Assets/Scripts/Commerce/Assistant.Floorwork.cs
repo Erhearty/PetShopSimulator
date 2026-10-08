@@ -48,7 +48,7 @@ namespace PetShop.Commerce
             {
                 yield return new WaitForSeconds(RestockInterval);
                 var shelf = FindRestockTarget();
-                if (shelf == null) continue;
+                if (shelf == null) { yield return IdleRoam(); continue; }
 
                 yield return WalkTo(shelf.transform.position);
                 if (shelf != null) ReportRestock(shelf, MoveFromWarehouse(shelf, UnitsPerTrip));
@@ -123,7 +123,7 @@ namespace PetShop.Commerce
             {
                 yield return new WaitForSeconds(FeedCheckInterval);
                 var pen = FindPenNeedingService();
-                if (pen == null) continue;
+                if (pen == null) { yield return IdleRoam(); continue; }
 
                 yield return WalkTo(pen.transform.position);
                 if (pen != null && pen.NeedsService) ServicePen(pen);
@@ -195,6 +195,16 @@ namespace PetShop.Commerce
             if (_agent != null) _agent.enabled = false;
             transform.SetPositionAndRotation(_homePosition, _homeRotation);
             _away = false;
+        }
+
+        /// <summary>Idle non-cashiers wander to a random NavMesh point near the till and pause there.</summary>
+        private IEnumerator IdleRoam()
+        {
+            if (!StaffRoleBehavior.RoamsWhenIdle(Role)) yield break;
+            var target = StaffRoleBehavior.IdleTarget(Role, _homePosition, Random.value, Random.value);
+            if (!NavMesh.SamplePosition(target, out var hit, NavMeshSearchRadius, NavMesh.AllAreas)) yield break;
+            yield return WalkTo(hit.position);
+            yield return new WaitForSeconds(StaffRoleBehavior.PauseSeconds(Role, Random.value));
         }
 
         /// <summary>Enables the agent on the nearest NavMesh point; false when there is none nearby.</summary>

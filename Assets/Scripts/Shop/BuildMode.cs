@@ -157,6 +157,7 @@ namespace PetShop.Shop
         private void TryPlace()
         {
             if (!RaycastFloor(out var worldPos)) return;
+            if (IsFreeItem(CurrentItem)) { TryPlaceFree(worldPos); return; }
             var cell = GridManager.WorldToGrid(worldPos);
             if (IsHolding) { PlaceHeld(cell); return; }
 
@@ -251,6 +252,7 @@ namespace PetShop.Shop
         /// </summary>
         public void RemoveAlongRay(Ray ray)
         {
+            if (TryFreePieceAlongRay(ray, out var freePiece)) { RemoveFreeEntry(freePiece); return; }
             if (!TryAimCell(ray, out var cell)) { OnBuildMessage.Invoke(AimToRemoveNotice); return; }
             RemoveAtWorldPos(GridManager.GridToWorld(cell));
         }
@@ -285,8 +287,17 @@ namespace PetShop.Shop
         /// </summary>
         public void RemoveAtWorldPos(Vector3 worldPos)
         {
+            var freeHere = FreeEntryContaining(worldPos);
+            if (freeHere != null) { RemoveFreeEntry(freeHere); return; }
+
             var cell = GridManager.WorldToGrid(worldPos);
-            if (!GridManager.TryGetObject(cell, out var entry)) { OnBuildMessage.Invoke(NothingToRemoveNotice); return; }
+            if (!GridManager.TryGetObject(cell, out var entry))
+            {
+                var rooted = FreeEntryRootedAt(cell);
+                if (rooted != null) { RemoveFreeEntry(rooted); return; }
+                OnBuildMessage.Invoke(NothingToRemoveNotice);
+                return;
+            }
             if (Supply != null && PenHasPets(entry.Instance))
             {
                 OnBuildMessage.Invoke(PenHasPetsNotice);

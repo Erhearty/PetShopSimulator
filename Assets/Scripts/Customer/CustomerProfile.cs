@@ -216,7 +216,7 @@ namespace PetShop.Customer
         public float RollPetBudget() => Random.Range(PetBudgetMin, PetBudgetMax);
 
         /// <summary>True if this shopper would buy <paramref name="pet"/>: an adult of at least the minimum rarity.</summary>
-        public bool Accepts(Pet pet) => pet != null && pet.IsAdult && pet.rarity >= MinPetRarity;
+        public bool Accepts(Pet pet) => pet != null && pet.IsAdult && !pet.Locked && pet.rarity >= MinPetRarity;
 
         /// <summary>First animal in <paramref name="pen"/> this shopper would buy, or null.</summary>
         public Pet FirstWantedPet(PetPen pen)

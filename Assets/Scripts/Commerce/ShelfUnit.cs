@@ -35,7 +35,6 @@ namespace PetShop.Commerce
 
         private readonly List<StockLine> _lines = new();
         private Transform  _visualRoot;
-        private WorldLabel _priceTag;
 
         // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -71,35 +70,12 @@ namespace PetShop.Commerce
 
         // ── Stock management ────────────────────────────────────────────────────
 
-        private void Start()
-        {
-            // Price tag above the unit. Genre standard: the player should never have to open
-            // a panel to see what a shelf is selling or how empty it is.
-            _priceTag = WorldLabel.Create(transform, new Vector3(0f, ShelfHeight + 0.26f, ShelfDepth * 0.5f),
-                                          "", 0.085f, UIFactory.Ink, width: 1.7f);
-            RefreshLabel();
-
-            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
-            if (shop != null) shop.OnPriceChanged.AddListener(_ => RefreshLabel());
-        }
-
         /// <summary>
-        /// Category, marked-up price and stock, colour-coded so a nearly-empty shelf reads
-        /// from across the room.
+        /// The marked-up price (or price range) of what the shelf stocks, for the interact prompt;
+        /// empty when nothing priced is stocked. <paramref name="shop"/> may be null (base prices).
         /// </summary>
-        public void RefreshLabel()
+        public string PriceText(ShopManager shop)
         {
-            if (_priceTag == null) return;
-
-            if (_lines.Count == 0)
-            {
-                _priceTag.SetText(Localization.Loc.F("shelf.tag.empty", Localization.LocNames.CategoryTitle(Category),
-                                                     InputBindings.Label(GameAction.Interact)));
-                _priceTag.SetColour(UIFactory.Bad);
-                return;
-            }
-
-            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
             float lowest = float.MaxValue, highest = 0f;
             foreach (var line in _lines)
             {
@@ -108,19 +84,10 @@ namespace PetShop.Commerce
                 lowest  = Mathf.Min(lowest, price);
                 highest = Mathf.Max(highest, price);
             }
-
-            int capacity = Mathf.Max(1, _lines.Count * MaxPerLine);
-            float fill   = TotalUnits / (float)capacity;
-
-            string priceText = Mathf.Approximately(lowest, highest)
+            if (highest <= 0f) return string.Empty;
+            return Mathf.Approximately(lowest, highest)
                 ? $"€ {lowest:0.00}"
                 : $"€ {lowest:0.00} – {highest:0.00}";
-
-            _priceTag.SetText(Localization.Loc.F("shelf.tag.stock", Localization.LocNames.CategoryTitle(Category),
-                                                 priceText, TotalUnits, capacity));
-            _priceTag.SetColour(fill <= 0.01f ? UIFactory.Bad
-                              : fill < 0.3f   ? new Color(0.95f, 0.72f, 0.35f)
-                                              : UIFactory.Ink);
         }
 
         /// <summary>Add units of a product. Returns how many were actually added.</summary>
@@ -141,7 +108,6 @@ namespace PetShop.Commerce
 
             line.Units += added;
             RefreshVisuals();
-            RefreshLabel();
             OnStockChanged.Invoke(this);
             return added;
         }
@@ -155,9 +121,28 @@ namespace PetShop.Commerce
             var line = stocked[Random.Range(0, stocked.Count)];
             line.Units--;
             RefreshVisuals();
-            RefreshLabel();
             OnStockChanged.Invoke(this);
             return line.Product;
+        }
+
+        /// <summary>
+        /// Sells every unit of <paramref name="product"/> on this shelf at the current shelf price,
+        /// crediting <paramref name="shop"/>. Returns the units sold (0 when none or no shop).
+        /// </summary>
+        public int SellLine(ProductItem product, ShopManager shop, out float revenue)
+        {
+            revenue = 0f;
+            var line = _lines.Find(l => l.Product == product);
+            if (line == null || line.Units <= 0 || shop == null) return 0;
+
+            int units = line.Units;
+            float price = shop.PriceOf(product.basePrice);
+            line.Units = 0;
+            revenue = price * units;
+            shop.RecordSale(product.id, product.displayName, units, price, "Shelf sale");
+            RefreshVisuals();
+            OnStockChanged.Invoke(this);
+            return units;
         }
 
         /// <summary>What one restock did: how much went on the shelf, and what it cost.</summary>
@@ -210,7 +195,6 @@ namespace PetShop.Commerce
             }
         done:
             RefreshVisuals();
-            RefreshLabel();
             OnStockChanged.Invoke(this);
             return result;
         }

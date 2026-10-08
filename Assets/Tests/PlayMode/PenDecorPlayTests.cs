@@ -54,7 +54,8 @@ namespace PetShop.Tests
                 var prop = decor.Find(PetPen.DecorSpeciesPropName);
                 Assert.IsNotNull(prop, $"{species}: no species prop");
                 Assert.Greater(prop.GetComponentsInChildren<MeshRenderer>().Length, 0, $"{species}: empty prop");
-                Assert.IsNotNull(decor.Find(PetPen.DecorCornerName), $"{species}: no corner piece");
+                foreach (var t in _pen.GetComponentsInChildren<Transform>(true))
+                    Assert.IsFalse(t.name.Contains("Plant") || t.name.StartsWith("Grass"), $"{species}: vegetation '{t.name}'");
                 Assert.IsNotNull(decor.Find(PetPen.DecorTrimName), $"{species}: no trim");
 
                 Assert.AreEqual(0, decor.GetComponentsInChildren<Collider>(true).Length,

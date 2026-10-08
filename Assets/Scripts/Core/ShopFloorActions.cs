@@ -67,9 +67,20 @@ namespace PetShop.Core
         /// </summary>
         private void ByTruck(System.Action drop)
         {
-            if (_game.IsDayRunning && Traffic.DeliveryTruck.Dispatch(drop)) return;
-            drop();
+            if (_game.IsDayRunning) _trucks.Add(drop);   // loads due together share one truck
+            else drop();
         }
+
+        private readonly TruckBatch _trucks = new();
+
+        /// <summary>Sends every load that fell due this frame on one truck. Called once per frame by the manager.</summary>
+        public void FlushTrucks()
+        {
+            if (_trucks.Count > 0) _trucks.Flush(Traffic.DeliveryTruck.Dispatch);
+        }
+
+        /// <summary>Drops any waiting load straight away, truck or not, so nothing is lost at day end or save.</summary>
+        public void DropWaitingLoads() => _trucks.DropAllNow();
 
         /// <summary>A landing spot on the forecourt for a delivery.</summary>
         private Vector3 ForecourtSpot()
@@ -168,7 +179,6 @@ namespace PetShop.Core
                                    (1f - ShopManager.WholesaleDiscount / ShopManager.EmergencyMarkup) * 100f));
 
             _game.Audio?.PlaySfx(result.Units > 0 ? "restock" : "deny");
-            _game.OnInfoPanel.Invoke(shelf.Describe());
         }
 
         /// <summary>
@@ -184,19 +194,7 @@ namespace PetShop.Core
             // Care comes first: an animal that needs feeding matters more than buying another.
             if (pen.NeedsService)
             {
-                float cost = pen.ServiceCost;
-                if (shop.ChangeBalance(-cost, "Pen upkeep"))
-                {
-                    pen.Service();
-                    _game.Notify(Loc.F("pen.serviced", LocNames.Species(pen.PenSpecies), cost));
-                    _game.Audio?.PlaySfx("restock");
-                }
-                else
-                {
-                    _game.Notify(Loc.F("pen.service_no_money", cost));
-                    _game.Audio?.PlaySfx("deny");
-                }
-                _game.OnInfoPanel.Invoke(pen.Describe());
+                TryServicePen(pen);
                 return;
             }
 
@@ -222,8 +220,39 @@ namespace PetShop.Core
             {
                 _game.Audio?.PlaySfx("click");
             }
+        }
 
-            _game.OnInfoPanel.Invoke(pen.Describe());
+        /// <summary>Pays for and runs a pen's feed-and-clean service, with the matching notice and sound.</summary>
+        private void TryServicePen(PetPen pen)
+        {
+            float cost = pen.ServiceCost;
+            if (_game.Shop.ChangeBalance(-cost, "Pen upkeep"))
+            {
+                pen.Service();
+                _game.Notify(Loc.F("pen.serviced", LocNames.Species(pen.PenSpecies), cost));
+                _game.Audio?.PlaySfx("restock");
+            }
+            else
+            {
+                _game.Notify(Loc.F("pen.service_no_money", cost));
+                _game.Audio?.PlaySfx("deny");
+            }
+        }
+
+        /// <summary>
+        /// Clicking a pen's feed pad feeds (and cleans) its pets for the service cost; an empty or
+        /// already-fed pen only says so.
+        /// </summary>
+        public void FeedPen(PetPen pen)
+        {
+            if (pen == null) return;
+            if (pen.Count == 0 || (pen.FoodLevel > 0.95f && pen.Cleanliness > 0.95f))
+            {
+                _game.Notify(Loc.T(pen.Count == 0 ? "pen.feed_empty" : "pen.feed_not_needed"));
+                _game.Audio?.PlaySfx("click");
+                return;
+            }
+            TryServicePen(pen);
         }
 
         /// <summary>Shown when the counter is used with nobody in line, so E never seems dead.</summary>

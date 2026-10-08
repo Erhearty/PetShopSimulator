@@ -10,7 +10,7 @@ namespace PetShop.Core
     {
         MoveForward, MoveBack, MoveLeft, MoveRight,
         Jump, Interact, EndDay, QuickSave, Ledger,
-        BuildMode, BuildRotate, BuildRemove, Guide
+        BuildMode, BuildRotate, BuildRemove, Guide, DebugConsole
     }
 
     /// <summary>Where key bindings are persisted. Swappable so tests never touch PlayerPrefs.</summary>
@@ -87,6 +87,7 @@ namespace PetShop.Core
             GameAction.BuildRotate => KeyCode.R,
             GameAction.BuildRemove => KeyCode.Delete,
             GameAction.Guide       => KeyCode.F1,
+            GameAction.DebugConsole => KeyCode.F2,
             _                      => KeyCode.None,
         };
 
@@ -202,6 +203,7 @@ namespace PetShop.Core
             GameAction.BuildRotate => Loc.T("action.build_rotate"),
             GameAction.BuildRemove => Loc.T("action.build_remove"),
             GameAction.Guide       => Loc.T("action.guide"),
+            GameAction.DebugConsole => Loc.T("action.debug_console"),
             _                      => action.ToString(),
         };
 

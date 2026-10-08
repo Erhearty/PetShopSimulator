@@ -86,6 +86,9 @@ namespace PetShop.Core
             public int    cellX, cellY;
             public string variant;
             public float  rotation;
+            /// <summary>True for a piece placed at a free world position (<see cref="posX"/>, <see cref="posZ"/>) and yaw.</summary>
+            public bool   free;
+            public float  posX, posZ;
             /// <summary>True when a hand-placed item occupies its catalogue footprint with x/y swapped.</summary>
             public bool   footprintRotated;
             public List<StockEntry>  shelfStock = new();
@@ -111,6 +114,7 @@ namespace PetShop.Core
             public int    ageDays, daysToMature;
             public float  basePrice;
             public int    ribbons;
+            public bool   Locked;
         }
     }
 
@@ -379,6 +383,7 @@ namespace PetShop.Core
             daysToMature = p.daysToMature,
             basePrice    = p.basePrice,
             ribbons      = p.ribbons,
+            Locked       = p.Locked,
         };
 
         public static Pet SaveDataToPet(SaveData.PetSaveData d)
@@ -401,6 +406,7 @@ namespace PetShop.Core
             pet.daysToMature = Mathf.Max(1, d.daysToMature);
             pet.basePrice    = d.basePrice > 0f ? d.basePrice : Pet.SpeciesBasePrice(pet.species);
             pet.ribbons      = Mathf.Max(0, d.ribbons);
+            pet.Locked       = d.Locked;
             return pet;
         }
     }

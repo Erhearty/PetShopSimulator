@@ -128,7 +128,7 @@ namespace PetShop.Core
 
         /// <summary>
         /// The till is wherever the first placed counter is: customers queue out from its front
-        /// (+Z, the customer side of every furniture prefab) and staff stand behind it. Without
+        /// (the counter prefab's -Z, where the cashier used to stand) and staff stand on its +Z. Without
         /// this the queue sat at the shop's old fixed till spot, metres from any placed counter.
         /// The front and back faces come from the counter's colliders — what people actually bump
         /// into — so the first place in line is always clear of the counter on its customer side.
@@ -141,9 +141,10 @@ namespace PetShop.Core
             if (!StaffStationValid || Spawner == null || Spawner.RegisterPoint == null) return;
             Transform counter = _counters[0].transform;
 
-            Vector3 forward = counter.forward;
+            // Customer side: the counter's -Z. The cashier stands on its +Z.
+            Vector3 forward = -counter.forward;
             forward.y = 0f;
-            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.back;
             forward.Normalize();
 
             float front    = ReachAlong(counter.gameObject, forward);

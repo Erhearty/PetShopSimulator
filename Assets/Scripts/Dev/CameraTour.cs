@@ -259,10 +259,6 @@ namespace PetShop.Dev
                 shots.Add(Ui("book_staff",    uiFrom, uiTo, () => { ui.Stats.Show(); ui.Stats.ShowTab(StatsPanel.StaffTab); }, ui.Stats.Hide));
             }
 
-            if (ui != null && ui.Info != null)
-                shots.Add(Ui("info_panel", uiFrom, uiTo,
-                             () => ui.Info.Show(PenDescription()), ui.Info.Hide));
-
             if (ui != null && ui.Results != null && game != null)
                 shots.Add(Ui("day_results", uiFrom, uiTo,
                              () => ui.Results.Show(game.Shop.GetCurrentDaySummary()), ui.Results.Hide));
@@ -431,12 +427,6 @@ namespace PetShop.Dev
         {
             var pen = FindAnyObjectByType<PetShop.Pets.PetPen>();
             return pen != null ? pen.transform.position : Vector3.zero;
-        }
-
-        private string PenDescription()
-        {
-            var pen = FindAnyObjectByType<PetShop.Pets.PetPen>();
-            return pen != null ? pen.Describe() : "No pens.";
         }
 
         private Vector3 PlayerShot(out Vector3 lookAt)

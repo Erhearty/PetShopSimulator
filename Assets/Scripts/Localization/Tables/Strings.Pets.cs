@@ -12,7 +12,6 @@ namespace PetShop.Localization.Strings
 
             Add("species.cat", "Cat", "Кіт");
             Add("species.dog", "Dog", "Пес");
-            Add("species.fox", "Fox", "Лис");
             Add("species.chicken", "Chicken", "Курка");
             Add("species.penguin", "Penguin", "Пінгвін");
             Add("species.deer", "Deer", "Олень");
@@ -76,11 +75,21 @@ namespace PetShop.Localization.Strings
             Add("pen.describe.may_breed", "  Two adults — they may breed tonight.", "  Дві дорослі тварини — уночі може з’явитися потомство.");
             Add("pen.describe.needs_adults", "  Needs two adults to breed.", "  Для розведення потрібні дві дорослі тварини.");
             Add("pen.describe.full", "  Pen is full.", "  Вольєр заповнений.");
-            Add("pen.sign.empty", "{0} pen\n<size=75%>empty</size>", "Вольєр «{0}»\n<size=75%>порожній</size>");
-            // {0} species, {1} asking price, {2} residents, {3} capacity, {4} rarity, {5} pen.sign.paired or empty.
-            Add("pen.sign.stocked", "{0}   € {1:0.00}\n<size=75%>{2} / {3}  ·  {4}{5}</size>",
-                                    "{0}   € {1:0.00}\n<size=75%>{2} / {3}  ·  {4}{5}</size>");
-            Add("pen.sign.paired", "  ·  paired tonight", "  ·  пара на ніч");
+
+            // Pen info panel (the feed pad and plaque carry no world text).
+            Add("pen.info.paired", "Paired for tonight.", "Пара на ніч обрана.");
+            Add("pen.feed_empty", "Nobody lives in this pen yet.", "У цьому вольєрі ще нікого немає.");
+            Add("pen.feed_not_needed", "This pen is already fed and clean.", "У вольєрі вже є корм і чисто.");
+            Add("pen.info.title", "{0} pen", "Вольєр «{0}»");
+            Add("pen.info.summary", "Pets {0}/{1}   ·   Feed {2:0}%   ·   Bedding {3:0}%",
+                                    "Тварин {0}/{1}   ·   Корм {2:0}%   ·   Підстилка {3:0}%");
+            Add("pen.info.needs_service", "Needs feeding and cleaning (€{0:N2}).", "Потрібні годування й прибирання (€{0:N2}).");
+            Add("pen.info.empty", "Nobody lives here yet.", "Тут ще ніхто не живе.");
+            Add("pen.info.row", "{0}  ·  {1}  ·  hunger {3:0}%  ·  €{2:0.00}", "{0}  ·  {1}  ·  голод {3:0}%  ·  €{2:0.00}");
+            Add("pen.info.unlocked", "Lock from sale", "Не продавати");
+            Add("pen.info.locked", "Locked — not for sale", "Заблоковано — не продається");
+            Add("pen.info.hint", "Locked pets are never sold. Click the plaque to open this panel.",
+                                 "Заблоковані тварини не продаються. Клацніть табличку, щоб відкрити цю панель.");
 
             // Progression tiers and milestones
             Add("tier.corner_shop", "Corner Shop", "Крамничка за рогом");

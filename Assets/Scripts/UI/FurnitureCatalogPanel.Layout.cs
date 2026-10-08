@@ -68,6 +68,7 @@ namespace PetShop.UI
             row.Root = UIFactory.Panel($"Row_{index}", panel, new Vector2(Left, y0), new Vector2(Right, y1), RowColour);
             var t = row.Root.transform;
             row.Name = UIFactory.Label("Name", t, "", new Vector2(0.01f, 0.5f), new Vector2(0.44f, 1f), NameFont);
+            UIFactory.AutoFit(row.Name);   // a long or locked name shrinks instead of being cut off
             row.Description = UIFactory.Label("Description", t, "", new Vector2(0.01f, 0f),
                 new Vector2(0.60f, 0.5f), BodyFont, UIFactory.InkMuted);
             row.Cost = UIFactory.Label("Cost", t, "", new Vector2(0.45f, 0.5f), new Vector2(0.60f, 1f),

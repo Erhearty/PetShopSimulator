@@ -63,6 +63,7 @@ namespace PetShop.UI
         private readonly List<BookPage> _pages = new();
         private int _current;
         private int _openedFrame = -1;
+        private bool _holdsPause;
 
         /// <summary>True while the book is on screen.</summary>
         public bool IsOpen => _root != null && _root.activeSelf;
@@ -196,6 +197,7 @@ namespace PetShop.UI
             _openedFrame = Time.frameCount;
             ShowPage(OverviewTab);
             _game?.SetModalOpen(true);
+            if (!_holdsPause) { _holdsPause = true; GamePause.Acquire(); }
         }
 
         /// <summary>Closes the book and restarts the clock.</summary>
@@ -204,6 +206,7 @@ namespace PetShop.UI
             if (_root == null) return;
             _root.SetActive(false);
             _game?.SetModalOpen(false);
+            if (_holdsPause) { _holdsPause = false; GamePause.Release(); }
         }
 
         /// <summary>Opens the book when closed, closes it when open.</summary>

@@ -211,7 +211,7 @@ namespace PetShop.Shop
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
-                if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+                if (!yard.Contains(check) || grid.TryGetObject(check, out _) || grid.CoveredByFree(check)) return false;
             }
             return true;
         }
@@ -231,7 +231,7 @@ namespace PetShop.Shop
             for (int y = 0; y < size.y; y++)
             {
                 var check = cell + new Vector2Int(x, y);
-                if (!yard.Contains(check) || grid.TryGetObject(check, out _)) return false;
+                if (!yard.Contains(check) || grid.TryGetObject(check, out _) || grid.CoveredByFree(check)) return false;
                 if (IsDoorwayCell(check) && !IsRoomWallCell(check)) return false;
             }
             return true;

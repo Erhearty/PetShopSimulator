@@ -37,12 +37,8 @@ namespace PetShop.Localization.Strings
             Add("item.wound_gel.name", "Wound Gel", "Гель для ран");
 
             // Shelves and deliveries
-            Add("shelf.tag.empty", "{0}\n<size=70%>empty — press {1}</size>", "{0}\n<size=70%>порожньо — натисніть {1}</size>");
-            Add("shelf.tag.stock", "{0}   {1}\n<size=75%>{2} / {3} in stock</size>", "{0}   {1}\n<size=75%>{2} / {3} в наявності</size>");
             Add("shelf.describe.empty", "{0} shelf — empty", "Полиця «{0}» — порожня");
             Add("shelf.describe.title", "{0} shelf", "Полиця «{0}»");
-            Add("crate.label.furniture", "furniture: {0}\n<size=75%>[{1}] to unpack</size>", "меблі: {0}\n<size=75%>[{1}] — розпакувати</size>");
-            Add("crate.label.stock", "delivery: {0}\n<size=75%>{1} units  ·  [{2}] to collect</size>", "доставка: {0}\n<size=75%>{1} од.  ·  [{2}] — забрати</size>");
             Add("crate.prompt.furniture", "[{0}]  Unpack the {1} into your furniture inventory", "[{0}]  Розпакувати «{1}» до запасу меблів");
             Add("crate.prompt.stock", "[{0}]  Collect {1} {2} units from the delivery", "[{0}]  Забрати з доставки {1} од. ({2})");
 

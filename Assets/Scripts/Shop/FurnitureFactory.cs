@@ -13,6 +13,9 @@ namespace PetShop.Shop
     {
         public const string ShelfSmall = "shelf_small";
         public const string ShelfLarge = "shelf_large";
+        public const string ShelfToys        = "shelf_toys";
+        public const string ShelfAccessories = "shelf_accessories";
+        public const string ShelfMedicine    = "shelf_medicine";
         public const string PetPen     = "pet_pen";
         public const string Counter    = "counter";
         public const string Wall       = "wall";
@@ -53,6 +56,23 @@ namespace PetShop.Shop
         /// <summary>Stalls in every pen: the most pets one pen holds.</summary>
         public const int PenCapacity = 4;
 
+        /// <summary>Side of a normal pen's footprint, in cells.</summary>
+        public const int PenFootprintCells = 2;
+
+        /// <summary>Side of the deer pen's footprint, in cells: room for a pen of twice the area.</summary>
+        public const int DeerPenFootprintCells = 3;
+
+        /// <summary>Footprint of the pen for <paramref name="species"/>: the deer pen is the big one.</summary>
+        public static Vector2Int PenFootprintFor(Pet.Species species)
+        {
+            int side = species == Pet.Species.Deer ? DeerPenFootprintCells : PenFootprintCells;
+            return new Vector2Int(side, side);
+        }
+
+        /// <summary>Linear scale of a pen's fence and floor: 1, or sqrt(2) for the deer pen so its area doubles.</summary>
+        public static float PenSideScale(Pet.Species species) =>
+            species == Pet.Species.Deer ? Mathf.Sqrt(2f) : 1f;
+
         /// <summary>Species of the legacy <c>pet_pen</c> when its variant names none.</summary>
         public const Pet.Species DefaultLegacyPenSpecies = Pet.Species.Rabbit;
 
@@ -70,7 +90,6 @@ namespace PetShop.Shop
         {
             [Pet.Species.Dog]     = new Color(0.62f, 0.45f, 0.28f),
             [Pet.Species.Cat]     = new Color(0.72f, 0.42f, 0.55f),
-            [Pet.Species.Fox]     = new Color(0.85f, 0.48f, 0.20f),
             [Pet.Species.Chicken] = new Color(0.90f, 0.80f, 0.42f),
             [Pet.Species.Penguin] = new Color(0.78f, 0.88f, 0.95f),
             [Pet.Species.Deer]    = new Color(0.40f, 0.58f, 0.30f),
@@ -91,6 +110,24 @@ namespace PetShop.Shop
                 Id = ShelfLarge, DisplayName = "Large Shelf", Type = "shelf",
                 Description = "A wide shelf with room for more stock per line.",
                 Size = new Vector2Int(2, 1), Cost = 210f, Tint = new Color(0.50f, 0.35f, 0.18f)
+            },
+            [ShelfToys] = new PlacedObjectData
+            {
+                Id = ShelfToys, DisplayName = "Toy Shelf", Type = "shelf",
+                Description = "A shelf for pet toys.",
+                Size = new Vector2Int(1, 1), Cost = 140f, Tint = new Color(0.85f, 0.45f, 0.30f)
+            },
+            [ShelfAccessories] = new PlacedObjectData
+            {
+                Id = ShelfAccessories, DisplayName = "Accessory Shelf", Type = "shelf",
+                Description = "A shelf for collars, leads and other accessories.",
+                Size = new Vector2Int(1, 1), Cost = 140f, Tint = new Color(0.35f, 0.50f, 0.80f)
+            },
+            [ShelfMedicine] = new PlacedObjectData
+            {
+                Id = ShelfMedicine, DisplayName = "Medicine Shelf", Type = "shelf",
+                Description = "A shelf for pet medicine.",
+                Size = new Vector2Int(1, 1), Cost = 140f, Tint = new Color(0.40f, 0.72f, 0.55f)
             },
             // Legacy species-picked pen: still loadable from old saves, no longer sold.
             [PetPen] = new PlacedObjectData
@@ -165,7 +202,7 @@ namespace PetShop.Shop
             Id = PenIdFor(species), DisplayName = $"{species} Pen", Type = PenType, PenSpecies = species,
             Category = BuildCategory.Furniture,
             Description = $"Four stalls for {species}s. Ships with a breeding pair of adult {species}s.",
-            Size = new Vector2Int(2, 2),
+            Size = PenFootprintFor(species),
             Cost = PenBaseCost + PenStarterPairSize * Pet.WholesalePrice(species),
             Tint = PenBeddingTints.TryGetValue(species, out var tint) ? tint : Color.white,
         };
@@ -176,6 +213,12 @@ namespace PetShop.Shop
             Id = id, DisplayName = name, Type = DecorationType, Category = BuildCategory.Decoration,
             Description = description, Size = new Vector2Int(width, depth), Cost = cost,
         };
+
+        /// <summary>The product category a dedicated shelf id stocks (toys, accessories, medicine), else null.</summary>
+        public static ProductCategory? ShelfCategoryFor(string id) =>
+            id == ShelfToys        ? ProductCategory.Toy :
+            id == ShelfAccessories ? ProductCategory.Accessory :
+            id == ShelfMedicine    ? ProductCategory.Medicine : (ProductCategory?)null;
 
         /// <summary>Catalogue entries that are building fabric rather than furniture.</summary>
         public static bool IsBuildingPiece(string id) =>
@@ -241,6 +284,34 @@ namespace PetShop.Shop
             return go;
         }
 
+        /// <summary>
+        /// Instantiate the baked prefab for a catalogue entry at an exact world position and yaw, off the
+        /// grid. Same object as <see cref="Spawn"/> makes, just not snapped to a cell.
+        /// </summary>
+        public static GameObject SpawnFree(PlacedObjectData def, Vector3 position, string variant,
+                                           Transform parent, float yRotation)
+        {
+            if (def == null) return null;
+
+            GameObject prefab = Prefabs != null ? Prefabs.Get(def.Id) : null;
+            if (prefab == null)
+            {
+                Debug.LogError($"[FurnitureFactory] No baked prefab for '{def.Id}'. " +
+                               "Assign a FurniturePrefabs catalogue to ShopLayout.FurniturePrefabs.");
+                return null;
+            }
+
+            GameObject go = Object.Instantiate(prefab, parent, false);
+            bool decor = def.Category == BuildCategory.Decoration;
+            if (!decor) AddBehaviour(go, def, variant);
+
+            go.name = $"Placed_{def.Id}_{position.x:0.##}_{position.z:0.##}";
+            go.transform.position    = new Vector3(position.x, 0f, position.z);
+            go.transform.eulerAngles = new Vector3(0f, yRotation, 0f);
+            MeshBuilder.SetLayerRecursive(go, decor ? DecorationLayer : GameLayers.Furniture);
+            return go;
+        }
+
         private static void AddBehaviour(GameObject go, PlacedObjectData def, string variant)
         {
             switch (def.Type)
@@ -249,8 +320,46 @@ namespace PetShop.Shop
                 case BuildCatalog.PenType: ConfigurePen(go, def, variant); break;
                 case "counter":
                     if (go.GetComponent<CounterInteractable>() == null) go.AddComponent<CounterInteractable>();
+                    AddGuideBook(go);
                     break;
             }
+        }
+
+        /// <summary>Name of the counter prefab's books child.</summary>
+        private const string BooksName = "books";
+
+        /// <summary>
+        /// Gives the counter's books child a collider fitted to its meshes and a
+        /// <see cref="GuideBookInteractable"/>, so interacting with the books opens the guide.
+        /// </summary>
+        private static void AddGuideBook(GameObject counter)
+        {
+            Transform books = null;
+            foreach (var t in counter.GetComponentsInChildren<Transform>(true))
+                if (t.name == BooksName) { books = t; break; }
+            if (books == null || books.GetComponent<GuideBookInteractable>() != null) return;
+
+            bool any = false;
+            Bounds fitted = default;
+            foreach (var mf in books.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue;
+                Matrix4x4 toBooks = books.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                Bounds b = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = b.center + Vector3.Scale(b.extents,
+                        new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f));
+                    Vector3 p = toBooks.MultiplyPoint3x4(corner);
+                    if (!any) { fitted = new Bounds(p, Vector3.zero); any = true; }
+                    else fitted.Encapsulate(p);
+                }
+            }
+
+            var box = books.gameObject.AddComponent<BoxCollider>();
+            if (any) { box.center = fitted.center; box.size = fitted.size; }
+            else     { box.center = Vector3.up * 0.1f; box.size = new Vector3(0.4f, 0.2f, 0.3f); }
+            books.gameObject.AddComponent<GuideBookInteractable>();
         }
 
         private static void ConfigureShelf(GameObject go, PlacedObjectData def, string variant)
@@ -264,7 +373,16 @@ namespace PetShop.Shop
             unit.TwoShelves  = true;
             unit.MaxLines    = 3;
             unit.MaxPerLine  = def.Size.x >= 2 ? 6 : 4;
-            unit.Category    = ParseEnum(variant, ProductCategory.Food);
+            unit.Category    = ParseEnum(variant, BuildCatalog.ShelfCategoryFor(def.Id) ?? ProductCategory.Food);
+            if (BuildCatalog.ShelfCategoryFor(def.Id).HasValue) TintShelf(go, def);
+        }
+
+        /// <summary>Recolours a category shelf's renderers with the entry's tint so it reads apart from the plain shelf.</summary>
+        private static void TintShelf(GameObject go, PlacedObjectData def)
+        {
+            var mat = MaterialFactory.Get($"shelf_{def.Id}", def.Tint, 0f, 0.2f);
+            if (mat == null) return;
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = mat;
         }
 
         /// <summary>
@@ -275,10 +393,24 @@ namespace PetShop.Shop
         {
             var pen = go.GetComponent<PetPen>();
             if (pen == null) pen = go.AddComponent<PetPen>();
-            pen.PenSize    = def.Size.x * GridManager.CellSize * 0.86f;
-            pen.Capacity   = BuildCatalog.PenCapacity;
             pen.PenSpecies = BuildCatalog.PenSpecies(def.Id, variant);
+            pen.Capacity   = BuildCatalog.PenCapacity;
+            // The pen's side is its normal footprint's, times sqrt(2) for deer (twice the area); the deer
+            // footprint (3 cells) is wider than that, so the bigger pen never overlaps its neighbours.
+            float sideScale = BuildCatalog.PenSideScale(pen.PenSpecies);
+            pen.PenSize = BuildCatalog.PenFootprintCells * GridManager.CellSize * 0.86f * sideScale;
+            if (sideScale > 1f) ScalePrefabParts(go.transform, sideScale);
             if (def.Id != BuildCatalog.PetPen) ApplyPenBedding(go, def);
+        }
+
+        /// <summary>Grows the baked pen parts (floor, fences, posts) about the pen's centre by <paramref name="scale"/>.</summary>
+        private static void ScalePrefabParts(Transform root, float scale)
+        {
+            foreach (Transform child in root)
+            {
+                child.localPosition *= scale;
+                child.localScale    *= scale;
+            }
         }
 
         /// <summary>Name of the pen prefab's floor child, recoloured as each species' bedding.</summary>

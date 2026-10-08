@@ -16,7 +16,7 @@ namespace PetShop.Shop
         /// <summary>
         /// True when <paramref name="def"/> is a counter rooted at <paramref name="cell"/> with footprint
         /// <paramref name="size"/>, turned <paramref name="yaw"/> degrees, whose row (or column) of cells
-        /// directly behind its back face — opposite its customer side, which is the prefab's +Z — has any
+        /// directly behind its back face — opposite its customer side, which is the prefab's -Z — has any
         /// cell on the room's wall ring, occupied, or off the floor. False for everything else.
         /// </summary>
         private bool BlocksCashier(PlacedObjectData def, Vector2Int cell, Vector2Int size, float yaw)
@@ -42,18 +42,18 @@ namespace PetShop.Shop
         }
 
         /// <summary>
-        /// The grid step an item's customer side (+Z in its prefab) faces once turned <paramref name="yaw"/>
-        /// degrees, rounded to the nearest quarter turn: 0° → +Y, 90° → +X, 180° → −Y, 270° → −X.
+        /// The grid step a counter's customer side (-Z in its prefab) faces once turned <paramref name="yaw"/>
+        /// degrees, rounded to the nearest quarter turn: 0° → −Y, 90° → −X, 180° → +Y, 270° → +X.
         /// </summary>
         private static Vector2Int FacingStep(float yaw)
         {
             int quarters = Mathf.RoundToInt(Mathf.Repeat(yaw, FullTurn) / QuarterTurn) % QuartersPerTurn;
             return quarters switch
             {
-                1 => Vector2Int.right,
-                2 => Vector2Int.down,
-                3 => Vector2Int.left,
-                _ => Vector2Int.up,
+                1 => Vector2Int.left,
+                2 => Vector2Int.up,
+                3 => Vector2Int.right,
+                _ => Vector2Int.down,
             };
         }
     }

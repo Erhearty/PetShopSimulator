@@ -21,12 +21,7 @@ namespace PetShop.Commerce
 
         /// <summary>Edge of one furniture crate, in metres — bigger than a stock box.</summary>
         private const float FurnitureCrateSize = 0.9f;
-        private const float LabelHeight        = 1.32f;
-        private const float LabelFontSize      = 0.09f;
-        private const float LabelWidth         = 1.7f;
         private static readonly Color CrateColour = new Color(0.66f, 0.49f, 0.29f);
-
-        private WorldLabel _label;
 
         /// <summary>The furniture order this crate carries, or null for a stock pallet.</summary>
         public FurnitureOrder FurnitureOrder { get; private set; }
@@ -39,12 +34,12 @@ namespace PetShop.Commerce
             IsFurniture ? BuildCatalog.Get(FurnitureOrder.CatalogId)?.DisplayName ?? FurnitureOrder.CatalogId : null;
 
         /// <summary>
-        /// <see cref="FurnitureName"/> in the current language, for the label and prompt only; null for a stock pallet.
+        /// <see cref="FurnitureName"/> in the current language, for the prompt only; null for a stock pallet.
         /// </summary>
         public string LocalizedFurnitureName =>
             IsFurniture ? BuildCatalog.Get(FurnitureOrder.CatalogId)?.LocalizedName ?? FurnitureName : null;
 
-        /// <summary>Builds a crate stack sized to the order and labels it.</summary>
+        /// <summary>Builds a crate stack sized to the order.</summary>
         public static DeliveryCrate Spawn(Vector3 position, ProductCategory category, int units)
         {
             var root = new GameObject($"Delivery_{category}");
@@ -68,7 +63,6 @@ namespace PetShop.Commerce
                 box.transform.localEulerAngles = new Vector3(0f, Random.Range(-9f, 9f), 0f);
             }
 
-            crate.AttachLabel();
             SetLayerRecursive(root, GameLayers.Furniture);
             return crate;
         }
@@ -91,7 +85,6 @@ namespace PetShop.Commerce
             var box = MeshBuilder.CreateBox(FurnitureCrateSize, FurnitureCrateSize, FurnitureCrateSize, mat, "Crate");
             box.transform.SetParent(root.transform, false);
 
-            crate.AttachLabel();
             SetLayerRecursive(root, GameLayers.Furniture);
             return crate;
         }
@@ -109,19 +102,6 @@ namespace PetShop.Commerce
                     t.gameObject.AddComponent<BoxCollider>();
             }
         }
-
-        private void AttachLabel()
-        {
-            _label = WorldLabel.Create(transform, new Vector3(0f, LabelHeight, 0f),
-                                       "", LabelFontSize, UIFactory.Accent, width: LabelWidth);
-            RefreshLabel();
-        }
-
-        private void RefreshLabel() =>
-            _label?.SetText(IsFurniture
-                ? Localization.Loc.F("crate.label.furniture", LocalizedFurnitureName, InputBindings.Label(GameAction.Interact))
-                : Localization.Loc.F("crate.label.stock", Localization.LocNames.Category(Category), Units,
-                                     InputBindings.Label(GameAction.Interact)));
 
         /// <summary>Moves the load into the stockroom and clears the forecourt. A furniture crate is left alone.</summary>
         public int Collect(ShopManager shop)

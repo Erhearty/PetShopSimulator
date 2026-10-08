@@ -119,24 +119,24 @@ namespace PetShop.Tests
             var interaction = player.GetComponent<InteractionSystem>();
             Assert.IsNotNull(interaction, "The player has no InteractionSystem.");
 
-            Vector3 forward = Flat(counter.transform.forward).normalized;
+            Vector3 forward = -Flat(counter.transform.forward).normalized;
             var cc = player.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
-            player.SetPositionAndRotation(Flat(counter.transform.position) - forward * distance,
+            player.SetPositionAndRotation(Flat(counter.transform.position) - forward * distance, // cashier side: counter +Z
                                           Quaternion.LookRotation(forward, Vector3.up));
             if (cc != null) cc.enabled = true;
             Physics.SyncTransforms();
             return interaction;
         }
 
-        /// <summary>The front-of-line spot lies outside the counter, on its customer (+forward) side.</summary>
+        /// <summary>The front-of-line spot lies outside the counter, on its customer (-forward) side.</summary>
         private static void AssertClearOfCounter(GameObject counter, Vector3 spot)
         {
             Vector3 body = spot + Vector3.up * BodyHeight;
             foreach (var col in counter.GetComponentsInChildren<Collider>())
                 Assert.IsFalse(col.bounds.Contains(body), $"The till spot {spot} is inside the counter.");
             float ahead = Vector3.Dot(Flat(spot - counter.transform.position), counter.transform.forward);
-            Assert.Greater(ahead, 0f, "The till spot is behind the counter, not on its customer side.");
+            Assert.Less(ahead, 0f, "The till spot is behind the counter, not on its customer side.");
         }
 
         private static Vector3 Flat(Vector3 v) => new(v.x, 0f, v.z);

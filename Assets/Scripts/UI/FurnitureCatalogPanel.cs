@@ -28,8 +28,8 @@ namespace PetShop.UI
         private const KeyCode NextPageKey = KeyCode.PageDown;
         private const KeyCode PrevPageKey = KeyCode.PageUp;
 
-        private static readonly BuildCategory[] Tabs =
-            (BuildCategory[])System.Enum.GetValues(typeof(BuildCategory));
+        /// <summary>The tabs shown; building pieces (<see cref="BuildCategory.Structure"/>) are laid with the build toolbar, not ordered here.</summary>
+        private static readonly BuildCategory[] Tabs = { BuildCategory.Furniture, BuildCategory.Decoration };
 
         private sealed class Row
         {
@@ -138,7 +138,7 @@ namespace PetShop.UI
         public void Open(string focusId)
         {
             var def = BuildCatalog.Get(focusId);
-            if (def != null)
+            if (def != null && System.Array.IndexOf(Tabs, def.Category) >= 0)
             {
                 Tab  = def.Category;
                 Page = Mathf.Max(0, ItemsIn(Tab).IndexOf(def)) / ItemsPerPage;

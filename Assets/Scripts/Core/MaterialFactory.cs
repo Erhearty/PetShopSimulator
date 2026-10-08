@@ -160,7 +160,6 @@ namespace PetShop.Core
             Pets.Pet.Species.Hamster => Get("pet_hamster", new Color(0.88f, 0.70f, 0.45f), 0f,    0.3f),
             Pets.Pet.Species.Parrot  => Get("pet_parrot",  new Color(0.30f, 0.75f, 0.35f), 0f,    0.4f),
             Pets.Pet.Species.Fish    => Get("pet_fish",    new Color(0.25f, 0.55f, 0.90f), 0.05f, 0.7f),
-            Pets.Pet.Species.Fox     => Get("pet_fox",     new Color(0.88f, 0.45f, 0.18f), 0f,    0.3f),
             Pets.Pet.Species.Chicken => Get("pet_chicken", new Color(0.95f, 0.92f, 0.86f), 0f,    0.3f),
             Pets.Pet.Species.Penguin => Get("pet_penguin", new Color(0.18f, 0.20f, 0.24f), 0f,    0.3f),
             Pets.Pet.Species.Deer    => Get("pet_deer",    new Color(0.72f, 0.55f, 0.36f), 0f,    0.3f),

@@ -31,6 +31,7 @@ namespace PetShop.Shop
             if (string.IsNullOrEmpty(id)) return null;
             foreach (var e in Entries)
                 if (e.Id == id) return e.Prefab;
+            if (BuildCatalog.ShelfCategoryFor(id).HasValue) return Get(BuildCatalog.ShelfSmall);
             return id.StartsWith(BuildCatalog.SpeciesPenPrefix) ? Get(BuildCatalog.PetPen) : null;
         }
     }

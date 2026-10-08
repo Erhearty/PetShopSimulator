@@ -19,6 +19,12 @@ namespace PetShop.Shop
         private readonly Dictionary<Vector2Int, GridEntry> _grid       = new();
         private readonly HashSet<Vector2Int>               _floorCells = new();
 
+        /// <summary>Freely placed pieces (any position and yaw): they hold no cells, so they never block the grid.</summary>
+        private readonly List<GridEntry> _free = new();
+
+        /// <summary>The freely placed pieces, in placement order.</summary>
+        public IReadOnlyList<GridEntry> FreePieces => _free;
+
         // ── Coordinate conversion ───────────────────────────────────────────────
 
         public Vector2Int WorldToGrid(Vector3 worldPos) => new(
@@ -67,6 +73,7 @@ namespace PetShop.Shop
             var result = new List<GridEntry>();
             foreach (var entry in _grid.Values)
                 if (seen.Add(entry.Root)) result.Add(entry);
+            result.AddRange(_free);
             return result;
         }
 
@@ -81,6 +88,41 @@ namespace PetShop.Shop
                 _grid[cell + new Vector2Int(x, y)] = entry;
             OnObjectPlaced.Invoke(cell, data);
             return true;
+        }
+
+        /// <summary>
+        /// Registers a piece standing at an exact world position and yaw. It occupies no grid cells; its
+        /// <see cref="GridEntry.Root"/> is the cell its centre lies in.
+        /// </summary>
+        public GridEntry PlaceFree(PlacedObjectData data, Vector3 position, float yaw)
+        {
+            position.y = 0f;
+            var entry = new GridEntry(WorldToGrid(position), data, data.Size)
+                { IsFree = true, Position = position, Yaw = yaw };
+            _free.Add(entry);
+            OnObjectPlaced.Invoke(entry.Root, data);
+            return entry;
+        }
+
+        public bool RemoveFree(GridEntry entry)
+        {
+            if (entry == null || !_free.Remove(entry)) return false;
+            OnObjectRemoved.Invoke(entry.Root);
+            return true;
+        }
+
+        /// <summary>
+        /// True when a freely placed piece's footprint covers <paramref name="cell"/>. Thin building pieces
+        /// (walls, fences) do not count: they are kept apart from other pieces by the physics overlap check.
+        /// </summary>
+        public bool CoveredByFree(Vector2Int cell)
+        {
+            foreach (var piece in _free)
+            {
+                if (piece.Data != null && BuildCatalog.IsBuildingPiece(piece.Data.Id)) continue;
+                if (BuildMode.FreeCells(piece.Position, piece.Yaw, piece.Size).Contains(cell)) return true;
+            }
+            return false;
         }
 
         public bool RemoveObject(Vector2Int cell)
@@ -98,6 +140,7 @@ namespace PetShop.Shop
         public void ClearAll()
         {
             _grid.Clear();
+            _free.Clear();
         }
 
         public void SetFloor(Vector2Int cell, bool value)
@@ -185,6 +228,13 @@ namespace PetShop.Shop
         public Vector2Int       Size;
         public GameObject       Instance;   // set by whoever spawned the visual
         public string           Variant;    // shelf category / pen species
+
+        /// <summary>True for a piece placed at a free position and yaw rather than on grid cells.</summary>
+        public bool             IsFree;
+        /// <summary>World position of a free piece's centre (floor level).</summary>
+        public Vector3          Position;
+        /// <summary>Yaw of a free piece in degrees.</summary>
+        public float            Yaw;
 
         public GridEntry(Vector2Int root, PlacedObjectData data, Vector2Int size)
         { Root = root; Data = data; Size = size; }

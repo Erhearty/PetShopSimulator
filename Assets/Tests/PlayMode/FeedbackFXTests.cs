@@ -42,16 +42,14 @@ namespace PetShop.Tests
             for (float t = 0f; t < seconds; t += Step) _fx.Tick(Step);
         }
 
-        /// <summary>A sale shows exactly one floating label and a coin burst, and both clean up.</summary>
+        /// <summary>A sale throws a coin burst (no floating text) and it cleans up.</summary>
         [Test]
-        public void Sale_SpawnsOneTextAndCoinBurst_ThenCleansUp()
+        public void Sale_SpawnsCoinBurst_ThenCleansUp()
         {
             _fx.PlaySale(Vector3.zero, SaleValue);
-            Assert.AreEqual(1, _fx.ActiveTextCount);
             Assert.AreEqual(FeedbackFX.CoinBurst, _fx.Coins.particleCount);
+            Assert.AreEqual(0, _host.GetComponentsInChildren<WorldLabel>(true).Length);
 
-            StepFor(FeedbackFX.TextLifetime + Step);
-            Assert.AreEqual(0, _fx.ActiveTextCount);
             _fx.Coins.Simulate(FeedbackFX.CoinLifetime + Step, true, false);
             Assert.AreEqual(0, _fx.Coins.particleCount);
         }

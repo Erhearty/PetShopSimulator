@@ -18,6 +18,8 @@ namespace PetShop.Shop
         private const float HalfExtent       = 0.5f;
         /// <summary>Thickness of the Remove tool's red cell highlight.</summary>
         private const float RemoveGhostHeight = 0.1f;
+        /// <summary>Depth of the Remove highlight over a thin wall piece, as a share of a cell.</summary>
+        private const float RemoveThinDepth = 0.4f;
 
         private GameObject _ghost;
         private Material   _ghostMat;
@@ -92,7 +94,18 @@ namespace PetShop.Shop
         /// <summary>Covers the whole footprint of the piece under the cursor, or just the cell when empty.</summary>
         private void UpdateRemoveGhost()
         {
-            if (_ghost == null || !TryAimRay(out var ray) || !TryAimCell(ray, out _hoverCell)) return;
+            if (_ghost == null || !TryAimRay(out var ray)) return;
+            if (TryFreePieceAlongRay(ray, out var freePiece))
+            {
+                _hoverCell  = freePiece.Root;
+                _hoverValid = true;
+                _ghost.transform.position   = freePiece.Position + Vector3.up * _ghostLift;
+                _ghost.transform.rotation   = Quaternion.Euler(0f, freePiece.Yaw, 0f);
+                bool thin = freePiece.Data != null && BuildCatalog.IsBuildingPiece(freePiece.Data.Id);
+                _ghost.transform.localScale = new Vector3(freePiece.Size.x, 1f, thin ? RemoveThinDepth : freePiece.Size.y);
+                return;
+            }
+            if (!TryAimCell(ray, out _hoverCell)) return;
 
             Vector2Int root = _hoverCell, size = Vector2Int.one;
             _hoverValid = GridManager.TryGetObject(_hoverCell, out var entry);
@@ -113,6 +126,7 @@ namespace PetShop.Shop
         private void UpdateGhost()
         {
             if (_ghost == null || !RaycastFloor(out var worldPos)) return;
+            if (IsFreeItem(CurrentItem)) { UpdateFreeGhost(worldPos); return; }
 
             _hoverCell = GridManager.WorldToGrid(worldPos);
             Vector2Int size = ActiveFootprint;

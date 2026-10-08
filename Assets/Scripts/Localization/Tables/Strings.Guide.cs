@@ -18,8 +18,8 @@ namespace PetShop.Localization.Strings
             Add("guide.page", "Page {0} of {1}", "Сторінка {0} з {1}");
 
             // Shop book Guide page. {0} the guide key.
-            Add("guide.book.intro", "Press {0} at any time to open it. It covers:",
-                                    "Натисніть {0} будь-коли, щоб відкрити його. Тут описано:");
+            Add("guide.book.intro", "Press {0} at any time to open it, or interact with the guide book on the counter. It covers:",
+                                    "Натисніть {0} будь-коли, щоб відкрити його, або взаємодійте з довідником на прилавку. Тут описано:");
             Add("guide.book.open", "Open the guide", "Відкрити довідник");
 
             // {0} the interact key.
@@ -72,45 +72,30 @@ namespace PetShop.Localization.Strings
                 "you order it and arrives as a crate on the forecourt; unpack it with " +
                 "{1}.\n\nPieces you own sit in the inventory bar. Press 1-9 to pick one up, " +
                 "click to place it, and rotate with {2}. Middle-click or " +
-                "{3} removes a piece, and Esc cancels.",
+                "{3} removes a piece, and Esc cancels.\n\nBuilding is free-form: there is no grid, so walls, doorways and fences " +
+                "go wherever you aim and can be turned to any angle. The shop starts walled in, " +
+                "with closed corners; change the walls with the build view tools.",
                 "Відкрийте Книгу обліку клавішею {0} і перейдіть на сторінку «Будівництво». Меблі " +
                 "оплачуються під час замовлення й прибувають ящиком на майданчик; розпакуйте його " +
                 "клавішею {1}.\n\nВаші меблі лежать на панелі інвентарю. Натисніть 1-9, щоб узяти предмет, " +
                 "клацніть, щоб поставити його, і обертайте клавішами {2}. Клацання середньою кнопкою миші " +
-                "або {3} прибирає предмет, а Esc скасовує дію.");
-
-            // {0} the build-view key; {1}–{4} the Wall, Window wall, Doorway and Fence tool keys; {5} the Remove tool key.
-            Add("guide.walls.title", "Walls and structure", "Стіни та конструкції");
-            Add("guide.walls.body",
-                "Press {0} for the top-down build view. Its tool strip has " +
-                "Wall ({1}), Window wall ({2}), " +
-                "Doorway ({3}) and Fence ({4}). Walls are not " +
-                "delivered: each piece is charged when you place it.\n\nThe Remove tool " +
-                "({5}) takes pieces away again, including the shop's own room walls, " +
-                "so you can open up the floor.\n\nWalls and fences can be built anywhere in the yard, not just " +
-                "on the unlocked lot, so you can fence off the yard or put up outbuildings. The shop's back door " +
-                "leads out into the yard behind it; keep a doorway there if you want to walk out to your pens. " +
-                "Right-drag to orbit the view; Esc leaves it.",
-                "Натисніть {0}, щоб перейти до режиму будівництва з видом згори. На панелі інструментів є " +
-                "«Стіна» ({1}), «Стіна з вікном» ({2}), «Дверний отвір» ({3}) і «Паркан» ({4}). Стіни не " +
-                "доставляють: кожен елемент оплачується, щойно ви його ставите.\n\nІнструмент «Прибрати» " +
-                "({5}) знову забирає елементи, зокрема й стіни самої крамниці, тож ви можете розширити " +
-                "простір.\n\nСтіни й паркани можна зводити будь-де на подвір’ї, а не лише на відкритій " +
-                "ділянці, тож ви можете обгородити подвір’я чи звести господарські будівлі. Задні двері " +
-                "крамниці ведуть на подвір’я позаду неї; залиште там дверний отвір, якщо хочете виходити " +
-                "до своїх вольєрів. Тягніть правою кнопкою миші, щоб обертати огляд; Esc — вийти з режиму.");
+                "або {3} прибирає предмет, а Esc скасовує дію.\n\nБудівництво вільне: сітки немає, тож стіни, дверні " +
+                "отвори й паркани стають там, куди ви цілитеся, і їх можна повертати під будь-яким кутом. " +
+                "Крамниця починається обгородженою стінами, із закритими кутами; змінюйте стіни за допомогою інструментів режиму будівництва.");
 
             // {0} the interact key.
             Add("guide.animals.title", "Pens, buying, feeding and breeding", "Вольєри, купівля, годування та розведення");
             Add("guide.animals.body",
                 "Press {0} at a pen. If the animals need feeding or fresh bedding, that " +
                 "comes first and costs a small fee. Otherwise, if there is room, you buy a young animal from " +
-                "the breeder.\n\nTwo adults in a pen with space to spare may breed overnight. Plan pairings in " +
+                "the breeder. Click the plaque on a pen to open its info panel with the pets' names and prices, " +
+                "where you can also lock a pet so it is never sold.\n\nTwo adults in a pen with space to spare may breed overnight. Plan pairings in " +
                 "the breeding planner, follow bloodlines in the family tree and enter animals in the showcase, " +
                 "all from the Animals page of the Shop book.",
                 "Натисніть {0} біля вольєра. Якщо тваринам потрібен корм чи свіжа підстилка, спершу " +
                 "подбаєте про це за невелику плату. Інакше, якщо є місце, ви купите молоду тварину в " +
-                "заводчика.\n\nДві дорослі тварини у вольєрі з вільним місцем можуть дати потомство вночі. " +
+                "заводчика. Клацніть табличку на вольєрі, щоб відкрити його інфопанель з іменами та цінами тварин; там " +
+                "же можна заблокувати тварину, щоб її ніколи не продали.\n\nДві дорослі тварини у вольєрі з вільним місцем можуть дати потомство вночі. " +
                 "Плануйте пари в планувальнику розведення, стежте за лініями в родоводі й записуйте тварин " +
                 "на виставку — усе це зі сторінки «Тварини» в Книзі обліку.");
 
@@ -145,12 +130,12 @@ namespace PetShop.Localization.Strings
                 "Each day runs on a clock. Near closing time the doors stop letting new customers in. Press " +
                 "{0} to close up early whenever you like.\n\nOvernight, animals may breed, " +
                 "deliveries still on the road land, and rent and wages are paid. If the bills take your balance " +
-                "below zero, the shop closes for good, so keep an eye on tonight's bill in the Shop book.",
+                "below zero, the shop closes for good, so keep an eye on tonight's bill in the Shop book. The clock stops while the Shop book is open.",
                 "Кожен день іде за годинником. Ближче до закриття нових покупців уже не впускають. Натисніть " +
                 "{0}, щоб зачинитися раніше, коли забажаєте.\n\nУночі тварини можуть дати потомство, " +
                 "прибувають доставки, що були в дорозі, і сплачуються оренда та зарплати. Якщо після " +
                 "рахунків баланс стане від’ємним, крамниця закриється назавжди, тож стежте за вечірнім " +
-                "рахунком у Книзі обліку.");
+                "рахунком у Книзі обліку. Поки Книга обліку відкрита, годинник стоїть.");
 
             // {0} the quest journal key.
             Add("guide.quests.title", "Quests and the journal", "Завдання та журнал");
